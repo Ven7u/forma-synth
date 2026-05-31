@@ -1,7 +1,7 @@
 {
     "name": "Metal Zone",
     "category": "Lead",
-    "synth_model": "theSynth",
+    "synth_model": "forma",
     "osc_wave": [
         1,
         2,

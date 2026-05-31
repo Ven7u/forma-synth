@@ -1,7 +1,7 @@
 {
     "name": "Acid Rain",
     "category": "Lead",
-    "synth_model": "theSynth",
+    "synth_model": "forma",
     "osc_wave": [
         2,
         1,

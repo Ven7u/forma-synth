@@ -1,4 +1,4 @@
-//! `Patch` — serialisable snapshot of the synth's sound-generating parameters.
+//! `Patch` — serialisable snapshot of Forma's sound-generating parameters.
 //!
 //! Covers oscillator bank, noise, LFOs, filter, filter ADSR, amp ADSR, glide,
 //! master / global volume, limiter, and the entire FX chain. Excludes

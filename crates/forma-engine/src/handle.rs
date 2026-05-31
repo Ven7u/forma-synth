@@ -1,4 +1,4 @@
-//! SynthEngineHandle — the typed, clonable facade over the synth engine.
+//! EngineHandle — the typed, clonable facade over the synth engine.
 //!
 //! Two equivalent projections live on the handle:
 //!

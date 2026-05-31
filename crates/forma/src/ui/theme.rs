@@ -1,7 +1,7 @@
 use egui::Color32;
 use serde::{Deserialize, Serialize};
 
-/// A complete visual theme for The Synth.
+/// A complete visual theme for Forma.
 ///
 /// Organised in three layers:
 ///   1. Semantic backgrounds / borders / text  — used by SynthFrame and apply_to_egui

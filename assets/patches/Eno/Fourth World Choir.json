@@ -1,7 +1,7 @@
 {
     "name": "Fourth World Choir",
     "category": "Pad",
-    "synth_model": "theSynth",
+    "synth_model": "forma",
     "osc_wave": [
         0,
         0,

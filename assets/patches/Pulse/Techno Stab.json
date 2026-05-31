@@ -1,7 +1,7 @@
 {
     "name": "Techno Stab",
     "category": "Pulse",
-    "synth_model": "theSynth",
+    "synth_model": "forma",
     "osc_wave": [
         2,
         1,

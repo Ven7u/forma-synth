@@ -1,4 +1,4 @@
-//! The Synth — unified MiniMoog-style synthesizer
+//! Forma — unified MiniMoog-style synthesizer
 //! Run with: cargo run
 
 #![allow(clippy::precedence)]
@@ -31,12 +31,12 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 860.0])
-            .with_title("The Synth"),
+            .with_title("Forma"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "The Synth",
+        "Forma",
         options,
         Box::new(move |cc| {
             if let Some(wgpu_state) = cc.wgpu_render_state.as_ref() {
