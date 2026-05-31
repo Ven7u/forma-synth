@@ -1,0 +1,11 @@
+/dist
+/target
+/output
+*.wav
+.DS_Store
+
+# Runtime state files — machine/user-specific, not version controlled.
+# Shareable defaults live in midi_presets.rs and assets/patches/.
+forma-layout.json
+forma-midi-bindings.json
+forma-patch-history.json
