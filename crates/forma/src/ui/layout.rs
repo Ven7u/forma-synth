@@ -171,21 +171,10 @@ pub fn builtin_presets() -> Vec<LayoutPreset> {
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
-fn layout_path() -> std::path::PathBuf {
-    std::path::PathBuf::from("forma-layout.json")
-}
-
 pub fn save_layout(state: &LayoutState) {
-    if let Ok(json) = serde_json::to_string_pretty(state) {
-        let _ = std::fs::write(layout_path(), json);
-    }
+    crate::layout_store::save_current(state);
 }
 
 pub fn load_layout() -> LayoutState {
-    let path = layout_path();
-    if let Ok(json) = std::fs::read_to_string(&path) {
-        serde_json::from_str(&json).unwrap_or_default()
-    } else {
-        LayoutState::default()
-    }
+    crate::layout_store::load_current()
 }

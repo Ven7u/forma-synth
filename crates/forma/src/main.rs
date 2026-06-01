@@ -6,6 +6,7 @@
 mod audio;
 mod eq;
 mod history;
+mod layout_store;
 mod midi_mapping_store;
 mod midi_presets;
 mod patch;
@@ -460,6 +461,9 @@ pub(crate) struct SynthApp {
 
     // Mix-bus parametric EQ
     pub(crate) eq: Arc<Mutex<crate::eq::EqParams>>,
+
+    // Layout management
+    pub(crate) layout_save_name: String,
 }
 
 impl SynthApp {
@@ -783,6 +787,7 @@ impl SynthApp {
             midi_monitor: Vec::new(),
             midi_reconnect_tick: 0,
             eq,
+            layout_save_name: String::new(),
         }
     }
 }
@@ -1547,9 +1552,9 @@ impl SynthApp {
 // Main update
 // ---------------------------------------------------------------------------
 
-impl eframe::App for SynthApp {
-    fn on_exit(&mut self) {
-        let state = ui::layout::LayoutState {
+impl SynthApp {
+    pub(crate) fn capture_layout_state(&self) -> ui::layout::LayoutState {
+        ui::layout::LayoutState {
             theme_name: self.theme.name.clone(),
             panels: self.panels.to_state(),
             app_mode: self.app_mode,
@@ -1560,7 +1565,29 @@ impl eframe::App for SynthApp {
                 .midi
                 .connected_port
                 .and_then(|i| self.midi.port_names.get(i).cloned()),
-        };
+        }
+    }
+
+    pub(crate) fn apply_panel_visibility(&mut self, s: &ui::layout::PanelVisibilityState) {
+        self.panels = PanelVisibility::from_state(s);
+    }
+
+    pub(crate) fn apply_layout_state(&mut self, state: &ui::layout::LayoutState) {
+        self.panels = PanelVisibility::from_state(&state.panels);
+        self.app_mode = state.app_mode;
+        self.studio_tab = state.studio_tab;
+        if let Some(t) = ui::theme::builtin_themes()
+            .into_iter()
+            .find(|t| t.name == state.theme_name)
+        {
+            self.theme = t;
+        }
+    }
+}
+
+impl eframe::App for SynthApp {
+    fn on_exit(&mut self) {
+        let state = self.capture_layout_state();
         ui::layout::save_layout(&state);
         self.save_active_bindings();
     }

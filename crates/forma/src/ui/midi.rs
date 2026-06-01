@@ -110,6 +110,89 @@ impl SynthApp {
 
         ui.separator();
 
+        // ── Layouts ───────────────────────────────────────────────────────
+        ui.label(
+            egui::RichText::new("Layouts")
+                .small()
+                .strong()
+                .color(text_sec),
+        );
+
+        // Save current layout
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.layout_save_name)
+                    .hint_text("Layout name…")
+                    .desired_width(110.0)
+                    .font(egui::TextStyle::Small),
+            );
+            let can_save = !self.layout_save_name.trim().is_empty();
+            let save_btn = egui::Button::new(egui::RichText::new("Save").small());
+            if ui
+                .add_enabled(can_save, save_btn)
+                .on_hover_text("Save current layout under this name.")
+                .clicked()
+            {
+                let name = self.layout_save_name.trim().to_string();
+                let state = self.capture_layout_state();
+                crate::layout_store::save_named(&name, &state);
+            }
+        });
+
+        ui.add_space(2.0);
+
+        // Factory layouts
+        ui.label(egui::RichText::new("Factory").size(10.0).color(text_dis));
+        use crate::ui::layout::builtin_presets;
+        for preset in builtin_presets() {
+            ui.horizontal(|ui| {
+                let btn =
+                    egui::Button::new(egui::RichText::new(preset.name).small().color(accent));
+                if ui
+                    .add(btn)
+                    .on_hover_text(preset.description)
+                    .clicked()
+                {
+                    self.apply_panel_visibility(&preset.panels);
+                    let state = self.capture_layout_state();
+                    crate::ui::layout::save_layout(&state);
+                }
+            });
+        }
+
+        // User-saved layouts
+        let saved = crate::layout_store::list_user_layouts();
+        if !saved.is_empty() {
+            ui.add_space(2.0);
+            ui.label(egui::RichText::new("Saved").size(10.0).color(text_dis));
+            for name in saved {
+                ui.horizontal(|ui| {
+                    let btn =
+                        egui::Button::new(egui::RichText::new(&name).small().color(accent));
+                    if ui
+                        .add(btn)
+                        .on_hover_text(format!("Load layout \"{name}\""))
+                        .clicked()
+                    {
+                        if let Some(state) = crate::layout_store::load_named(&name) {
+                            self.apply_layout_state(&state);
+                        }
+                    }
+                    let del =
+                        egui::Button::new(egui::RichText::new("✕").size(10.0).color(text_dis));
+                    if ui
+                        .add(del)
+                        .on_hover_text(format!("Delete layout \"{name}\""))
+                        .clicked()
+                    {
+                        crate::layout_store::delete_named(&name);
+                    }
+                });
+            }
+        }
+
+        ui.separator();
+
         // ── MIDI Monitor ─────────────────────────────────────────────────
         ui.horizontal(|ui| {
             ui.label(
