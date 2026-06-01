@@ -6,6 +6,7 @@
 mod audio;
 mod eq;
 mod history;
+mod midi_mapping_store;
 mod midi_presets;
 mod patch;
 mod recorder;
@@ -496,6 +497,12 @@ impl SynthApp {
                 let _ = midi.connect(i);
             }
         }
+        // Load bindings for whichever device just connected (or the no-device fallback).
+        let initial_bindings = midi
+            .connected_port
+            .and_then(|i| midi.port_names.get(i))
+            .map(|name| midi_mapping_store::load_for_device(name))
+            .unwrap_or_else(midi_mapping_store::load_no_device);
 
         // Track 0 is the UI's active engine — existing UI code uses self.engine
         // which always points to the focused track's handle. Phase 2 will add
@@ -768,7 +775,7 @@ impl SynthApp {
             ab_slot_a: None,
             ab_slot_b: None,
             ab_active: 0,
-            midi_bindings: load_midi_bindings(),
+            midi_bindings: initial_bindings,
             midi_learn_open: false,
             midi_learn_param: None,
             midi_learn_filter: String::new(),
@@ -1319,35 +1326,23 @@ fn random_patch() -> Patch {
 }
 
 // ---------------------------------------------------------------------------
-// MIDI learn persistence helpers
+// MIDI binding persistence — delegated to midi_mapping_store
 // ---------------------------------------------------------------------------
 
-fn midi_bindings_path() -> std::path::PathBuf {
-    std::path::PathBuf::from("forma-midi-bindings.json")
-}
+impl SynthApp {
+    fn active_device_name(&self) -> Option<&str> {
+        self.midi
+            .connected_port
+            .and_then(|i| self.midi.port_names.get(i))
+            .map(|s| s.as_str())
+    }
 
-fn load_midi_bindings() -> std::collections::HashMap<u8, forma_control::ParamId> {
-    let path = midi_bindings_path();
-    if let Ok(json) = std::fs::read_to_string(&path) {
-        if let Ok(map) =
-            serde_json::from_str::<std::collections::HashMap<u8, forma_control::ParamId>>(&json)
-        {
-            return map;
+    pub(crate) fn save_active_bindings(&self) {
+        match self.active_device_name() {
+            Some(name) => midi_mapping_store::save_for_device(name, &self.midi_bindings),
+            None => midi_mapping_store::save_no_device(&self.midi_bindings),
         }
     }
-    std::collections::HashMap::new()
-}
-
-fn save_midi_bindings(bindings: &std::collections::HashMap<u8, forma_control::ParamId>) {
-    if let Ok(json) = serde_json::to_string_pretty(bindings) {
-        let _ = std::fs::write(midi_bindings_path(), json);
-    }
-}
-
-pub(crate) fn save_midi_bindings_pub(
-    bindings: &std::collections::HashMap<u8, forma_control::ParamId>,
-) {
-    save_midi_bindings(bindings);
 }
 
 // ---------------------------------------------------------------------------
@@ -1426,7 +1421,7 @@ impl SynthApp {
                     // MIDI learn: if we're waiting for a CC, bind it now.
                     if let Some(param_id) = self.midi_learn_param.take() {
                         self.midi_bindings.insert(cc, param_id);
-                        save_midi_bindings(&self.midi_bindings);
+                        self.save_active_bindings();
                     } else {
                         // Apply any learned binding for this CC.
                         if let Some(&param_id) = self.midi_bindings.get(&cc) {
@@ -1567,7 +1562,7 @@ impl eframe::App for SynthApp {
                 .and_then(|i| self.midi.port_names.get(i).cloned()),
         };
         ui::layout::save_layout(&state);
-        save_midi_bindings(&self.midi_bindings);
+        self.save_active_bindings();
     }
 
     fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -3121,7 +3116,7 @@ impl SynthApp {
                                 .clicked()
                             {
                                 self.midi_bindings.clear();
-                                save_midi_bindings(&self.midi_bindings);
+                                self.save_active_bindings();
                             }
                         });
                     });
@@ -3203,7 +3198,7 @@ impl SynthApp {
                                         .clicked()
                                     {
                                         self.midi_bindings.remove(&cc);
-                                        save_midi_bindings(&self.midi_bindings);
+                                        self.save_active_bindings();
                                     }
                                 } else {
                                     ui.label(egui::RichText::new("—").size(11.0).color(text_dis));

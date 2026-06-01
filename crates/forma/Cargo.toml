@@ -42,3 +42,4 @@ rfd         = "0.15"
 egui_dock   = "0.19"
 hound       = "3"
 image       = { version = "0.25", default-features = false, features = ["png"] }
+directories = "5"

@@ -10,10 +10,13 @@ pub struct KeyboardPreset {
     pub name: &'static str,
     pub description: &'static str,
     pub mappings: &'static [(u8, ParamId)],
+    /// Lowercase substrings matched against the connected device name.
+    pub device_patterns: &'static [&'static str],
 }
 
 // ── Arturia KeyLab MkIII ────────────────────────────────────────────────────
 //
+// TODO: midi mapping is still in progress, but the KeyLab MkIII is a good test case for presets since it has a large number of controls with a well-known factory mapping. The preset maps the encoders and faders to useful parameters, while leaving the transport buttons free for MIDI learn (e.g. to map patch browsing and history pinning to the wheel). The preset also includes detailed instructions in the description field.
 // Encoder row (Analog Lab V preset):
 //   Enc 1 = CC 74  Enc 2 = CC 71  Enc 3 = CC 76  Enc 4 = CC 77
 //   Enc 5 = CC 93  Enc 6 = CC 18  Enc 7 = CC 19  Enc 8 = CC 16
@@ -84,18 +87,32 @@ pub const PRESETS: &[KeyboardPreset] = &[
         name: "Arturia KeyLab MkIII",
         description: "9 encoders + 9 faders mapped to filter, LFO, FX, amp envelope and oscillator levels.\n\nPatch library (always active):\n  Wheel turn (CC 114) — browse all patches\n  Wheel press (CC 115) — pin current state to history\n  CC 60 — toggle favourite\n  CC 61 / 62 — prev / next favourite\n  CC 63 — randomize patch\n  Program Change — jump to patch by index",
         mappings: KEYLAB_MK3,
+        device_patterns: &["keylab mk3", "keylab mkiii", "keylab 3"],
     },
     KeyboardPreset {
         name: "Arturia MiniLab MkIII",
         description: "8 encoders mapped to filter, LFO, and FX. Uses Analog Lab V factory preset.",
         mappings: MINILAB_MK3,
+        device_patterns: &["minilab mk3", "minilab mkiii", "minilab 3"],
     },
     KeyboardPreset {
         name: "Generic",
         description: "Minimal mapping using standard CC numbers common to most keyboards.",
         mappings: GENERIC,
+        device_patterns: &[],
     },
 ];
+
+/// Return factory bindings for a device by matching its name against known patterns.
+/// Returns an empty map if no preset matches.
+pub fn bindings_for_device(device_name: &str) -> HashMap<u8, ParamId> {
+    let lower = device_name.to_lowercase();
+    PRESETS
+        .iter()
+        .find(|p| p.device_patterns.iter().any(|pat| lower.contains(pat)))
+        .map(preset_bindings)
+        .unwrap_or_default()
+}
 
 /// Build a `HashMap` from a preset's mapping slice.
 pub fn preset_bindings(preset: &KeyboardPreset) -> HashMap<u8, ParamId> {

@@ -48,8 +48,13 @@ impl SynthApp {
                         .clicked()
                         && !selected
                     {
-                        if let Err(e) = self.midi.connect(i) {
-                            eprintln!("MIDI connect error: {e}");
+                        match self.midi.connect(i) {
+                            Ok(()) => {
+                                let name = self.midi.port_names[i].clone();
+                                self.midi_bindings =
+                                    crate::midi_mapping_store::load_for_device(&name);
+                            }
+                            Err(e) => eprintln!("MIDI connect error: {e}"),
                         }
                     }
                 }
@@ -89,9 +94,8 @@ impl SynthApp {
             ui.horizontal(|ui| {
                 let btn = egui::Button::new(egui::RichText::new(preset.name).small().color(accent));
                 if ui.add(btn).on_hover_text(preset.description).clicked() {
-                    let bindings = midi_presets::preset_bindings(preset);
-                    self.midi_bindings = bindings;
-                    crate::save_midi_bindings_pub(&self.midi_bindings);
+                    self.midi_bindings = midi_presets::preset_bindings(preset);
+                    self.save_active_bindings();
                 }
             });
         }
