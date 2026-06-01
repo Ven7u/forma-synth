@@ -28,10 +28,18 @@ fn main() -> eframe::Result {
     let recorder_sink = Arc::new(Mutex::new(None));
     let audio = AudioEngine::new(Arc::clone(&recorder_sink)).expect("Failed to start audio");
 
+    let icon = {
+        let bytes = include_bytes!("../assets/icons/icon_512x512@2x.png");
+        let img = image::load_from_memory(bytes).expect("valid icon PNG").into_rgba8();
+        let (w, h) = img.dimensions();
+        egui::IconData { rgba: img.into_raw(), width: w, height: h }
+    };
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 860.0])
-            .with_title("Forma"),
+            .with_title("Forma")
+            .with_icon(icon),
         ..Default::default()
     };
 
