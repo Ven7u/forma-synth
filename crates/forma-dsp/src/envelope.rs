@@ -125,9 +125,20 @@ impl AudioNode for LiveAdsr {
                 self.progress += dt / d;
                 self.level = 1.0 - (1.0 - s) * self.progress.min(1.0);
                 if self.progress >= 1.0 {
-                    self.stage = AdsrStage::Sustain;
-                    self.progress = 0.0;
                     self.level = s;
+                    self.progress = 0.0;
+                    // Sustain ≈ 0 → one-shot: auto-release so the voice goes
+                    // silent and the slot is eventually freed, regardless of
+                    // whether the gate is still high. This prevents a held key
+                    // from silently occupying a voice slot forever on percussive
+                    // patches and protects against any patch (user or factory)
+                    // accidentally setting sustain to zero.
+                    if s < 0.001 {
+                        self.stage = AdsrStage::Release;
+                        self.start_level = 0.0;
+                    } else {
+                        self.stage = AdsrStage::Sustain;
+                    }
                 }
             }
             AdsrStage::Sustain => {
@@ -238,6 +249,40 @@ mod tests {
         // First sample of attack should be close to the release level (not a hard jump to 0)
         assert!(after_retrigger > release_level * 0.9,
             "retrigger should start smoothly from release level {release_level}, got {after_retrigger}");
+    }
+
+    /// Sustain = 0 triggers auto-release after decay (one-shot enforcement).
+    /// The envelope must reach zero and go idle even while the gate stays high.
+    #[test]
+    fn zero_sustain_auto_releases_while_gate_held() {
+        // Laser-style patch: very fast attack, short decay, sustain=0.
+        let mut adsr = make_adsr(0.001, 0.1, 0.0, 0.05);
+        let sr = 44100.0_f32;
+
+        // Hold gate high throughout — the envelope must self-release.
+        // Run through attack + decay (0.101 s).
+        let after_decay = run_gate(&mut adsr, 1.0, (sr * 0.15) as usize);
+        assert!(
+            after_decay < 0.01,
+            "level should be ~0 after decay with sustain=0 (got {after_decay})"
+        );
+
+        // Continue holding — after the auto-release time (0.05 s) elapses the
+        // envelope must be fully idle (level=0, cursor=0).
+        run_gate(&mut adsr, 1.0, (sr * 0.1) as usize);
+        assert!(
+            adsr.level < 0.001,
+            "level should be 0 after auto-release completes (got {})",
+            adsr.level
+        );
+
+        // Re-press (gate 1→0→1) must restart the attack cleanly.
+        run_gate(&mut adsr, 0.0, 10); // brief release
+        let peak = run_gate(&mut adsr, 1.0, (sr * 0.002) as usize); // 2 ms into attack
+        assert!(
+            peak > 0.1,
+            "re-press after one-shot should restart attack (got {peak})"
+        );
     }
 
     /// Envelope output must always be in [0.0, 1.0].

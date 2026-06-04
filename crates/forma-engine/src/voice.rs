@@ -118,6 +118,15 @@ impl VoiceAllocator {
     /// 1.0 when the countdown hits zero.
     #[inline]
     pub fn tick_sample(&mut self, state: &AudioState) {
+        if state
+            .silence_all_requested
+            .swap(false, Ordering::Relaxed)
+        {
+            for vi in 0..VOICE_COUNT {
+                self.retrigger_countdown[vi] = 0;
+            }
+            return;
+        }
         for vi in 0..VOICE_COUNT {
             if self.retrigger_countdown[vi] > 0 {
                 self.retrigger_countdown[vi] -= 1;
@@ -251,11 +260,13 @@ impl VoiceAllocator {
     ///
     /// - Increments the pitch's hold count.
     /// - Allocates (or reuses) a slot (existing-pitch → empty → round-robin steal).
-    /// - If the target slot is audibly playing (gate still high OR amp
-    ///   envelope not yet idle): forces gate=0 and starts a 4-sample
-    ///   countdown. The next `tick_sample` calls flip the gate back to 1.0,
-    ///   giving the ADSR a real 0→1 edge.
-    /// - Otherwise (fresh / silent slot): sets gate=1.0 immediately.
+    /// - Always forces gate=0 for a 4-sample countdown when the slot was
+    ///   previously allocated, giving the ADSR a guaranteed 0→1 edge.
+    ///   This covers: audible retriggers, silence_all_voices (gate zeroed
+    ///   atomically before drain_events runs — ADSR prev_gate still 1.0),
+    ///   and one-shot patches that left gate=1 while ADSR went idle.
+    /// - Only skips the countdown for truly fresh/freed slots (voice_notes=None)
+    ///   where the ADSR is confirmed idle with gate=0.
     fn trigger_note(&mut self, state: &AudioState, pitch: u8, velocity: u8) {
         let count = &mut self.pitch_hold_count[pitch as usize];
         *count = count.saturating_add(1);
@@ -272,25 +283,46 @@ impl VoiceAllocator {
                 s
             });
 
-        // Audible if the gate is still held, or the amp envelope hasn't gone
-        // idle yet (cursor > 0.5 means attack/decay/sustain/release — i.e.
-        // still producing sound). Amp_cursor encoding: 0=idle, 1.x=A, 2.x=D,
-        // 3=S, 4.x=R.
-        let audible =
-            state.voice_gates[slot].value() > 0.5 || state.amp_cursors[slot].value() > 0.5;
+        // If the slot was previously allocated (voice_notes = Some), the ADSR
+        // may still have prev_gate=1.0 even after silence_all_voices zeroed the
+        // gate atomically — drain_events runs before ADSR ticks, so the ADSR
+        // hasn't had a chance to observe the 0. A direct gate=1.0 would produce
+        // no rising edge (1→1), permanently silencing the voice.
+        // Always use the 4-sample countdown for allocated slots so the ADSR
+        // reliably sees a 0→1 edge regardless of timing.
+        let was_allocated = self.voice_notes[slot].is_some();
+        let gate_val = state.voice_gates[slot].value();
+        let amp_val  = state.amp_cursors[slot].value();
+        let needs_retrigger = was_allocated || gate_val > 0.5 || amp_val > 0.5;
+
+        eprintln!(
+            "[voice] NoteOn pitch={pitch} slot={slot} \
+             was_alloc={was_allocated} gate={gate_val:.2} amp={amp_val:.2} \
+             hold={} retrigger={needs_retrigger}",
+            self.pitch_hold_count[pitch as usize]
+        );
 
         self.voice_notes[slot] = Some(pitch);
         state.voice_freq_targets[slot].set(midi_hz(pitch as f64) as f32);
         state.voice_velocities[slot].set(velocity as f32 / 127.0);
 
-        if audible {
-            // Force a brief gap so the ADSR sees a real 0→1 edge.
+        if needs_retrigger {
             state.voice_gates[slot].set(0.0);
-            self.retrigger_countdown[slot] = 4; // ~90 µs at 44.1 kHz
+            self.retrigger_countdown[slot] = 4;
         } else {
             state.voice_gates[slot].set(1.0);
             self.retrigger_countdown[slot] = 0;
         }
+
+        let pool: Vec<String> = self.voice_notes.iter().enumerate().map(|(i, n)| {
+            format!("s{}:{} g{:.1} a{:.1} c{}",
+                i,
+                n.map_or("--".into(), |p| p.to_string()),
+                state.voice_gates[i].value(),
+                state.amp_cursors[i].value(),
+                self.retrigger_countdown[i])
+        }).collect();
+        eprintln!("[pool] {}", pool.join("  "));
     }
 
     /// Decrement the hold count for `pitch` and kill its gate only when the
@@ -588,5 +620,78 @@ mod tests {
         va.begin_buffer(&state, &rx, 64, 48_000.0);
         let f = midi_hz(80.0) as f32;
         assert!((state.voice_freq_targets[0].value() - f).abs() < 1e-3);
+    }
+
+    #[test]
+    fn silence_all_requested_cancels_retrigger_countdown() {
+        // Regression: silence_all_voices() sets gates to 0 atomically, but a
+        // voice mid-retrigger had retrigger_countdown > 0. Without the fix,
+        // tick_sample would fire the countdown and set the gate back to 1.0,
+        // producing a phantom note with the new patch's parameters.
+        let (mut va, state, tx, rx) = setup();
+
+        // Start a note so slot 0 is active with amp_cursor > 0 (audible).
+        tx.try_send(ControlEvent::NoteOn { pitch: 60, velocity: 100, track: 0 }).unwrap();
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        state.amp_cursors[0].set(3.0); // simulate sustain phase
+
+        // Same-buffer NoteOff + NoteOn starts a retrigger (countdown = 4, gate = 0).
+        tx.try_send(ControlEvent::NoteOff { pitch: 60, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOn  { pitch: 60, velocity: 100, track: 0 }).unwrap();
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        assert_eq!(state.voice_gates[0].value(), 0.0); // mid-retrigger gap
+        // retrigger_countdown is now 4
+
+        // Simulate patch load: silence_all_voices() sets the flag.
+        state.silence_all_requested.store(true, Ordering::Relaxed);
+
+        // tick_sample should clear the countdown and NOT flip the gate back up.
+        va.tick_sample(&state); // reads-and-clears the flag, resets countdown
+        assert_eq!(state.voice_gates[0].value(), 0.0, "gate must stay silent after silence_all");
+
+        // Subsequent ticks must also leave the gate at 0 (no phantom re-fire).
+        va.tick_sample(&state);
+        va.tick_sample(&state);
+        va.tick_sample(&state);
+        assert_eq!(state.voice_gates[0].value(), 0.0);
+    }
+
+    #[test]
+    fn all_notes_off_resets_pitch_hold_count_for_untracked_notes() {
+        // Regression: hardware MIDI notes are not in piano_held_midi, so
+        // all_notes_off() never sent NoteOff for them. pitch_hold_count stayed
+        // at 1, causing the next NoteOn for the same pitch (count → 2) to
+        // produce a stuck gate — the gate only drops when count reaches 0, so
+        // a single NoteOff left count=1 and the voice stayed open.
+        //
+        // The fix is to send NoteOff for all 128 pitches after silence_all_voices().
+        // This test simulates that by sending the NoteOffs manually.
+        let (mut va, state, tx, rx) = setup();
+
+        // Simulate a hardware MIDI NoteOn (note not tracked in piano_held_midi).
+        tx.try_send(ControlEvent::NoteOn { pitch: 64, velocity: 100, track: 0 }).unwrap();
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        assert_eq!(state.voice_gates[0].value(), 1.0);
+
+        // Simulate patch load: silence_all_voices() zeros the gates, then
+        // engine.all_notes_off() flushes NoteOff for all 128 pitches.
+        for gate in state.voice_gates.iter() { gate.set(0.0); }
+        state.silence_all_requested.store(true, Ordering::Relaxed);
+        for p in 0u8..=127 {
+            tx.try_send(ControlEvent::NoteOff { pitch: p, track: 0 }).ok();
+        }
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        va.tick_sample(&state); // clear retrigger flag
+
+        // Now play the same pitch again — count must be 1 (not 2).
+        tx.try_send(ControlEvent::NoteOn { pitch: 64, velocity: 100, track: 0 }).unwrap();
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        for _ in 0..4 { va.tick_sample(&state); } // let retrigger fire
+        assert_eq!(state.voice_gates[0].value(), 1.0);
+
+        // Single NoteOff must silence it (count 1→0).
+        tx.try_send(ControlEvent::NoteOff { pitch: 64, track: 0 }).unwrap();
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
+        assert_eq!(state.voice_gates[0].value(), 0.0, "stuck gate: count was > 1");
     }
 }

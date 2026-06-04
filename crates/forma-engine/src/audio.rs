@@ -206,6 +206,10 @@ pub struct AudioState {
     // shimmer + crystallizer buffers zeroed). Checked and cleared by FxChain::tick()
     // so the clear runs on the audio thread without any allocation or locking.
     pub fx_clear_requested: Arc<AtomicBool>,
+    /// Set by the UI thread via `silence_all_voices()`. The voice allocator's
+    /// `tick_sample` reads-and-clears this to reset all retrigger_countdowns,
+    /// preventing phantom notes after a forced gate-zero on patch load.
+    pub silence_all_requested: Arc<AtomicBool>,
 
     // FX chain (post-mix, pre-output) — all wet/dry 0.0 = bypass
     pub fx_overdrive_drive: Shared,  // 1.0..10.0
@@ -400,6 +404,7 @@ impl AudioState {
             limiter_enabled: Arc::new(AtomicBool::new(true)),
             limiter_threshold: shared(0.95),
             fx_clear_requested: Arc::new(AtomicBool::new(false)),
+            silence_all_requested: Arc::new(AtomicBool::new(false)),
             fx_overdrive_drive: shared(3.0),
             fx_overdrive_mix: shared(0.0),
             fx_overdrive_tone: shared(0.8),

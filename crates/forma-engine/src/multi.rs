@@ -460,8 +460,11 @@ fn build_track_graph(state: &TrackState, sr: f64) -> Box<dyn AudioUnit + Send> {
                 Some(state.fenv_cursors[vi].clone()),
                 sr as f32,
             ));
-        let dyn_cutoff =
-            var(&state.effective_cutoff) + fenv * var(&state.filter_env_amount) * dc(12000.0_f32);
+        let dyn_cutoff = (var(&state.effective_cutoff)
+            + fenv * var(&state.filter_env_amount) * dc(12000.0_f32))
+            >> map(|x: &Frame<f32, U1>| -> Frame<f32, U1> {
+                [x[0].clamp(80.0, 18000.0)].into()
+            });
         let filtered = (osc | dyn_cutoff | var(&state.resonance)) >> moog();
 
         let env = var(vg)
@@ -523,6 +526,8 @@ pub struct MultiTrackEngine {
     out_limiter: PeakLimiter,
     sr: f64,
     smoothed_freqs: Vec<Vec<f32>>,
+    silence_counter: u32,
+    recent_note_counter: u32,
 
     // Drum track (optional; enabled via enable_drum_track)
     pub drum_state: Option<DrumTrackState>,
@@ -552,6 +557,8 @@ impl MultiTrackEngine {
             out_limiter: PeakLimiter::new(sr as f32, 2.0, 80.0),
             sr,
             smoothed_freqs,
+            silence_counter: 0,
+            recent_note_counter: 0,
             drum_state: None,
             drum_dsp: None,
         }
@@ -709,6 +716,50 @@ impl MultiTrackEngine {
             out_pre = self.out_limiter.process(out_pre, thr);
         }
         let out = out_pre.tanh();
+
+        // Keep a decaying counter so we know a note was played recently.
+        let any_gate = self.tracks[0].voice_gates.iter().any(|g| g.value() > 0.5);
+        if any_gate {
+            self.recent_note_counter = (self.sr as u32) * 3; // 3 s window
+        } else if self.recent_note_counter > 0 {
+            self.recent_note_counter -= 1;
+        }
+
+        // Silence detector: output near zero while a note was recently played.
+        if self.recent_note_counter > 0 {
+            if out.abs() < 1e-5 {
+                self.silence_counter = self.silence_counter.saturating_add(1);
+                // Fire once when silence crosses 200 ms.
+                if self.silence_counter == (self.sr as u32) / 5 {
+                    let t = &self.tracks[0];
+                    let gates: Vec<String> = t.voice_gates.iter()
+                        .map(|g| format!("{:.1}", g.value())).collect();
+                    let amps: Vec<String> = t.amp_cursors.iter()
+                        .map(|a| format!("{:.2}", a.value())).collect();
+                    let fenvs: Vec<String> = t.fenv_cursors.iter()
+                        .map(|f| format!("{:.2}", f.value())).collect();
+                    eprintln!(
+                        "[silence] output=0 for 200ms after recent note\n  \
+                         gates      = [{}]\n  \
+                         amp_cursor = [{}]\n  \
+                         fenv_cursor= [{}]\n  \
+                         cutoff={:.0}  eff_cutoff={:.0}  fenv_amt={:.3}  \
+                         noise={:.2}  master={:.2}  out_pre={:.6}",
+                        gates.join(", "), amps.join(", "), fenvs.join(", "),
+                        t.cutoff.value(), t.effective_cutoff.value(),
+                        t.filter_env_amount.value(),
+                        t.noise_vol.value(),
+                        self.master_vol.value(),
+                        out_pre,
+                    );
+                }
+            } else {
+                self.silence_counter = 0;
+            }
+        } else {
+            self.silence_counter = 0;
+        }
+
         (out, out)
     }
 }
@@ -873,5 +924,51 @@ mod tests {
         t.voice_gates[0].set(1.0);
 
         run_samples(&mut engine, (SR * 2.0) as usize);
+    }
+
+    /// Regression: Noise Drop has filter_env_amount=-0.9 and base cutoff=8000 Hz.
+    /// At peak fenv (1.0), dyn_cutoff = 8000 + (-0.9 × 12000) = -2800 Hz.
+    /// A negative cutoff fed into the Moog filter produces NaN, which poisons
+    /// the DSP graph permanently — all subsequent notes are silent even after
+    /// a patch change. The fix is to clamp dyn_cutoff to a safe minimum.
+    #[test]
+    fn negative_filter_env_amount_stays_finite() {
+        let mut engine = MultiTrackEngine::new(SR);
+        engine.master_vol.set(0.5);
+
+        // Noise Drop configuration
+        let t = &engine.tracks[0];
+        t.track_vol.set(1.0);
+        t.noise_vol.set(0.8);
+        t.cutoff.set(8000.0);
+        t.effective_cutoff.set(8000.0);
+        t.filter_env_amount.set(-0.9);
+        t.fenv_attack.set(0.001);
+        t.fenv_decay.set(2.5);
+        t.fenv_sustain.set(0.0);
+        t.fenv_release.set(0.5);
+        t.adsr_attack.set(0.001);
+        t.adsr_decay.set(2.0);
+        t.adsr_sustain.set(0.0);
+        t.adsr_release.set(0.5);
+        t.voice_freq_targets[0].set(440.0);
+        t.voice_gates[0].set(1.0);
+
+        // Run through the full one-shot (3 seconds covers attack + decay + release).
+        run_samples(&mut engine, (SR * 3.0) as usize);
+
+        // Simulate patch switch: reset to a simple clean patch and retrigger.
+        engine.tracks[0].noise_vol.set(0.0);
+        engine.tracks[0].cutoff.set(2000.0);
+        engine.tracks[0].effective_cutoff.set(2000.0);
+        engine.tracks[0].filter_env_amount.set(0.3);
+        engine.tracks[0].fenv_sustain.set(0.7);
+        engine.tracks[0].adsr_sustain.set(0.7);
+        engine.tracks[0].voice_gates[0].set(0.0);
+        run_samples(&mut engine, 64); // let gate fall
+        engine.tracks[0].voice_gates[0].set(1.0);
+
+        // Output must still be finite — NaN-poisoned graph would fail here.
+        run_samples(&mut engine, (SR * 0.5) as usize);
     }
 }

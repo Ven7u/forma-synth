@@ -1128,6 +1128,11 @@ impl SynthEngineHandle {
         for gate in self.state.voice_gates.iter() {
             gate.set(0.0);
         }
+        // Tell the audio thread to reset retrigger_countdowns so no in-flight
+        // retrigger fires a gate back to 1.0 after this forced silence.
+        self.state
+            .silence_all_requested
+            .store(true, Ordering::Relaxed);
     }
 
     /// Flush all FX tail buffers (delay, reverb, shimmer, crystallizer, pre-delay,

@@ -228,6 +228,9 @@ pub(crate) struct SynthApp {
     pub(crate) kb_freeze: bool,
     /// MIDI notes currently sustained by freeze (key lifted but NoteOff suppressed).
     pub(crate) frozen_notes: std::collections::HashSet<u8>,
+    /// Hardware MIDI notes physically held right now (NoteOn received, NoteOff not yet).
+    /// Used to re-trigger notes seamlessly after a patch load.
+    pub(crate) midi_held_notes: std::collections::HashSet<u8>,
     /// Scale highlight: root pitch class (0=C … 11=B) and scale type. None = off.
     pub(crate) piano_scale_root: u8,
     pub(crate) piano_scale_highlight: Option<crate::sequencer::ScaleType>,
@@ -627,6 +630,7 @@ impl SynthApp {
             kb_voicing_applied: crate::sequencer::VoicingType::Root,
             kb_freeze: false,
             frozen_notes: std::collections::HashSet::new(),
+            midi_held_notes: std::collections::HashSet::new(),
             piano_held_midi: std::collections::HashSet::new(),
             piano_mouse_midi: None,
             piano_scale_root: 0,
@@ -1096,6 +1100,12 @@ impl SynthApp {
         // In LIVE mode each track is independent — other tracks' arps/seqs
         // keep running; only the focused track's keyboard input is cleared.
         self.engine.silence_all_voices();
+        // Send NoteOff for all 128 pitches so the voice allocator's
+        // pitch_hold_count is fully zeroed — hardware MIDI notes are not
+        // tracked in piano_held_midi so they'd otherwise keep a non-zero
+        // count and cause stuck gates on the next NoteOn for the same pitch.
+        self.engine.all_notes_off();
+        self.midi_held_notes.clear();
         let held: Vec<u8> = self.piano_held_midi.drain().collect();
         for n in held {
             self.engine.note_off(n);
@@ -1411,9 +1421,11 @@ impl SynthApp {
                     channel,
                 } => {
                     let _ = velocity;
+                    self.midi_held_notes.insert(note);
                     self.route_note_on(note, channel);
                 }
                 MidiEvent::NoteOff { note, .. } => {
+                    self.midi_held_notes.remove(&note);
                     self.push_note_off(note);
                 }
                 MidiEvent::Aftertouch { value, .. } => {
@@ -1925,6 +1937,15 @@ impl SynthApp {
         self.patch_recent.insert(0, rname);
         self.patch_recent.truncate(12);
 
+        eprintln!("[patch] loading \"{}\" (category={}  osc_enabled={:?}  noise={:.2}  \
+                   amp_adsr={:?}  cutoff={:.0}  fenv_amt={:.2})",
+            p.name, p.category, p.osc_enabled, p.noise_vol,
+            p.amp_adsr, p.filter_cutoff, p.filter_env_amount);
+
+        // Capture physically held hardware MIDI notes before all_notes_off clears the set,
+        // so we can re-trigger them with the new patch parameters below.
+        let held_midi: Vec<u8> = self.midi_held_notes.iter().copied().collect();
+
         // Silence all voices before changing parameters to prevent Moog filter blowup.
         self.all_notes_off();
         // Clear FX tail buffers so old reverb/delay from the previous patch does not
@@ -2141,6 +2162,16 @@ impl SynthApp {
         // Propagate delay-sync state.
         if self.patch_load_fx {
             self.apply_clock_sync();
+        }
+
+        // Re-trigger any hardware MIDI keys that were physically held when the
+        // patch was loaded. all_notes_off() already zeroed all gates and the
+        // control-channel NoteOffs are queued ahead of these NoteOns, so the
+        // voice allocator will process them in the right order: silence first,
+        // then fresh NoteOn with the new patch's parameters.
+        for note in held_midi {
+            self.engine.note_on(note, self.piano_velocity);
+            self.midi_held_notes.insert(note);
         }
     }
 }
