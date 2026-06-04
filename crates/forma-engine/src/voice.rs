@@ -102,6 +102,14 @@ impl VoiceAllocator {
         frames: usize,
         sr: f64,
     ) {
+        if state
+            .silence_all_requested
+            .swap(false, Ordering::Relaxed)
+        {
+            for vi in 0..VOICE_COUNT {
+                self.retrigger_countdown[vi] = 0;
+            }
+        }
         self.release_cleanup(state);
         self.drain_events(state, rx);
         self.tick_arp_walker(state, frames, sr);
@@ -118,15 +126,6 @@ impl VoiceAllocator {
     /// 1.0 when the countdown hits zero.
     #[inline]
     pub fn tick_sample(&mut self, state: &AudioState) {
-        if state
-            .silence_all_requested
-            .swap(false, Ordering::Relaxed)
-        {
-            for vi in 0..VOICE_COUNT {
-                self.retrigger_countdown[vi] = 0;
-            }
-            return;
-        }
         for vi in 0..VOICE_COUNT {
             if self.retrigger_countdown[vi] > 0 {
                 self.retrigger_countdown[vi] -= 1;
@@ -642,18 +641,19 @@ mod tests {
         assert_eq!(state.voice_gates[0].value(), 0.0); // mid-retrigger gap
         // retrigger_countdown is now 4
 
-        // Simulate patch load: silence_all_voices() sets the flag.
+        // Simulate patch load: silence_all_voices() zeros gates + sets the flag.
+        for gate in state.voice_gates.iter() { gate.set(0.0); }
         state.silence_all_requested.store(true, Ordering::Relaxed);
 
-        // tick_sample should clear the countdown and NOT flip the gate back up.
-        va.tick_sample(&state); // reads-and-clears the flag, resets countdown
-        assert_eq!(state.voice_gates[0].value(), 0.0, "gate must stay silent after silence_all");
+        // begin_buffer consumes the flag and clears in-flight countdowns
+        // *before* draining new events, so any queued NoteOns after the patch
+        // load (e.g. held-MIDI retrigger) still set fresh countdowns that
+        // survive into the per-sample loop.
+        va.begin_buffer(&state, &rx, 64, 48_000.0);
 
-        // Subsequent ticks must also leave the gate at 0 (no phantom re-fire).
-        va.tick_sample(&state);
-        va.tick_sample(&state);
-        va.tick_sample(&state);
-        assert_eq!(state.voice_gates[0].value(), 0.0);
+        // No phantom re-fire: the gate stays at 0 through the buffer.
+        for _ in 0..8 { va.tick_sample(&state); }
+        assert_eq!(state.voice_gates[0].value(), 0.0, "gate must stay silent after silence_all");
     }
 
     #[test]
