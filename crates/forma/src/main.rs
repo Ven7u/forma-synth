@@ -2897,7 +2897,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_secondary)
                 };
                 if ui
-                    .button(egui::RichText::new("LIB").size(11.0).color(lib_col))
+                    .button(egui::RichText::new("PATCH").size(11.0).color(lib_col))
                     .on_hover_text("Patch Library — browse and load factory patches.")
                     .clicked()
                 {
