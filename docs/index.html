@@ -587,8 +587,8 @@
       no subscription, no account.
     </p>
     <div class="hero-ctas">
-      <a class="btn btn-primary" href="https://github.com/Ven7u/forma-synth/releases/latest">
-        ↓ Download for Mac
+      <a class="btn btn-primary" href="#guide">
+        ↓ Install for Mac
       </a>
       <a class="btn btn-ghost" href="https://github.com/Ven7u/forma-synth">
         View on GitHub
@@ -649,6 +649,19 @@
 
   <section class="guide" id="guide">
     <p class="section-label">How to use it</p>
+
+    <details open>
+      <summary>Install</summary>
+      <div class="guide-body">
+        <p style="margin-bottom:0.6rem;"><strong>Recommended — Homebrew</strong> (no warnings, no manual steps):</p>
+        <pre style="margin-bottom:1rem;">brew tap ven7u/forma
+brew install --cask forma</pre>
+        <p style="margin-bottom:0.4rem;"><strong>cargo install</strong> — requires <a href="https://rustup.rs" style="color:var(--phosphor)">Rust</a>, builds from source, no Gatekeeper warning:</p>
+        <pre style="margin-bottom:1rem;">cargo install --git https://github.com/Ven7u/forma-synth forma</pre>
+        <p style="margin-bottom:0.4rem;"><strong>DMG</strong> — download from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a>, open it, drag <strong>Forma.app</strong> to Applications.<br>
+        <em>Seeing "Forma is damaged"?</em> macOS blocks unsigned apps. Fix: <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code>, or right-click → Open → Open.</p>
+      </div>
+    </details>
 
     <details open>
       <summary>Quick start</summary>
