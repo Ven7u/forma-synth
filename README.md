@@ -147,11 +147,6 @@ Other crates in the workspace are experimental and not part of the stable surfac
 
 ## License
 
-Licensed under either of
-
-- [MIT License](LICENSE-MIT)
-- [Apache License, Version 2.0](LICENSE-APACHE)
-
-at your option.
+Licensed under the [GNU General Public License v3.0](LICENSE).
 
 Copyright © 2026 Francesco Ventura
