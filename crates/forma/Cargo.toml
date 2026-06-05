@@ -1,7 +1,7 @@
 [package]
 name = "forma"
 version = "0.1.0"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-only"
 edition = "2021"
 publish = false
 
@@ -9,7 +9,7 @@ publish = false
 name = "Forma"
 identifier = "com.francescoventura.forma"
 version = "0.1.0"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-only"
 copyright = "© 2026 Francesco Ventura"
 category = "Music"
 short_description = "Moog-style software synthesizer"
