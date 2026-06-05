@@ -653,14 +653,25 @@
     <details open>
       <summary>Install</summary>
       <div class="guide-body">
-        <p style="margin-bottom:0.6rem;"><strong>Recommended — Homebrew</strong> (no Gatekeeper, no Rust needed, launch with <code style="color:var(--phosphor)">forma</code>):</p>
-        <pre style="margin-bottom:1rem;">brew tap ven7u/forma
+        <p style="margin-bottom:0.8rem;color:var(--phosphor-dim);"><em>New to the terminal?</em> Open the <strong>Terminal</strong> app: press <kbd>⌘</kbd> + <kbd>Space</kbd>, type <code style="color:var(--phosphor)">Terminal</code>, press <kbd>Enter</kbd>. Paste commands with <kbd>⌘</kbd> + <kbd>V</kbd>, run with <kbd>Enter</kbd>.</p>
+
+        <p style="margin-bottom:0.4rem;"><strong>1. Homebrew (recommended)</strong> — launch from any terminal with <code style="color:var(--phosphor)">forma</code>.</p>
+        <p style="margin-bottom:0.4rem;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;">Prerequisite: <a href="https://brew.sh" style="color:var(--phosphor)">Homebrew</a>. Don't have it? Paste this first:</p>
+        <pre style="margin-bottom:0.6rem;margin-left:1rem;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
+        <p style="margin-bottom:0.4rem;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;">Then install Forma:</p>
+        <pre style="margin-bottom:1.2rem;margin-left:1rem;">brew tap ven7u/forma
 brew trust ven7u/forma
 brew install ven7u/forma/forma</pre>
-        <p style="margin-bottom:0.4rem;"><strong>cargo install</strong> — requires <a href="https://rustup.rs" style="color:var(--phosphor)">Rust</a>, builds from source, no Gatekeeper warning:</p>
-        <pre style="margin-bottom:1rem;">cargo install --git https://github.com/Ven7u/forma-synth forma</pre>
-        <p style="margin-bottom:0.4rem;"><strong>DMG / .app bundle</strong> — download from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a> or use <code style="color:var(--phosphor)">brew install --cask forma</code>.<br>
-        <em>Seeing a Gatekeeper warning?</em> Run <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code>, or right-click → Open → Open.</p>
+
+        <p style="margin-bottom:0.4rem;"><strong>2. cargo install</strong> — builds from source, no Gatekeeper warning.</p>
+        <p style="margin-bottom:0.4rem;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;">Prerequisite: <a href="https://rustup.rs" style="color:var(--phosphor)">Rust toolchain</a>. Don't have it? Paste this first:</p>
+        <pre style="margin-bottom:0.6rem;margin-left:1rem;">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</pre>
+        <p style="margin-bottom:0.4rem;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;">Then install Forma (takes a few minutes):</p>
+        <pre style="margin-bottom:1.2rem;margin-left:1rem;">cargo install --git https://github.com/Ven7u/forma-synth forma</pre>
+
+        <p style="margin-bottom:0.4rem;"><strong>3. Download the DMG</strong> — no terminal required.</p>
+        <p style="margin-bottom:0.4rem;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;">Download from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a>, open the <code style="color:var(--phosphor)">.dmg</code> file, drag <strong>Forma.app</strong> into <strong>Applications</strong>, then launch from Launchpad.</p>
+        <p style="margin-bottom:0;margin-left:1rem;color:var(--phosphor-dim);font-size:0.9rem;"><em>Seeing "Forma is damaged" or "cannot be verified"?</em> macOS blocks unsigned apps. Right-click <strong>Forma.app</strong> in Finder → <strong>Open</strong> → confirm <strong>Open</strong>. Or run <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code> in Terminal.</p>
       </div>
     </details>
 

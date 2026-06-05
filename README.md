@@ -84,7 +84,17 @@ Overdrive · Distortion · Chorus · Delay (BPM sync) · Reverb (Freeverb / Plat
 
 ## Installing
 
+> **First time with the terminal?** Open the **Terminal** app: press `Cmd` + `Space`, type `Terminal`, press `Enter`. You can paste commands with `Cmd` + `V` and run them with `Enter`.
+
 ### Homebrew (recommended)
+
+**Prerequisite:** [Homebrew](https://brew.sh) — paste this into Terminal if you don't have it:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Then install Forma:
 
 ```sh
 brew tap ven7u/forma
@@ -92,27 +102,35 @@ brew trust ven7u/forma
 brew install ven7u/forma/forma
 ```
 
-Installs the `forma` binary — no Gatekeeper warning, no Rust required. Launch with `forma`. Updates via `brew upgrade ven7u/forma/forma`.
+Launch with `forma` from any terminal window. Update with `brew upgrade ven7u/forma/forma`. No Gatekeeper warnings, no Rust required.
 
-> **Prefer a .app bundle?** Use `brew install --cask forma` instead. You may need to run `xattr -cr /Applications/Forma.app` the first time due to macOS Gatekeeper.
+> **Prefer a clickable .app in `/Applications`?** Use `brew install --cask forma` instead. macOS may show "Forma cannot be verified" on first launch — fix with `xattr -cr /Applications/Forma.app` or right-click → Open → Open.
 
 ### cargo install
 
-Requires [Rust](https://rustup.rs) installed. Builds from source — no Gatekeeper warning.
+**Prerequisite:** [Rust toolchain](https://rustup.rs) — paste this into Terminal if you don't have it:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Then install Forma (builds from source, takes a few minutes):
 
 ```sh
 cargo install --git https://github.com/Ven7u/forma-synth forma
 ```
 
+Launch with `forma`. No Gatekeeper warning since the binary is compiled locally.
+
 ### Download (macOS universal DMG)
 
-Download the latest DMG from [Releases](https://github.com/Ven7u/forma-synth/releases/latest), open it and drag **Forma.app** to Applications.
+No terminal required. Download the latest DMG from [Releases](https://github.com/Ven7u/forma-synth/releases/latest), open it, drag **Forma.app** to **Applications**, and launch from Launchpad.
 
-> **"Forma is damaged and can't be opened"** — macOS Gatekeeper blocks unsigned apps. Fix with one of:
+> **"Forma is damaged" or "cannot be verified"** — macOS Gatekeeper blocks unsigned apps. Fix with one of:
 >
 > - **Terminal:** `xattr -cr /Applications/Forma.app` then open normally
-> - **Right-click** Forma.app → **Open** → **Open**
-> - **System Settings** → Privacy & Security → **Open Anyway**
+> - **Right-click** Forma.app in Finder → **Open** → confirm **Open** in the dialog
+> - **System Settings** → **Privacy & Security** → scroll to the Forma notice → **Open Anyway**
 
 ---
 
