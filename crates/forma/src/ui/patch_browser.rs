@@ -84,7 +84,7 @@ impl SynthApp {
             }
         }
 
-        let browser_label = egui::RichText::new("LIBRARY").color(if self.patch_browser_open {
+        let browser_label = egui::RichText::new("PATCH").color(if self.patch_browser_open {
             self.theme.c(&self.theme.accent)
         } else {
             Color32::WHITE
