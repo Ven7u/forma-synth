@@ -17,11 +17,11 @@
 
     :root {
       /* — icon palette — */
-      --screen:       #0d1422;   /* CRT screen dark navy */
-      --phosphor:     #8ec5a5;   /* P31 waveform green  */
-      --phosphor-dim: #4a7a5e;   /* dimmer phosphor     */
-      --phosphor-hi:  #c2e8d0;   /* bright highlight    */
-      --bezel:        #3d2f38;   /* pixel-art frame     */
+      --screen:       #0d1422;
+      --phosphor:     #8ec5a5;
+      --phosphor-dim: #4a7a5e;
+      --phosphor-hi:  #c2e8d0;
+      --bezel:        #3d2f38;
       --bezel-light:  #5c4555;
 
       /* — derived — */
@@ -42,7 +42,6 @@
 
     html { scroll-behavior: smooth; }
 
-    /* ── SCANLINES + VIGNETTE overlay ── */
     body {
       background: var(--bg);
       color: var(--text);
@@ -83,7 +82,6 @@
       );
     }
 
-    /* subtle flicker */
     @keyframes flicker {
       0%   { opacity: 1; }
       92%  { opacity: 1; }
@@ -93,9 +91,7 @@
       100% { opacity: 1; }
     }
 
-    #crt-wrap {
-      animation: flicker 8s infinite;
-    }
+    #crt-wrap { animation: flicker 8s infinite; }
 
     /* ── NAV ── */
     nav {
@@ -168,6 +164,23 @@
       box-shadow: 0 0 0 1px var(--border), var(--glow-md);
     }
 
+    .hero-title-row {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 1rem;
+    }
+
+    .hero-wave {
+      flex: 1;
+      min-width: 0;
+      height: clamp(48px, 8vw, 88px);
+      display: block;
+      opacity: 0.9;
+    }
+
     .hero h1 {
       font-family: var(--font-display);
       font-size: clamp(4rem, 12vw, 8rem);
@@ -176,6 +189,8 @@
       color: var(--phosphor-hi);
       text-shadow: var(--glow-lg);
       line-height: 1;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .hero-sub {
@@ -330,9 +345,7 @@
       transition: background 0.15s;
     }
 
-    .feature-card:hover {
-      background: #141f18;
-    }
+    .feature-card:hover { background: #141f18; }
 
     .feature-label {
       font-size: 0.72rem;
@@ -348,10 +361,122 @@
       line-height: 1.55;
     }
 
+    /* ── GUIDE ── */
+    .guide {
+      padding: 2rem 2rem 4rem;
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .guide details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .guide details + details { border-top: none; }
+
+    .guide summary {
+      padding: 0.9rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--phosphor);
+      letter-spacing: 0.06em;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-transform: uppercase;
+    }
+
+    .guide summary::before { content: "▶"; font-size: 0.6rem; transition: transform 0.2s; color: var(--phosphor-dim); }
+    .guide details[open] summary::before { transform: rotate(90deg); }
+    .guide summary:hover { color: var(--phosphor-hi); text-shadow: var(--glow-sm); }
+
+    .guide-body {
+      padding: 0 1.5rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .guide-body p { color: var(--muted); }
+    .guide-body strong { color: var(--phosphor); }
+
+    /* numbered steps */
+    .steps { display: flex; flex-direction: column; gap: 0.6rem; list-style: none; counter-reset: step; }
+    .steps li { counter-increment: step; display: flex; gap: 0.75rem; align-items: baseline; }
+    .steps li::before {
+      content: counter(step);
+      flex-shrink: 0;
+      width: 1.4em;
+      height: 1.4em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--phosphor-dim);
+      color: var(--phosphor);
+      font-size: 0.72rem;
+    }
+
+    /* keyboard map */
+    .kbd-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+    }
+
+    .kbd-row { display: flex; gap: 0.25rem; align-items: center; flex-wrap: wrap; }
+    .kbd-row-label {
+      width: 5rem;
+      font-size: 0.68rem;
+      color: var(--phosphor-dim);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.6em;
+      padding: 0.1em 0.4em;
+      background: var(--screen);
+      border: 1px solid var(--phosphor-dim);
+      color: var(--phosphor);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-shadow: var(--glow-sm);
+    }
+
+    /* two-col tip list */
+    .tip-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem 1.5rem;
+      list-style: none;
+      font-size: 0.78rem;
+    }
+
+    .tip-list li::before { content: "› "; color: var(--phosphor-dim); }
+
+    @media (max-width: 520px) {
+      .tip-list { grid-template-columns: 1fr; }
+    }
+
     /* ── BUILD FROM SOURCE ── */
     .source {
-      padding: 2rem 2rem 4rem;
-      max-width: 640px;
+      padding: 0 2rem 4rem;
+      max-width: 760px;
       margin: 0 auto;
     }
 
@@ -437,6 +562,7 @@
     </a>
     <ul class="nav-links">
       <li><a href="#features">Features</a></li>
+      <li><a href="#guide">Guide</a></li>
       <li><a href="https://github.com/Ven7u/forma-synth">GitHub</a></li>
       <li><a href="https://github.com/Ven7u/forma-synth/releases">Releases</a></li>
     </ul>
@@ -450,7 +576,11 @@
         <img src="https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml/badge.svg" alt="CI status" style="height:20px;image-rendering:auto;" />
       </a>
     </div>
-    <h1>Forma</h1>
+    <div class="hero-title-row">
+      <canvas id="wave-l" class="hero-wave"></canvas>
+      <h1>Forma</h1>
+      <canvas id="wave-r" class="hero-wave"></canvas>
+    </div>
     <p class="hero-sub">
       A <strong>polyphonic software synthesizer</strong> for macOS, built in Rust.
       171 presets, mod matrix, full FX chain, MIDI learn —
@@ -515,6 +645,180 @@
     </div>
   </section>
 
+  <div class="divider">// guide</div>
+
+  <section class="guide" id="guide">
+    <p class="section-label">How to use it</p>
+
+    <details open>
+      <summary>Quick start</summary>
+      <div class="guide-body">
+        <ol class="steps">
+          <li>Launch Forma. It opens with the <strong>Init patch</strong> loaded — a basic saw wave ready to play.</li>
+          <li>Press keys on your computer keyboard (<kbd>A</kbd>–<kbd>'</kbd> are white keys, <kbd>W E T Y U O P</kbd> are sharps). <kbd>Z</kbd> / <kbd>X</kbd> shift octaves. <kbd>Space</kbd> freezes the last note.</li>
+          <li>Open the <strong>PATCH</strong> browser and pick any preset from the 171 factory patches to hear what the synth can do.</li>
+          <li>Connect a MIDI keyboard: open the <strong>MIDI &amp; Latency</strong> tab, select your device from the list. Forma auto-reconnects on next launch.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>Computer keyboard layout</summary>
+      <div class="guide-body">
+        <p>Forma maps your QWERTY keyboard to a two-octave piano — GarageBand style.</p>
+        <div class="kbd-layout">
+          <div class="kbd-row">
+            <span class="kbd-row-label">Sharps</span>
+            <kbd>W</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">C#</span>
+            <kbd>E</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">D#</span>
+            &nbsp;
+            <kbd>T</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">F#</span>
+            <kbd>Y</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">G#</span>
+            <kbd>U</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">A#</span>
+            &nbsp;
+            <kbd>O</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">C#</span>
+            <kbd>P</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">D#</span>
+          </div>
+          <div class="kbd-row">
+            <span class="kbd-row-label">Naturals</span>
+            <kbd>A</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">C</span>
+            <kbd>S</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">D</span>
+            <kbd>D</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">E</span>
+            <kbd>F</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">F</span>
+            <kbd>G</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">G</span>
+            <kbd>H</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">A</span>
+            <kbd>J</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">B</span>
+            <kbd>K</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">C</span>
+            <kbd>L</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">D</span>
+            <kbd>;</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">E</span>
+            <kbd>'</kbd><span style="color:var(--phosphor-dim);font-size:0.7rem;margin:0 2px">F</span>
+          </div>
+          <div class="kbd-row" style="margin-top:0.4rem;">
+            <span class="kbd-row-label">Octave</span>
+            <kbd>Z</kbd> <span style="font-size:0.75rem;margin:0 0.4rem;">down</span>
+            <kbd>X</kbd> <span style="font-size:0.75rem;margin:0 0.4rem;">up</span>
+          </div>
+          <div class="kbd-row">
+            <span class="kbd-row-label">Freeze</span>
+            <kbd>Space</kbd> <span style="font-size:0.75rem;margin-left:0.4rem;">hold last note</span>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Connecting a MIDI keyboard</summary>
+      <div class="guide-body">
+        <ol class="steps">
+          <li>Plug in your USB MIDI keyboard.</li>
+          <li>In Forma, open the <strong>MIDI &amp; Latency</strong> tab (top bar).</li>
+          <li>Select your device from the <strong>MIDI Input</strong> dropdown. The indicator turns green when notes arrive.</li>
+          <li>Under <strong>Keyboard Presets</strong>, click your keyboard model (Arturia KeyLab MkIII / MiniLab MkIII, or Generic) to load a factory CC mapping — knobs and faders will control the synth immediately.</li>
+          <li>Forma remembers the last connected device and reconnects automatically on next launch.</li>
+        </ol>
+        <p><strong>MIDI Learn:</strong> right-click any knob → <em>MIDI Learn</em>, then move a hardware knob or fader. The binding is saved with the session.</p>
+        <p><strong>Program Change:</strong> send a PC message from your keyboard to jump to any of the 171 factory patches by index.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Browsing &amp; saving patches</summary>
+      <div class="guide-body">
+        <ol class="steps">
+          <li>Click <strong>PATCH</strong> in the top bar to open the patch browser.</li>
+          <li>Use the <strong>category list</strong> on the left to filter by type (Ambient, Bass, Lead, Pad…). The search box filters by name.</li>
+          <li>Click a patch name to load it instantly — no need to confirm.</li>
+          <li>Star a patch with the ★ button to add it to <strong>Favourites</strong>. Access favourites via the ★ filter or from your MIDI keyboard (Arturia KeyLab: CC 62).</li>
+          <li>To save your own sound: dial in your patch, type a name in the patch name field (top bar), then click <strong>SAVE</strong>. It writes a plain JSON file you can back up or share.</li>
+        </ol>
+        <p>Patch history auto-snapshots every few seconds of silence. Access snapshots from the <strong>History</strong> panel to step back through edits.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Oscillators, filter &amp; envelopes</summary>
+      <div class="guide-body">
+        <p>Open the <strong>VOICE</strong> tab in the Studio view.</p>
+        <ul class="tip-list">
+          <li>Enable up to 3 oscillators independently</li>
+          <li>Mix waveforms: sine, saw, square, triangle, noise</li>
+          <li><strong>Unison</strong> stacks up to 5 detuned copies per oscillator — great for super-saws</li>
+          <li><strong>FM</strong> uses OSC 2 to frequency-modulate OSC 1 at audio rate</li>
+          <li><strong>Ring mod</strong> multiplies OSC 1 × OSC 2 for metallic tones</li>
+          <li><strong>Hard sync</strong> resets OSC 2 phase to OSC 1 — sweep OSC 2 pitch for classic sync sounds</li>
+          <li>Filter: Moog-style 4-pole lowpass with resonance, drive, and key tracking</li>
+          <li>Filter envelope amount can go negative (inverts the sweep)</li>
+          <li>Amp &amp; filter each have independent ADSR envelopes</li>
+          <li><strong>Mono/legato</strong>: enable in the voice header — portamento glide time is adjustable</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>Modulation matrix</summary>
+      <div class="guide-body">
+        <p>Open the <strong>MOD</strong> tab. Forma has 2 LFOs and 4 free-routing mod slots.</p>
+        <ol class="steps">
+          <li>Set an LFO waveform and rate (Hz or BPM-synced). Enable <strong>Retrigger</strong> to reset phase on each note.</li>
+          <li>In the mod matrix, choose a <strong>source</strong> (LFO 1/2, envelope, velocity, aftertouch, mod wheel) and a <strong>destination</strong> (pitch, filter cutoff, amp, pan, oscillator params…).</li>
+          <li>Set the <strong>amount</strong> with the slider — negative values invert the modulation.</li>
+          <li>Use <strong>Pulse lanes</strong> for rhythmic gate-based modulation tied to the BPM clock.</li>
+        </ol>
+        <p>Aftertouch and mod wheel are always available as sources — use them for expressive vibrato or filter sweeps during performance.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Sequencer &amp; arpeggiator</summary>
+      <div class="guide-body">
+        <p>Open the <strong>SEQ</strong> tab in the Studio view.</p>
+        <p><strong>Step sequencer:</strong></p>
+        <ol class="steps">
+          <li>Click steps to toggle them on/off. Each active step plays at the pitch you set below it.</li>
+          <li>Set a <strong>scale</strong> and <strong>root note</strong> — the sequencer snaps pitches to the scale.</li>
+          <li>Use <strong>chord mode</strong> to play full chords per step.</li>
+          <li>Press <strong>Play</strong> or hit <kbd>Space</kbd> to start. BPM is shared with the drum machine.</li>
+        </ol>
+        <p><strong>Arpeggiator:</strong> hold one or more notes and the arp plays them in pattern. Modes include up, down, up+down, random, and chord. The <strong>Scale Walker</strong> generates a generative random walk within the active scale — useful for ambient textures.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Drum machine</summary>
+      <div class="guide-body">
+        <p>Switch to <strong>Drum Machine</strong> mode from the top-left mode selector.</p>
+        <ol class="steps">
+          <li>Click grid cells to toggle steps. Each row is a channel: KICK, SNARE, HAT, CLAP, TOM×2, PERC, NOISE.</li>
+          <li>Drag vertically on a step to set its <strong>velocity</strong>.</li>
+          <li>Click <strong>Euclid</strong> on any lane to auto-generate a Euclidean rhythm — set hits, steps, and offset.</li>
+          <li>Use <strong>A/B/C/D</strong> pattern slots to arrange different beats. Copy/paste between slots.</li>
+          <li>Click the channel name to open the <strong>Voice editor</strong> — tune pitch, decay, noise mix, and envelope per drum sound.</li>
+          <li>Solo, Mute, Reverse, and Randomize buttons are at the end of each lane.</li>
+        </ol>
+        <p>Save a kit (all 8 voice settings) with the <strong>Save Kit</strong> button — kits are independent of patches.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>FX chain</summary>
+      <div class="guide-body">
+        <p>Open the <strong>FX</strong> tab. Effects run in series in the order shown.</p>
+        <ul class="tip-list">
+          <li>Toggle each effect on/off independently</li>
+          <li><strong>Overdrive / Distortion</strong>: saturation and harmonic color before reverb</li>
+          <li><strong>Chorus</strong>: spread and depth for stereo width</li>
+          <li><strong>Delay</strong>: BPM-synced or free, with feedback and mix</li>
+          <li><strong>Reverb</strong>: three algorithms — Freeverb, Plate, FDN Hall</li>
+          <li><strong>Shimmer</strong>: pitch-shifted reverb feedback for ambient pads</li>
+          <li><strong>Crystallizer</strong>: granular pitch-shift effect for glassy textures</li>
+          <li><strong>EQ</strong>: 8-band parametric — drag dots on the canvas to reshape</li>
+        </ul>
+        <p>When <strong>Load FX with patch</strong> is on (patch browser toggle), loading a preset restores its FX chain. Turn it off to keep your current FX while auditioning sounds.</p>
+      </div>
+    </details>
+
+  </section>
+
   <div class="divider">// build</div>
 
   <section class="source">
@@ -540,5 +844,82 @@ cargo run -p forma --release</pre>
   </footer>
 
 </div><!-- #crt-wrap -->
+
+<script>
+(function () {
+  var COLOR = '#8ec5a5';
+  var GLOW  = 'rgba(142,197,165,0.85)';
+
+  var L = document.getElementById('wave-l');
+  var R = document.getElementById('wave-r');
+  if (!L || !R) return;
+
+  var ctxL = L.getContext('2d');
+  var ctxR = R.getContext('2d');
+
+  /* single shared buffer covers: [left canvas | hidden gap | right canvas] */
+  var buf, WL, WR, HL, HR, GAP, TOTAL, dpr;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    WL = L.offsetWidth;  HL = L.offsetHeight;
+    WR = R.offsetWidth;  HR = R.offsetHeight;
+
+    /* measure the pixel gap between the two canvases (the title sits there) */
+    var lRect = L.getBoundingClientRect();
+    var rRect = R.getBoundingClientRect();
+    GAP   = Math.max(0, Math.round(rRect.left - lRect.right));
+    TOTAL = WL + GAP + WR;
+
+    L.width  = Math.round(WL * dpr); L.height = Math.round(HL * dpr);
+    R.width  = Math.round(WR * dpr); R.height = Math.round(HR * dpr);
+    ctxL.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxR.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    buf = new Float32Array(Math.max(TOTAL, 2)).fill(0);
+  }
+
+  var t = 0;
+  function sample() {
+    var env = 0.55 + 0.45 * Math.sin(t * 0.11 + 1.2);
+    return env * (
+      Math.sin(t * 2.17)  * 0.38 +
+      Math.sin(t * 4.83)  * 0.22 +
+      Math.sin(t * 7.05)  * 0.13 +
+      Math.sin(t * 11.4)  * 0.07 +
+      Math.sin(t * 0.63)  * 0.14 +
+      (Math.random() - 0.5) * 0.04
+    );
+  }
+
+  function drawSegment(ctx, W, H, offset) {
+    var cy = H * 0.5, amp = H * 0.42;
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    ctx.moveTo(0, cy + buf[offset] * amp);
+    for (var i = 1; i < W; i++) ctx.lineTo(i, cy + buf[offset + i] * amp);
+    ctx.strokeStyle = COLOR;
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = GLOW;
+    ctx.shadowBlur  = 10;
+    ctx.stroke();
+  }
+
+  function draw() {
+    if (!buf) { requestAnimationFrame(draw); return; }
+    buf.copyWithin(0, 1);
+    buf[TOTAL - 1] = sample();
+    t += 0.072;
+    /* left portion starts at 0, right portion starts after the gap */
+    drawSegment(ctxL, WL, HL, 0);
+    drawSegment(ctxR, WR, HR, WL + GAP);
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  new ResizeObserver(function () { resize(); }).observe(L.parentElement);
+  draw();
+})();
+</script>
 </body>
 </html>
