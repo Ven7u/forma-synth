@@ -46,6 +46,11 @@ jobs:
       - name: Bundle .app (uses the universal binary in target/release/)
         run: cargo bundle --release -p forma
 
+      - name: Ad-hoc sign the app bundle
+        # lipo invalidates any existing signature; re-sign with ad-hoc (-) so
+        # macOS does not report "damaged" when Homebrew removes quarantine.
+        run: codesign --force --deep --sign - target/release/bundle/osx/Forma.app
+
       - name: Zip bundle
         run: |
           cd target/release/bundle/osx
