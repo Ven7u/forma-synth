@@ -850,73 +850,75 @@ cargo run -p forma --release</pre>
   var COLOR = '#8ec5a5';
   var GLOW  = 'rgba(142,197,165,0.85)';
 
-  function makeWave(canvas, phaseOffset) {
-    var ctx = canvas.getContext('2d');
-    var buf, W, H, dpr;
-
-    function resize() {
-      dpr = window.devicePixelRatio || 1;
-      W   = canvas.offsetWidth;
-      H   = canvas.offsetHeight;
-      canvas.width  = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      buf = new Float32Array(Math.max(W, 1)).fill(0);
-    }
-
-    var t = phaseOffset;
-
-    function sample() {
-      /* composite waveform: slow envelope × mix of harmonics */
-      var env = 0.55 + 0.45 * Math.sin(t * 0.11 + 1.2);
-      return env * (
-        Math.sin(t * 2.17)  * 0.38 +
-        Math.sin(t * 4.83)  * 0.22 +
-        Math.sin(t * 7.05)  * 0.13 +
-        Math.sin(t * 11.4)  * 0.07 +
-        Math.sin(t * 0.63)  * 0.14 +
-        (Math.random() - 0.5) * 0.04
-      );
-    }
-
-    var raf;
-    function draw() {
-      if (!buf) { raf = requestAnimationFrame(draw); return; }
-
-      buf.copyWithin(0, 1);
-      buf[W - 1] = sample();
-      t += 0.072;
-
-      ctx.clearRect(0, 0, W, H);
-
-      var cy  = H * 0.5;
-      var amp = H * 0.42;
-
-      ctx.beginPath();
-      ctx.moveTo(0, cy + buf[0] * amp);
-      for (var x = 1; x < W; x++) {
-        ctx.lineTo(x, cy + buf[x] * amp);
-      }
-      ctx.strokeStyle = COLOR;
-      ctx.lineWidth   = 1.5;
-      ctx.shadowColor = GLOW;
-      ctx.shadowBlur  = 10;
-      ctx.stroke();
-
-      raf = requestAnimationFrame(draw);
-    }
-
-    resize();
-    new ResizeObserver(resize).observe(canvas);
-    draw();
-  }
-
   var L = document.getElementById('wave-l');
   var R = document.getElementById('wave-r');
-  if (L && R) {
-    makeWave(L, 0);
-    makeWave(R, Math.PI * 1.4);
+  if (!L || !R) return;
+
+  var ctxL = L.getContext('2d');
+  var ctxR = R.getContext('2d');
+
+  /* single shared buffer covers: [left canvas | hidden gap | right canvas] */
+  var buf, WL, WR, HL, HR, GAP, TOTAL, dpr;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    WL = L.offsetWidth;  HL = L.offsetHeight;
+    WR = R.offsetWidth;  HR = R.offsetHeight;
+
+    /* measure the pixel gap between the two canvases (the title sits there) */
+    var lRect = L.getBoundingClientRect();
+    var rRect = R.getBoundingClientRect();
+    GAP   = Math.max(0, Math.round(rRect.left - lRect.right));
+    TOTAL = WL + GAP + WR;
+
+    L.width  = Math.round(WL * dpr); L.height = Math.round(HL * dpr);
+    R.width  = Math.round(WR * dpr); R.height = Math.round(HR * dpr);
+    ctxL.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxR.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    buf = new Float32Array(Math.max(TOTAL, 2)).fill(0);
   }
+
+  var t = 0;
+  function sample() {
+    var env = 0.55 + 0.45 * Math.sin(t * 0.11 + 1.2);
+    return env * (
+      Math.sin(t * 2.17)  * 0.38 +
+      Math.sin(t * 4.83)  * 0.22 +
+      Math.sin(t * 7.05)  * 0.13 +
+      Math.sin(t * 11.4)  * 0.07 +
+      Math.sin(t * 0.63)  * 0.14 +
+      (Math.random() - 0.5) * 0.04
+    );
+  }
+
+  function drawSegment(ctx, W, H, offset) {
+    var cy = H * 0.5, amp = H * 0.42;
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    ctx.moveTo(0, cy + buf[offset] * amp);
+    for (var i = 1; i < W; i++) ctx.lineTo(i, cy + buf[offset + i] * amp);
+    ctx.strokeStyle = COLOR;
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = GLOW;
+    ctx.shadowBlur  = 10;
+    ctx.stroke();
+  }
+
+  function draw() {
+    if (!buf) { requestAnimationFrame(draw); return; }
+    buf.copyWithin(0, 1);
+    buf[TOTAL - 1] = sample();
+    t += 0.072;
+    /* left portion starts at 0, right portion starts after the gap */
+    drawSegment(ctxL, WL, HL, 0);
+    drawSegment(ctxR, WR, HR, WL + GAP);
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  new ResizeObserver(function () { resize(); }).observe(L.parentElement);
+  draw();
 })();
 </script>
 </body>
