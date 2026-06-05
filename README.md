@@ -82,6 +82,37 @@ Overdrive · Distortion · Chorus · Delay (BPM sync) · Reverb (Freeverb / Plat
 
 ---
 
+## Installing
+
+### Homebrew (recommended)
+
+```sh
+brew tap ven7u/forma
+brew install --cask forma
+```
+
+No Gatekeeper warning, no Rust required. Updates via `brew upgrade forma`.
+
+### cargo install
+
+Requires [Rust](https://rustup.rs) installed. Builds from source — no Gatekeeper warning.
+
+```sh
+cargo install --git https://github.com/Ven7u/forma-synth forma
+```
+
+### Download (macOS universal DMG)
+
+Download the latest DMG from [Releases](https://github.com/Ven7u/forma-synth/releases/latest), open it and drag **Forma.app** to Applications.
+
+> **"Forma is damaged and can't be opened"** — macOS Gatekeeper blocks unsigned apps. Fix with one of:
+>
+> - **Terminal:** `xattr -cr /Applications/Forma.app` then open normally
+> - **Right-click** Forma.app → **Open** → **Open**
+> - **System Settings** → Privacy & Security → **Open Anyway**
+
+---
+
 ## Building
 
 ### Prerequisites
