@@ -34,11 +34,31 @@ jobs:
           zip -r "Forma-${{ github.ref_name }}-macos.zip" "Forma.app"
           mv "Forma-${{ github.ref_name }}-macos.zip" "$GITHUB_WORKSPACE/"
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        # create-dmg exits 2 when no code-signing identity is present — the DMG
+        # is still valid, so we treat exit 2 as success.
+        run: |
+          create-dmg \
+            --volname "Forma ${{ github.ref_name }}" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 128 \
+            --icon "Forma.app" 150 185 \
+            --hide-extension "Forma.app" \
+            --app-drop-link 450 185 \
+            "Forma-${{ github.ref_name }}-macos.dmg" \
+            "target/release/bundle/osx/" || test $? -eq 2
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Forma ${{ github.ref_name }}"
           body_path: CHANGELOG.md
-          files: "Forma-${{ github.ref_name }}-macos.zip"
+          files: |
+            Forma-${{ github.ref_name }}-macos.dmg
+            Forma-${{ github.ref_name }}-macos.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
