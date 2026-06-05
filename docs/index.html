@@ -653,14 +653,14 @@
     <details open>
       <summary>Install</summary>
       <div class="guide-body">
-        <p style="margin-bottom:0.6rem;"><strong>Recommended — Homebrew</strong> (no warnings, no manual steps):</p>
+        <p style="margin-bottom:0.6rem;"><strong>Recommended — Homebrew</strong> (no Gatekeeper, no Rust needed, launch with <code style="color:var(--phosphor)">forma</code>):</p>
         <pre style="margin-bottom:1rem;">brew tap ven7u/forma
 brew trust ven7u/forma
-brew install --cask forma</pre>
+brew install ven7u/forma/forma</pre>
         <p style="margin-bottom:0.4rem;"><strong>cargo install</strong> — requires <a href="https://rustup.rs" style="color:var(--phosphor)">Rust</a>, builds from source, no Gatekeeper warning:</p>
         <pre style="margin-bottom:1rem;">cargo install --git https://github.com/Ven7u/forma-synth forma</pre>
-        <p style="margin-bottom:0.4rem;"><strong>DMG</strong> — download from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a>, open it, drag <strong>Forma.app</strong> to Applications.<br>
-        <em>Seeing "Forma is damaged"?</em> macOS blocks unsigned apps. Fix: <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code>, or right-click → Open → Open.</p>
+        <p style="margin-bottom:0.4rem;"><strong>DMG / .app bundle</strong> — download from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a> or use <code style="color:var(--phosphor)">brew install --cask forma</code>.<br>
+        <em>Seeing a Gatekeeper warning?</em> Run <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code>, or right-click → Open → Open.</p>
       </div>
     </details>
 

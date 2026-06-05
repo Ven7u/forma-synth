@@ -89,10 +89,12 @@ Overdrive · Distortion · Chorus · Delay (BPM sync) · Reverb (Freeverb / Plat
 ```sh
 brew tap ven7u/forma
 brew trust ven7u/forma
-brew install --cask forma
+brew install ven7u/forma/forma
 ```
 
-No Gatekeeper warning, no Rust required. Updates via `brew upgrade forma`.
+Installs the `forma` binary — no Gatekeeper warning, no Rust required. Launch with `forma`. Updates via `brew upgrade ven7u/forma/forma`.
+
+> **Prefer a .app bundle?** Use `brew install --cask forma` instead. You may need to run `xattr -cr /Applications/Forma.app` the first time due to macOS Gatekeeper.
 
 ### cargo install
 
