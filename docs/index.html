@@ -651,8 +651,16 @@
     <p class="section-label">How to use it</p>
 
     <details open>
-      <summary>Quick start</summary>
+      <summary>Quick start &amp; installation</summary>
       <div class="guide-body">
+        <p>Download the DMG from <a href="https://github.com/Ven7u/forma-synth/releases/latest" style="color:var(--phosphor)">Releases</a>, open it, drag <strong>Forma.app</strong> to Applications.</p>
+        <p><strong>Seeing "Forma is damaged and can't be opened"?</strong> That's macOS Gatekeeper blocking an unsigned app — not actual damage. Fix it with one of:</p>
+        <ul class="tip-list" style="margin-bottom:0.5rem;">
+          <li><strong>Terminal:</strong> <code style="color:var(--phosphor)">xattr -cr /Applications/Forma.app</code></li>
+          <li><strong>Right-click</strong> Forma.app → Open → Open</li>
+          <li><strong>System Settings</strong> → Privacy &amp; Security → Open Anyway</li>
+          <li><strong>Build from source:</strong> <code style="color:var(--phosphor)">cargo run -p forma --release</code></li>
+        </ul>
         <ol class="steps">
           <li>Launch Forma. It opens with the <strong>Init patch</strong> loaded — a basic saw wave ready to play.</li>
           <li>Press keys on your computer keyboard (<kbd>A</kbd>–<kbd>'</kbd> are white keys, <kbd>W E T Y U O P</kbd> are sharps). <kbd>Z</kbd> / <kbd>X</kbd> shift octaves. <kbd>Space</kbd> freezes the last note.</li>

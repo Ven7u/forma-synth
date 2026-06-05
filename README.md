@@ -82,6 +82,26 @@ Overdrive · Distortion · Chorus · Delay (BPM sync) · Reverb (Freeverb / Plat
 
 ---
 
+## Installing
+
+### Download (macOS universal DMG)
+
+Download the latest DMG from [Releases](https://github.com/Ven7u/forma-synth/releases/latest), open it and drag **Forma.app** to Applications.
+
+> **"Forma is damaged and can't be opened"** — this is macOS Gatekeeper blocking an unsigned app, not actual damage. Three ways to fix it:
+>
+> **Option A — Terminal (one command):**
+> ```sh
+> xattr -cr /Applications/Forma.app
+> ```
+> Then open normally.
+>
+> **Option B — Right-click:** right-click `Forma.app` → **Open** → click **Open** in the dialog. Only needed once.
+>
+> **Option C — System Settings:** after a blocked attempt, open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+---
+
 ## Building
 
 ### Prerequisites

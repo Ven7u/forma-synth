@@ -19,6 +19,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] — 2026-05-30
 
+> **macOS Gatekeeper:** the app is not yet code-signed. If you see _"Forma is damaged and can't be opened"_, run `xattr -cr /Applications/Forma.app` in Terminal, or right-click the app → Open → Open.
+
+
 First public release.
 
 ### Sound engine
