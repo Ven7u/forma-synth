@@ -8,6 +8,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Infrastructure
+- GitHub Pages landing page (`docs/`) with CRT-style design
+- Release workflow now produces both a `.dmg` (drag-to-Applications) and a `.zip` alongside each GitHub Release
+- `cargo-release` configuration (`release.toml`) for automated version bump → commit → tag → push
+- `publish = false` set on all crates until library APIs stabilise
+- Branch protection on `main` — PRs and CI required before merging
+
 ---
 
 ## [0.1.0] — 2026-05-30

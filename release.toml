@@ -1,0 +1,41 @@
+# cargo-release configuration
+# Docs: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
+
+# No crates.io publishing yet — APIs are still evolving.
+# When ready, flip publish = true per-crate in [[packages]] overrides below.
+publish = false
+
+# Sign tags with the committer's GPG key if available, but don't require it.
+sign-tag = false
+
+# Commit message for the version bump ({{version}} is substituted by cargo-release).
+pre-release-commit-message = "chore: release v{{version}}"
+
+# Tag format must match the `v*` trigger in .github/workflows/release.yml.
+tag-name = "v{{version}}"
+tag-message = "Forma v{{version}}"
+
+# Push the version-bump commit and the tag in one go.
+push = true
+
+# Only the top-level `forma` binary drives the version; the library crates
+# are bumped in lock-step via the workspace but are not independently tagged.
+[[packages]]
+name = "forma"
+publish = false
+
+[[packages]]
+name = "forma-engine"
+publish = false
+
+[[packages]]
+name = "forma-dsp"
+publish = false
+
+[[packages]]
+name = "forma-control"
+publish = false
+
+[[packages]]
+name = "forma-common"
+publish = false
