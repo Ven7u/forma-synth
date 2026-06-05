@@ -88,6 +88,7 @@ Overdrive · Distortion · Chorus · Delay (BPM sync) · Reverb (Freeverb / Plat
 
 ```sh
 brew tap ven7u/forma
+brew trust ven7u/forma
 brew install --cask forma
 ```
 
