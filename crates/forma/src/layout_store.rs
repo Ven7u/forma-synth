@@ -9,8 +9,7 @@ use directories::ProjectDirs;
 use std::path::PathBuf;
 
 fn layouts_dir() -> Option<PathBuf> {
-    ProjectDirs::from("com", "francescoventura", "Forma")
-        .map(|d| d.data_dir().join("layouts"))
+    ProjectDirs::from("com", "francescoventura", "Forma").map(|d| d.data_dir().join("layouts"))
 }
 
 fn user_dir() -> Option<PathBuf> {
@@ -38,7 +37,9 @@ pub fn save_current(state: &LayoutState) {
 /// List all user-saved layout names (filename stems, sorted).
 pub fn list_user_layouts() -> Vec<String> {
     let Some(dir) = user_dir() else { return vec![] };
-    let Ok(entries) = std::fs::read_dir(&dir) else { return vec![] };
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return vec![];
+    };
     let mut names: Vec<String> = entries
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().map_or(false, |x| x == "json"))
@@ -79,7 +80,13 @@ pub fn delete_named(name: &str) {
 /// Strip characters that are unsafe in filenames.
 fn sanitize(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .trim()
         .to_string()

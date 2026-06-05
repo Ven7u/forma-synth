@@ -146,13 +146,8 @@ impl SynthApp {
         use crate::ui::layout::builtin_presets;
         for preset in builtin_presets() {
             ui.horizontal(|ui| {
-                let btn =
-                    egui::Button::new(egui::RichText::new(preset.name).small().color(accent));
-                if ui
-                    .add(btn)
-                    .on_hover_text(preset.description)
-                    .clicked()
-                {
+                let btn = egui::Button::new(egui::RichText::new(preset.name).small().color(accent));
+                if ui.add(btn).on_hover_text(preset.description).clicked() {
                     self.apply_panel_visibility(&preset.panels);
                     let state = self.capture_layout_state();
                     crate::ui::layout::save_layout(&state);
@@ -167,8 +162,7 @@ impl SynthApp {
             ui.label(egui::RichText::new("Saved").size(10.0).color(text_dis));
             for name in saved {
                 ui.horizontal(|ui| {
-                    let btn =
-                        egui::Button::new(egui::RichText::new(&name).small().color(accent));
+                    let btn = egui::Button::new(egui::RichText::new(&name).small().color(accent));
                     if ui
                         .add(btn)
                         .on_hover_text(format!("Load layout \"{name}\""))

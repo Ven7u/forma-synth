@@ -335,14 +335,14 @@ impl SynthApp {
                     ui.add(
                         egui::Slider::new(&mut self.fx_bitcrush_bits, 1.0_f32..=16.0)
                             .text("Bits")
-                            
+
                             .custom_formatter(|v, _| format!("{:.1}", v)),
                     )
                     .on_hover_text("Bit depth: 16 = CD quality, 8 = classic lo-fi, 4 = extreme crunch, 1 = 1-bit noise.");
                     ui.add(
                         egui::Slider::new(&mut self.fx_bitcrush_rate, 1.0_f32..=32.0)
                             .text("S/R Div")
-                            
+
                             .custom_formatter(|v, _| format!("÷{:.0}", v)),
                     )
                     .on_hover_text("Sample-rate divisor: 1 = no decimation, 32 = extreme aliasing crunch.");
@@ -440,7 +440,7 @@ impl SynthApp {
                         egui::Slider::new(&mut self.fx_phaser_center, 100.0_f32..=8000.0)
                             .text("Center")
                             .suffix(" Hz")
-                            
+
                             .logarithmic(true),
                     )
                     .on_hover_text("Center frequency of the all-pass notch sweep.");
@@ -484,7 +484,7 @@ impl SynthApp {
                         .color(self.theme.c(&self.theme.accent)));
                     ui.add(egui::Slider::new(&mut self.stereo_spread, 0.0_f32..=0.012)
                         .text("Spread")
-                        
+
                         .custom_formatter(|v, _| format!("{:.1} ms", v * 1000.0)))
                         .on_hover_text("Haas spread: delays R channel by 0–12 ms. Creates stereo width from mono unison voices. Keep under 10 ms to avoid comb filtering.");
                     ui.add(egui::Slider::new(&mut self.stereo_width, 0.0_f32..=2.0)

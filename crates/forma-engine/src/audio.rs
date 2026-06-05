@@ -756,9 +756,7 @@ pub fn build_synth_graph(state: &AudioState, sr: f64) -> Box<dyn AudioUnit + Sen
         let dyn_cutoff = (var(&state.effective_cutoff)
             + fenv * var(&state.filter_env_amount) * dc(12000.0_f32)
             + var(&state.voice_velocities[vi]) * var(&state.vel_filter) * dc(8000.0_f32))
-            >> map(|x: &Frame<f32, U1>| -> Frame<f32, U1> {
-                [x[0].clamp(80.0, 18000.0)].into()
-            });
+            >> map(|x: &Frame<f32, U1>| -> Frame<f32, U1> { [x[0].clamp(80.0, 18000.0)].into() });
         let filtered = (driven | dyn_cutoff | var(&state.resonance)) >> moog();
 
         // Amp ADSR envelope (fully live-parametric).

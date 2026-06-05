@@ -102,10 +102,7 @@ impl VoiceAllocator {
         frames: usize,
         sr: f64,
     ) {
-        if state
-            .silence_all_requested
-            .swap(false, Ordering::Relaxed)
-        {
+        if state.silence_all_requested.swap(false, Ordering::Relaxed) {
             for vi in 0..VOICE_COUNT {
                 self.retrigger_countdown[vi] = 0;
             }
@@ -291,7 +288,7 @@ impl VoiceAllocator {
         // reliably sees a 0→1 edge regardless of timing.
         let was_allocated = self.voice_notes[slot].is_some();
         let gate_val = state.voice_gates[slot].value();
-        let amp_val  = state.amp_cursors[slot].value();
+        let amp_val = state.amp_cursors[slot].value();
         let needs_retrigger = was_allocated || gate_val > 0.5 || amp_val > 0.5;
 
         eprintln!(
@@ -313,14 +310,21 @@ impl VoiceAllocator {
             self.retrigger_countdown[slot] = 0;
         }
 
-        let pool: Vec<String> = self.voice_notes.iter().enumerate().map(|(i, n)| {
-            format!("s{}:{} g{:.1} a{:.1} c{}",
-                i,
-                n.map_or("--".into(), |p| p.to_string()),
-                state.voice_gates[i].value(),
-                state.amp_cursors[i].value(),
-                self.retrigger_countdown[i])
-        }).collect();
+        let pool: Vec<String> = self
+            .voice_notes
+            .iter()
+            .enumerate()
+            .map(|(i, n)| {
+                format!(
+                    "s{}:{} g{:.1} a{:.1} c{}",
+                    i,
+                    n.map_or("--".into(), |p| p.to_string()),
+                    state.voice_gates[i].value(),
+                    state.amp_cursors[i].value(),
+                    self.retrigger_countdown[i]
+                )
+            })
+            .collect();
         eprintln!("[pool] {}", pool.join("  "));
     }
 
@@ -630,19 +634,35 @@ mod tests {
         let (mut va, state, tx, rx) = setup();
 
         // Start a note so slot 0 is active with amp_cursor > 0 (audible).
-        tx.try_send(ControlEvent::NoteOn { pitch: 60, velocity: 100, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOn {
+            pitch: 60,
+            velocity: 100,
+            track: 0,
+        })
+        .unwrap();
         va.begin_buffer(&state, &rx, 64, 48_000.0);
         state.amp_cursors[0].set(3.0); // simulate sustain phase
 
         // Same-buffer NoteOff + NoteOn starts a retrigger (countdown = 4, gate = 0).
-        tx.try_send(ControlEvent::NoteOff { pitch: 60, track: 0 }).unwrap();
-        tx.try_send(ControlEvent::NoteOn  { pitch: 60, velocity: 100, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOff {
+            pitch: 60,
+            track: 0,
+        })
+        .unwrap();
+        tx.try_send(ControlEvent::NoteOn {
+            pitch: 60,
+            velocity: 100,
+            track: 0,
+        })
+        .unwrap();
         va.begin_buffer(&state, &rx, 64, 48_000.0);
         assert_eq!(state.voice_gates[0].value(), 0.0); // mid-retrigger gap
-        // retrigger_countdown is now 4
+                                                       // retrigger_countdown is now 4
 
         // Simulate patch load: silence_all_voices() zeros gates + sets the flag.
-        for gate in state.voice_gates.iter() { gate.set(0.0); }
+        for gate in state.voice_gates.iter() {
+            gate.set(0.0);
+        }
         state.silence_all_requested.store(true, Ordering::Relaxed);
 
         // begin_buffer consumes the flag and clears in-flight countdowns
@@ -652,8 +672,14 @@ mod tests {
         va.begin_buffer(&state, &rx, 64, 48_000.0);
 
         // No phantom re-fire: the gate stays at 0 through the buffer.
-        for _ in 0..8 { va.tick_sample(&state); }
-        assert_eq!(state.voice_gates[0].value(), 0.0, "gate must stay silent after silence_all");
+        for _ in 0..8 {
+            va.tick_sample(&state);
+        }
+        assert_eq!(
+            state.voice_gates[0].value(),
+            0.0,
+            "gate must stay silent after silence_all"
+        );
     }
 
     #[test]
@@ -669,29 +695,52 @@ mod tests {
         let (mut va, state, tx, rx) = setup();
 
         // Simulate a hardware MIDI NoteOn (note not tracked in piano_held_midi).
-        tx.try_send(ControlEvent::NoteOn { pitch: 64, velocity: 100, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOn {
+            pitch: 64,
+            velocity: 100,
+            track: 0,
+        })
+        .unwrap();
         va.begin_buffer(&state, &rx, 64, 48_000.0);
         assert_eq!(state.voice_gates[0].value(), 1.0);
 
         // Simulate patch load: silence_all_voices() zeros the gates, then
         // engine.all_notes_off() flushes NoteOff for all 128 pitches.
-        for gate in state.voice_gates.iter() { gate.set(0.0); }
+        for gate in state.voice_gates.iter() {
+            gate.set(0.0);
+        }
         state.silence_all_requested.store(true, Ordering::Relaxed);
         for p in 0u8..=127 {
-            tx.try_send(ControlEvent::NoteOff { pitch: p, track: 0 }).ok();
+            tx.try_send(ControlEvent::NoteOff { pitch: p, track: 0 })
+                .ok();
         }
         va.begin_buffer(&state, &rx, 64, 48_000.0);
         va.tick_sample(&state); // clear retrigger flag
 
         // Now play the same pitch again — count must be 1 (not 2).
-        tx.try_send(ControlEvent::NoteOn { pitch: 64, velocity: 100, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOn {
+            pitch: 64,
+            velocity: 100,
+            track: 0,
+        })
+        .unwrap();
         va.begin_buffer(&state, &rx, 64, 48_000.0);
-        for _ in 0..4 { va.tick_sample(&state); } // let retrigger fire
+        for _ in 0..4 {
+            va.tick_sample(&state);
+        } // let retrigger fire
         assert_eq!(state.voice_gates[0].value(), 1.0);
 
         // Single NoteOff must silence it (count 1→0).
-        tx.try_send(ControlEvent::NoteOff { pitch: 64, track: 0 }).unwrap();
+        tx.try_send(ControlEvent::NoteOff {
+            pitch: 64,
+            track: 0,
+        })
+        .unwrap();
         va.begin_buffer(&state, &rx, 64, 48_000.0);
-        assert_eq!(state.voice_gates[0].value(), 0.0, "stuck gate: count was > 1");
+        assert_eq!(
+            state.voice_gates[0].value(),
+            0.0,
+            "stuck gate: count was > 1"
+        );
     }
 }

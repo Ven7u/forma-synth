@@ -1,6 +1,5 @@
 use crate::sequencer::{
-    chord_name, chord_quality, ScaleType, SeqClockDiv, SeqMode, DEGREE_LABELS,
-    NOTE_NAMES,
+    chord_name, chord_quality, ScaleType, SeqClockDiv, SeqMode, DEGREE_LABELS, NOTE_NAMES,
 };
 use crate::SynthApp;
 use eframe::egui;

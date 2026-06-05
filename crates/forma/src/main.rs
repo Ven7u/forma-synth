@@ -32,9 +32,15 @@ fn main() -> eframe::Result {
 
     let icon = {
         let bytes = include_bytes!("../assets/icons/icon_512x512@2x.png");
-        let img = image::load_from_memory(bytes).expect("valid icon PNG").into_rgba8();
+        let img = image::load_from_memory(bytes)
+            .expect("valid icon PNG")
+            .into_rgba8();
         let (w, h) = img.dimensions();
-        egui::IconData { rgba: img.into_raw(), width: w, height: h }
+        egui::IconData {
+            rgba: img.into_raw(),
+            width: w,
+            height: h,
+        }
     };
 
     let options = eframe::NativeOptions {
@@ -1937,10 +1943,17 @@ impl SynthApp {
         self.patch_recent.insert(0, rname);
         self.patch_recent.truncate(12);
 
-        eprintln!("[patch] loading \"{}\" (category={}  osc_enabled={:?}  noise={:.2}  \
+        eprintln!(
+            "[patch] loading \"{}\" (category={}  osc_enabled={:?}  noise={:.2}  \
                    amp_adsr={:?}  cutoff={:.0}  fenv_amt={:.2})",
-            p.name, p.category, p.osc_enabled, p.noise_vol,
-            p.amp_adsr, p.filter_cutoff, p.filter_env_amount);
+            p.name,
+            p.category,
+            p.osc_enabled,
+            p.noise_vol,
+            p.amp_adsr,
+            p.filter_cutoff,
+            p.filter_env_amount
+        );
 
         // Capture physically held hardware MIDI notes before all_notes_off clears the set,
         // so we can re-trigger them with the new patch parameters below.
