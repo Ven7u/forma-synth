@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forma — Polyphonic Synthesizer for macOS</title>
+  <meta name="description" content="A free, open-source polyphonic software synthesizer for macOS, built in Rust." />
+  <meta property="og:title" content="Forma Synthesizer" />
+  <meta property="og:description" content="Free, open-source polyphonic synth for macOS. 171 presets, mod matrix, FX chain, MIDI learn." />
+  <meta property="og:image" content="https://ven7u.github.io/forma-synth/imgs/screen_1.png" />
+  <link rel="icon" href="imgs/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* — icon palette — */
+      --screen:       #0d1422;   /* CRT screen dark navy */
+      --phosphor:     #8ec5a5;   /* P31 waveform green  */
+      --phosphor-dim: #4a7a5e;   /* dimmer phosphor     */
+      --phosphor-hi:  #c2e8d0;   /* bright highlight    */
+      --bezel:        #3d2f38;   /* pixel-art frame     */
+      --bezel-light:  #5c4555;
+
+      /* — derived — */
+      --bg:      var(--screen);
+      --surface: #111926;
+      --border:  #1e2e24;
+      --text:    var(--phosphor);
+      --muted:   var(--phosphor-dim);
+
+      --glow-sm: 0 0 6px rgba(142,197,165,0.55);
+      --glow-md: 0 0 12px rgba(142,197,165,0.45), 0 0 28px rgba(142,197,165,0.2);
+      --glow-lg: 0 0 8px rgba(142,197,165,0.6), 0 0 24px rgba(142,197,165,0.3), 0 0 56px rgba(142,197,165,0.1);
+
+      --font-display: 'VT323', monospace;
+      --font-mono:    'Share Tech Mono', ui-monospace, monospace;
+      --radius: 4px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    /* ── SCANLINES + VIGNETTE overlay ── */
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 15px;
+      line-height: 1.65;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    /* scanlines */
+    body::before {
+      content: '';
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 2px,
+        rgba(0, 0, 0, 0.18) 4px
+      );
+    }
+
+    /* vignette */
+    body::after {
+      content: '';
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
+    }
+
+    /* subtle flicker */
+    @keyframes flicker {
+      0%   { opacity: 1; }
+      92%  { opacity: 1; }
+      93%  { opacity: 0.97; }
+      94%  { opacity: 1; }
+      96%  { opacity: 0.98; }
+      100% { opacity: 1; }
+    }
+
+    #crt-wrap {
+      animation: flicker 8s infinite;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 52px;
+      background: rgba(13, 20, 34, 0.9);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      letter-spacing: 0.15em;
+      color: var(--phosphor);
+      text-decoration: none;
+      text-shadow: var(--glow-sm);
+    }
+
+    .nav-brand img {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      image-rendering: pixelated;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.75rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: color 0.15s, text-shadow 0.15s;
+    }
+
+    .nav-links a:hover {
+      color: var(--phosphor-hi);
+      text-shadow: var(--glow-sm);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 5rem 2rem 4rem;
+      gap: 1.5rem;
+    }
+
+    .hero-icon {
+      width: 112px;
+      height: 112px;
+      border-radius: 16px;
+      image-rendering: pixelated;
+      box-shadow: 0 0 0 1px var(--border), var(--glow-md);
+    }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(4rem, 12vw, 8rem);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--phosphor-hi);
+      text-shadow: var(--glow-lg);
+      line-height: 1;
+    }
+
+    .hero-sub {
+      font-size: 0.9rem;
+      color: var(--muted);
+      max-width: 460px;
+      letter-spacing: 0.03em;
+    }
+
+    .hero-sub strong { color: var(--phosphor); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2em 0.8em;
+      border: 1px solid var(--phosphor-dim);
+      font-size: 0.72rem;
+      color: var(--phosphor-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--phosphor);
+      color: var(--screen);
+      box-shadow: var(--glow-md);
+    }
+
+    .btn-primary:hover {
+      background: var(--phosphor-hi);
+      box-shadow: var(--glow-lg);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--phosphor);
+      border: 1px solid var(--phosphor-dim);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--phosphor);
+      color: var(--phosphor-hi);
+      text-shadow: var(--glow-sm);
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .platform-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── SCREENSHOTS ── */
+    .screenshots {
+      padding: 3rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .screenshot-grid img {
+      width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 0 0 1px rgba(142,197,165,0.08), 0 4px 24px rgba(0,0,0,0.5);
+      transition: box-shadow 0.2s, transform 0.2s;
+      display: block;
+    }
+
+    .screenshot-grid img:hover {
+      transform: scale(1.015);
+      box-shadow: var(--glow-md), 0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      color: var(--phosphor-dim);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── FEATURES ── */
+    .features {
+      padding: 4rem 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--phosphor-dim);
+      margin-bottom: 2.5rem;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+      gap: 1px;
+      border: 1px solid var(--border);
+      background: var(--border);
+    }
+
+    .feature-card {
+      background: var(--surface);
+      padding: 1.2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: background 0.15s;
+    }
+
+    .feature-card:hover {
+      background: #141f18;
+    }
+
+    .feature-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--phosphor);
+      text-shadow: var(--glow-sm);
+    }
+
+    .feature-card p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── BUILD FROM SOURCE ── */
+    .source {
+      padding: 2rem 2rem 4rem;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    summary {
+      padding: 0.9rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    summary::before { content: "▶"; font-size: 0.6rem; transition: transform 0.2s; }
+    details[open] summary::before { transform: rotate(90deg); }
+    summary:hover { color: var(--phosphor); }
+
+    .source-body {
+      padding: 0 1.25rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    pre {
+      background: var(--screen);
+      border: 1px solid var(--border);
+      padding: 0.85rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      overflow-x: auto;
+      color: var(--phosphor);
+      text-shadow: var(--glow-sm);
+    }
+
+    .source-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    footer a { color: var(--muted); text-decoration: underline; }
+    footer a:hover { color: var(--phosphor); text-shadow: var(--glow-sm); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 3.5rem 1rem 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div id="crt-wrap">
+
+  <nav>
+    <a class="nav-brand" href="#">
+      <img src="imgs/icon.png" alt="Forma icon" />
+      Forma
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="https://github.com/Ven7u/forma-synth">GitHub</a></li>
+      <li><a href="https://github.com/Ven7u/forma-synth/releases">Releases</a></li>
+    </ul>
+  </nav>
+
+  <section class="hero">
+    <img class="hero-icon" src="imgs/icon.png" alt="Forma icon" />
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;justify-content:center;">
+      <span class="badge">macOS &nbsp;·&nbsp; Free &nbsp;·&nbsp; Open Source</span>
+      <a href="https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml" style="display:inline-flex;">
+        <img src="https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml/badge.svg" alt="CI status" style="height:20px;image-rendering:auto;" />
+      </a>
+    </div>
+    <h1>Forma</h1>
+    <p class="hero-sub">
+      A <strong>polyphonic software synthesizer</strong> for macOS, built in Rust.
+      171 presets, mod matrix, full FX chain, MIDI learn —
+      no subscription, no account.
+    </p>
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="https://github.com/Ven7u/forma-synth/releases/latest">
+        ↓ Download for Mac
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/Ven7u/forma-synth">
+        View on GitHub
+      </a>
+    </div>
+    <p class="platform-note">Requires macOS 13 or later &nbsp;·&nbsp; Apple Silicon &amp; Intel</p>
+  </section>
+
+  <section class="screenshots">
+    <div class="screenshot-grid">
+      <img src="imgs/screen_1.png" alt="Forma main interface — oscillators, filter, envelope" />
+      <img src="imgs/screen_3.png" alt="Forma filter, FX chain and chord keyboard" />
+      <img src="imgs/screen_2.png" alt="Forma oscilloscope" />
+    </div>
+  </section>
+
+  <div class="divider">// features</div>
+
+  <section class="features" id="features">
+    <p class="section-label">What's inside</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <span class="feature-label">8-Voice Polyphony</span>
+        <p>Oldest-first voice stealing, velocity sensitivity, mono/legato with portamento.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">3 Oscillators</span>
+        <p>Sine, saw, square, triangle, noise. Unison up to 5 voices, FM, ring mod, hard sync.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">Mod Matrix</span>
+        <p>2 LFOs, 4 free-routing slots, aftertouch and mod wheel as sources.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">FX Chain</span>
+        <p>Overdrive · Distortion · Chorus · Delay · Reverb · Shimmer · Crystallizer.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">171 Factory Presets</span>
+        <p>20 categories — Ambient, Cinematic, Lead, Pad, Bass, and more.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">Drum Machine</span>
+        <p>8-channel × 16-step sequencer with Euclidean rhythm generator and per-step velocity.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">MIDI Learn</span>
+        <p>Click any knob, move a hardware CC to bind. Factory mappings for Arturia KeyLab.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-label">Sequencer &amp; Arp</span>
+        <p>16-step melodic patterns, arpeggiator, scale walker, chord voicings.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider">// build</div>
+
+  <section class="source">
+    <details>
+      <summary>Build from source (Rust / macOS)</summary>
+      <div class="source-body">
+        <pre>git clone https://github.com/Ven7u/forma-synth.git
+cd forma-synth
+cargo run -p forma --release</pre>
+        <p class="source-note">Rust stable 1.75+ required. First build takes a few minutes — LTO is enabled across DSP crates.</p>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    <div>
+      <strong>Forma</strong> &nbsp;·&nbsp;
+      <a href="https://github.com/Ven7u/forma-synth">GitHub</a> &nbsp;·&nbsp;
+      <a href="https://github.com/Ven7u/forma-synth/releases">Releases &amp; changelog</a> &nbsp;·&nbsp;
+      <a href="https://github.com/Ven7u/forma-synth/blob/main/CONTRIBUTING.md">Contributing</a>
+    </div>
+    <div>Licensed under MIT OR Apache-2.0 &nbsp;·&nbsp; © 2026 Francesco Ventura</div>
+  </footer>
+
+</div><!-- #crt-wrap -->
+</body>
+</html>

@@ -4,6 +4,8 @@
 # Forma
 
 A polyphonic software synthesizer for macOS, built in Rust.
+
+[![CI](https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml/badge.svg)](https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml)
 </div>
 
 > **Status:** Early development / personal project. **macOS only** — tested on macOS 15 Sequoia. Linux and Windows are untested.
