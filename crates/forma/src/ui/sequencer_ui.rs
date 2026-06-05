@@ -388,7 +388,7 @@ impl SynthApp {
                     SeqMode::ChordKb => 8,
                 };
                 self.seq_euclid_hits = self.seq_euclid_hits.clamp(1, cur_len);
-                self.seq_euclid_offset = self.seq_euclid_offset % cur_len;
+                self.seq_euclid_offset %= cur_len;
                 ui.horizontal(|ui| {
                     ui.label("Hits:");
                     let mut h = self.seq_euclid_hits;

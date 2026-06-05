@@ -43,6 +43,7 @@ const GENRE_TAGS: &[&str] = &["electronic", "synthwave", "rock", "cinematic"];
 // ---------------------------------------------------------------------------
 
 impl SynthApp {
+    #[allow(dead_code)]
     pub fn ui_patch_bar(&mut self, ui: &mut egui::Ui) {
         ui.label(egui::RichText::new("PATCH").strong().small());
 
@@ -56,7 +57,7 @@ impl SynthApp {
         {
             let p = self.capture_patch();
             if let Some(path) = rfd::FileDialog::new()
-                .set_file_name(&format!("{}.json", p.name))
+                .set_file_name(format!("{}.json", p.name))
                 .add_filter("Patch", &["json"])
                 .save_file()
             {
@@ -139,17 +140,16 @@ impl SynthApp {
                         });
                 ui.checkbox(&mut self.patch_load_fx, fx_label)
                     .on_hover_text("When on, loading a patch also restores its FX chain.");
-                if !self.patch_active_tags.is_empty() {
-                    if ui
+                if !self.patch_active_tags.is_empty()
+                    && ui
                         .small_button(
                             egui::RichText::new("Clear filters")
                                 .color(Color32::from_rgb(200, 100, 70)),
                         )
                         .clicked()
-                    {
-                        self.patch_active_tags.clear();
-                        self.patch_browser_category = "All".into();
-                    }
+                {
+                    self.patch_active_tags.clear();
+                    self.patch_browser_category = "All".into();
                 }
             });
         });

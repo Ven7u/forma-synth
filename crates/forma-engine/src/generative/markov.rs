@@ -236,13 +236,13 @@ fn apply_bias_and_normalize(
         total += out[j];
     }
     if total > 0.0 {
-        for j in 0..MELODIC_STATES {
-            out[j] /= total;
+        for slot in out.iter_mut().take(MELODIC_STATES) {
+            *slot /= total;
         }
     } else {
         // fallback: uniform
-        for j in 0..MELODIC_STATES {
-            out[j] = 1.0 / MELODIC_STATES as f32;
+        for slot in out.iter_mut().take(MELODIC_STATES) {
+            *slot = 1.0 / MELODIC_STATES as f32;
         }
     }
     out
@@ -306,6 +306,7 @@ pub struct MoodSet {
     /// Rhythmic speed multiplier. 1.0 = use role's base divisor as-is.
     /// <1.0 = slower (e.g. 0.5 = half speed, every voice steps half as often).
     /// >1.0 = faster (e.g. 2.0 = double speed).
+    ///
     /// Blended across moods, then applied to each role's rhythmic_divisor.
     pub rhythmic_speed: f32,
     /// Probability that the harmonic chain advances on each bar (0.0–1.0).
@@ -787,6 +788,7 @@ impl MelodicChain {
     /// Call only when the rhythmic chain fires `Single`, `Double`, or `Accent`.
     ///
     /// `force_root`: if true, snap to the harmonic root degree (used for Bass downbeats).
+    #[allow(clippy::too_many_arguments)]
     pub fn advance_and_resolve(
         &mut self,
         matrix: &MelodicMatrix,
@@ -927,10 +929,10 @@ impl MoodBlend {
     pub fn blend_harmonic(&self, moods: &[&MoodSet; N_MOODS]) -> HarmonicMatrix {
         let w0 = self.weight(0);
         let mut out = scale_harmonic(&moods[0].harmonic, w0);
-        for i in 1..N_MOODS {
+        for (i, mood_set) in moods.iter().enumerate().skip(1) {
             let wi = self.weight(i);
             if wi > 0.0 {
-                let contribution = scale_harmonic(&moods[i].harmonic, wi);
+                let contribution = scale_harmonic(&mood_set.harmonic, wi);
                 for r in 0..HARMONIC_STATES {
                     for c in 0..HARMONIC_STATES {
                         out[r][c] += contribution[r][c];
@@ -944,10 +946,10 @@ impl MoodBlend {
     pub fn blend_rhythmic(&self, moods: &[&MoodSet; N_MOODS]) -> RhythmicMatrix {
         let w0 = self.weight(0);
         let mut out = scale_rhythmic(&moods[0].rhythmic, w0);
-        for i in 1..N_MOODS {
+        for (i, mood_set) in moods.iter().enumerate().skip(1) {
             let wi = self.weight(i);
             if wi > 0.0 {
-                let contribution = scale_rhythmic(&moods[i].rhythmic, wi);
+                let contribution = scale_rhythmic(&mood_set.rhythmic, wi);
                 for r in 0..RHYTHMIC_STATES {
                     for c in 0..RHYTHMIC_STATES {
                         out[r][c] += contribution[r][c];
@@ -1001,10 +1003,10 @@ impl MoodBlend {
     pub fn blend_melodic(&self, moods: &[&MoodSet; N_MOODS]) -> MelodicMatrix {
         let w0 = self.weight(0);
         let mut out = scale_melodic(&moods[0].melodic, w0);
-        for i in 1..N_MOODS {
+        for (i, mood_set) in moods.iter().enumerate().skip(1) {
             let wi = self.weight(i);
             if wi > 0.0 {
-                let contribution = scale_melodic(&moods[i].melodic, wi);
+                let contribution = scale_melodic(&mood_set.melodic, wi);
                 for r in 0..MELODIC_STATES {
                     for c in 0..MELODIC_STATES {
                         out[r][c] += contribution[r][c];
@@ -1415,6 +1417,7 @@ impl MarkovVoice {
     /// `gate_subdivs`: maximum number of steps a note sustains before auto-off.
     ///   1 = staccato (note cut after one step), 16 = let patch ADSR decay naturally.
     /// `rhythmic_speed`: mood-blended speed multiplier (1.0 = normal).
+    #[allow(clippy::too_many_arguments)]
     pub fn on_subdivision(
         &mut self,
         rhythmic_matrix: &RhythmicMatrix,
@@ -1797,8 +1800,8 @@ impl ResolvedState {
     /// Create a resolved state by reading current values from shared atomics.
     pub fn snapshot_from_shared(shared: &MarkovEngineShared) -> Self {
         let mut mood = [0.0f32; N_MOODS];
-        for i in 0..N_MOODS {
-            mood[i] = shared.mood.weight(i);
+        for (i, slot) in mood.iter_mut().enumerate() {
+            *slot = shared.mood.weight(i);
         }
         let mut voice_enabled = [true; 4];
         for i in 0..4.min(shared.voice_enabled.len()) {
@@ -1878,8 +1881,8 @@ impl ResolvedState {
         let snap = t >= 0.5;
 
         let mut mood = [0.0f32; N_MOODS];
-        for i in 0..N_MOODS {
-            mood[i] = self.mood[i] * (1.0 - t) + other.mood[i] * t;
+        for (i, slot) in mood.iter_mut().enumerate() {
+            *slot = self.mood[i] * (1.0 - t) + other.mood[i] * t;
         }
 
         Self {

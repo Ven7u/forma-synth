@@ -7,7 +7,9 @@ use crate::SynthApp;
 use eframe::egui;
 use egui::{Color32, CornerRadius, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2};
 
+#[allow(dead_code)]
 const WHITE_SEMITONES: &[i32] = &[0, 2, 4, 5, 7, 9, 11];
+#[allow(dead_code)]
 const BLACK_SEMITONES: &[Option<i32>] = &[Some(1), Some(3), None, Some(6), Some(8), Some(10), None];
 
 const KEY_MAP: &[(egui::Key, i32)] = &[
@@ -51,6 +53,7 @@ impl SynthApp {
     /// Process keyboard input every frame regardless of which tab is visible.
     /// Call this from the main update loop, not from a tab panel.
     pub fn tick_keyboard_input(&mut self, ctx: &egui::Context) {
+        #[allow(dead_code)]
         const WHITE_KEYS: &[egui::Key] = &[
             egui::Key::A,
             egui::Key::S,
@@ -956,7 +959,7 @@ impl SynthApp {
             let in_kb_range = midi >= kb_range_start && midi < kb_range_end;
             let pitch_class = (midi % 12) as usize;
             let is_root = scale_pcs.is_some() && pitch_class == self.piano_scale_root as usize;
-            let in_scale = scale_pcs.map_or(false, |pcs| pcs[pitch_class]);
+            let in_scale = scale_pcs.is_some_and(|pcs| pcs[pitch_class]);
 
             let fill = if pressed {
                 self.theme.c(&self.theme.key_white_pressed)
@@ -1018,7 +1021,7 @@ impl SynthApp {
             let in_kb_range = midi >= kb_range_start && midi < kb_range_end;
             let pitch_class = (midi % 12) as usize;
             let is_root = scale_pcs.is_some() && pitch_class == self.piano_scale_root as usize;
-            let in_scale = scale_pcs.map_or(false, |pcs| pcs[pitch_class]);
+            let in_scale = scale_pcs.is_some_and(|pcs| pcs[pitch_class]);
 
             let fill = if pressed {
                 self.theme.c(&self.theme.key_black_pressed)

@@ -1,9 +1,11 @@
 use egui::{Context, Id, Pos2, Rect};
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 const SNAP_DISTANCE: f32 = 12.0;
 
 /// Window names — must match the egui::Window titles exactly.
+#[allow(dead_code)]
 pub const WINDOW_NAMES: &[&str] = &[
     "Oscillators",
     "Modulation & Filter",
@@ -17,6 +19,7 @@ pub const WINDOW_NAMES: &[&str] = &[
 
 /// Compute snap offsets for each window. Returns a map of window name → snapped position.
 /// Call this before rendering windows and pass the positions via `.current_pos()`.
+#[allow(dead_code)]
 pub fn compute_snap_positions(ctx: &Context) -> HashMap<&'static str, Pos2> {
     let mut result = HashMap::new();
 
@@ -66,11 +69,11 @@ pub fn compute_snap_positions(ctx: &Context) -> HashMap<&'static str, Pos2> {
         }
 
         // Snap to other windows.
-        for j in 0..entries.len() {
+        for (j, entry) in entries.iter().enumerate() {
             if i == j {
                 continue;
             }
-            let (_, _, other) = entries[j];
+            let other = entry.2;
 
             let overlap_y = rect.top() < other.bottom() && rect.bottom() > other.top();
             let overlap_x = rect.left() < other.right() && rect.right() > other.left();

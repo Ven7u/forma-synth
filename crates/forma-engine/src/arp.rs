@@ -600,7 +600,7 @@ impl ArpState {
                 // Even steps: walk forward through indices.
                 // Odd steps: always play the highest note (pivot).
                 self.pattern_pos += 1;
-                let idx = if self.pattern_pos % 2 == 0 {
+                let idx = if self.pattern_pos.is_multiple_of(2) {
                     (self.pattern_pos / 2) % total
                 } else {
                     total - 1

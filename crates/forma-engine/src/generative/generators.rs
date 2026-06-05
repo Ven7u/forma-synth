@@ -177,8 +177,8 @@ fn euclidean_pattern(hits: u8, steps: u8) -> [bool; EUCLIDEAN_MAX_STEPS] {
 
     // Formula: step i fires iff (i * k) % n < k.
     // This distributes k hits evenly starting at step 0 (canonical Bjorklund result).
-    for i in 0..n {
-        pattern[i] = (i * k) % n < k;
+    for (i, slot) in pattern[..n].iter_mut().enumerate() {
+        *slot = (i * k) % n < k;
     }
     pattern
 }
@@ -264,7 +264,7 @@ impl EuclideanGen {
             self.prev_steps = steps;
             self.prev_rotation = rotation;
             // Keep step in range.
-            self.step = self.step % steps as usize;
+            self.step %= steps as usize;
         }
 
         let n = steps as usize;
@@ -381,9 +381,8 @@ impl ProbTableGen {
     /// Call once per subdivision boundary.
     pub fn on_subdivision(&mut self, cfg: &ProbTableShared) -> GenEvent {
         let enabled = cfg.enabled.load(Ordering::Relaxed);
-        let step_count = (cfg.step_count.load(Ordering::Relaxed) as usize)
-            .max(1)
-            .min(PROB_TABLE_MAX_STEPS);
+        let step_count =
+            (cfg.step_count.load(Ordering::Relaxed) as usize).clamp(1, PROB_TABLE_MAX_STEPS);
 
         // Transition: disabled → note_off and reset.
         if !enabled {

@@ -57,6 +57,7 @@ impl Lcg {
     fn next_f32(&mut self) -> f32 {
         self.next_u32() as f32 / u32::MAX as f32
     }
+    #[allow(dead_code)]
     fn next_u8_in(&mut self, n: u8) -> u8 {
         if n == 0 {
             return 0;
@@ -189,8 +190,8 @@ impl DrumTrackState {
         let mut prob = [[100u8; DRUM_STEPS]; DRUM_LANES];
         for l in 0..DRUM_LANES {
             active[l] = self.step_active[pattern * DRUM_LANES + l].load(Ordering::Relaxed);
-            for s in 0..DRUM_STEPS {
-                prob[l][s] = self.step_prob[(pattern * DRUM_LANES + l) * DRUM_STEPS + s]
+            for (s, slot) in prob[l].iter_mut().enumerate() {
+                *slot = self.step_prob[(pattern * DRUM_LANES + l) * DRUM_STEPS + s]
                     .load(Ordering::Relaxed);
             }
         }

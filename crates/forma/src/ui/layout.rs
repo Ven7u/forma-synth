@@ -23,6 +23,7 @@ pub enum StudioTab {
 }
 
 impl StudioTab {
+    #[allow(dead_code)]
     pub const ALL: &'static [StudioTab] = &[
         StudioTab::Voice,
         StudioTab::Shape,
@@ -31,6 +32,7 @@ impl StudioTab {
         StudioTab::Settings,
     ];
 
+    #[allow(dead_code)]
     pub fn label(self) -> &'static str {
         match self {
             StudioTab::Voice => "VOICE",

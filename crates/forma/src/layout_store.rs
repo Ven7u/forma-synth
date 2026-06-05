@@ -42,7 +42,7 @@ pub fn list_user_layouts() -> Vec<String> {
     };
     let mut names: Vec<String> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |x| x == "json"))
+        .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
         .filter_map(|e| {
             e.path()
                 .file_stem()

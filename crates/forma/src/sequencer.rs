@@ -138,6 +138,7 @@ pub fn chord_name(root: u8, scale: ScaleType, degree: usize) -> String {
 /// `root`: MIDI semitone of root (0=C, 1=C#, …).
 /// `degree`: 0–6 scale degree.
 /// `octave`: base octave (4 = middle octave, so C4 = MIDI 60 when root=0).
+#[allow(dead_code)]
 pub fn chord_notes(root: u8, scale: ScaleType, degree: usize, octave: i32) -> [u8; 3] {
     let intervals = scale_intervals(scale);
     let base = root as i32 + octave * 12;
@@ -396,6 +397,7 @@ pub fn chord_notes_typed(
 #[derive(Clone, Copy)]
 pub struct PadConfig {
     pub chord_type: ChordType,
+    #[allow(dead_code)]
     pub custom_root: Option<u8>, // None = follow scale degree
 }
 
@@ -427,8 +429,8 @@ impl NoteSeqState {
         let mut notes = [60u8; 24];
         // Wish You Were Here – main arpeggio run (E3 G3 A3 G3 D4 C4 D4 E3)
         use forma_control::midi_note;
-        for i in 0..8 {
-            steps[i] = true;
+        for slot in steps[..8].iter_mut() {
+            *slot = true;
         }
         for (i, &v) in [
             midi_note!(E, 3),
@@ -486,8 +488,8 @@ impl ChordSeqState {
         Self {
             steps: {
                 let mut a = [false; 24];
-                for i in 0..8 {
-                    a[i] = true;
+                for slot in a[..8].iter_mut() {
+                    *slot = true;
                 }
                 a
             },
@@ -518,6 +520,7 @@ impl ChordSeqState {
     }
 
     /// Notes for step i with per-step voicing applied.
+    #[allow(dead_code)]
     pub fn step_notes(&self, i: usize) -> Vec<u8> {
         apply_voicing(self.step_notes_root(i), self.voicings[i])
     }
@@ -535,6 +538,7 @@ impl ChordSeqState {
 }
 
 /// Map a MIDI note to the closest scale degree (0–6) within the given root + scale.
+#[allow(dead_code)]
 pub fn note_to_scale_degree(midi: u8, root: u8, scale: ScaleType) -> usize {
     let intervals = scale_intervals(scale);
     let note_class = (midi % 12) as i32;
@@ -612,6 +616,7 @@ impl ChordKbState {
     }
 
     /// Reset a row's chord types to defaults (called when scale changes).
+    #[allow(dead_code)]
     pub fn reset_row(&mut self, row: usize) {
         let ct = default_row_chord_type(row);
         for col in 0..CHORD_KB_COLS {

@@ -7,7 +7,7 @@ use egui::{Color32, Pos2, Sense, Vec2};
 impl SynthApp {
     pub fn tick_metronome(&mut self, ctx: &egui::Context) {
         let now = ctx.input(|i| i.time);
-        let dt = (now - self.metro_last_time).max(0.0).min(0.5);
+        let dt = (now - self.metro_last_time).clamp(0.0, 0.5);
         self.metro_last_time = now;
 
         let seq_playing = self.seq.playing.load(std::sync::atomic::Ordering::Relaxed);

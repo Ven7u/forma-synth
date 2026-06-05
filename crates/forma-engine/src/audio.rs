@@ -466,6 +466,7 @@ impl Default for AudioState {
 /// - `pregain = drive * 2.0` so saturation is clearly audible at moderate settings.
 /// - `BIAS` shifts the curve off-centre → even harmonics (2nd especially) → warmth.
 /// - Subtracting `tanh(BIAS)` re-centres output so DC doesn't build up in the filter.
+///
 /// Output is bounded to roughly (−1, +1).
 #[derive(Clone)]
 struct DriveNode {

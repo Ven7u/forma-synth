@@ -583,7 +583,7 @@ fn draw_spectrum(painter: &egui::Painter, rect: Rect, buf: &[f32], sample_rate: 
 
     // Hann-windowed DFT at each log-spaced frequency.
     let mut bins = [0.0f32; N_BINS];
-    for k in 0..N_BINS {
+    for (k, bin) in bins.iter_mut().enumerate() {
         let t = k as f32 / (N_BINS - 1) as f32;
         let freq = F_MIN * (F_MAX / F_MIN).powf(t);
         let step = 2.0 * PI * freq / sr;
@@ -597,7 +597,7 @@ fn draw_spectrum(painter: &egui::Painter, rect: Rect, buf: &[f32], sample_rate: 
         }
         let mag = (re * re + im * im).sqrt() / w_sum.max(1e-9);
         let db = 20.0 * mag.max(1e-9).log10();
-        bins[k] = ((db - DB_FLOOR) / (-DB_FLOOR)).clamp(0.0, 1.0);
+        *bin = ((db - DB_FLOOR) / (-DB_FLOOR)).clamp(0.0, 1.0);
     }
 
     let pad_l = 36.0;
@@ -957,6 +957,7 @@ pub fn draw_latency_bar(
     });
 }
 
+#[allow(dead_code)]
 pub fn draw_peak_meter(
     ui: &mut egui::Ui,
     level: f32,
