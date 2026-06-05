@@ -1,6 +1,6 @@
 [package]
 name = "forma"
-version = "0.1.0"
+version = "0.1.1"
 license = "GPL-3.0-only"
 edition = "2021"
 publish = false
@@ -8,7 +8,7 @@ publish = false
 [package.metadata.bundle]
 name = "Forma"
 identifier = "com.francescoventura.forma"
-version = "0.1.0"
+version = "0.1.1"
 license = "GPL-3.0-only"
 copyright = "© 2026 Francesco Ventura"
 category = "Music"
