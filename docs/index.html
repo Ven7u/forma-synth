@@ -164,6 +164,23 @@
       box-shadow: 0 0 0 1px var(--border), var(--glow-md);
     }
 
+    .hero-title-row {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 1rem;
+    }
+
+    .hero-wave {
+      flex: 1;
+      min-width: 0;
+      height: clamp(48px, 8vw, 88px);
+      display: block;
+      opacity: 0.9;
+    }
+
     .hero h1 {
       font-family: var(--font-display);
       font-size: clamp(4rem, 12vw, 8rem);
@@ -172,6 +189,8 @@
       color: var(--phosphor-hi);
       text-shadow: var(--glow-lg);
       line-height: 1;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .hero-sub {
@@ -557,7 +576,11 @@
         <img src="https://github.com/Ven7u/forma-synth/actions/workflows/ci.yml/badge.svg" alt="CI status" style="height:20px;image-rendering:auto;" />
       </a>
     </div>
-    <h1>Forma</h1>
+    <div class="hero-title-row">
+      <canvas id="wave-l" class="hero-wave"></canvas>
+      <h1>Forma</h1>
+      <canvas id="wave-r" class="hero-wave"></canvas>
+    </div>
     <p class="hero-sub">
       A <strong>polyphonic software synthesizer</strong> for macOS, built in Rust.
       171 presets, mod matrix, full FX chain, MIDI learn —
@@ -821,5 +844,80 @@ cargo run -p forma --release</pre>
   </footer>
 
 </div><!-- #crt-wrap -->
+
+<script>
+(function () {
+  var COLOR = '#8ec5a5';
+  var GLOW  = 'rgba(142,197,165,0.85)';
+
+  function makeWave(canvas, phaseOffset) {
+    var ctx = canvas.getContext('2d');
+    var buf, W, H, dpr;
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      W   = canvas.offsetWidth;
+      H   = canvas.offsetHeight;
+      canvas.width  = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      buf = new Float32Array(Math.max(W, 1)).fill(0);
+    }
+
+    var t = phaseOffset;
+
+    function sample() {
+      /* composite waveform: slow envelope × mix of harmonics */
+      var env = 0.55 + 0.45 * Math.sin(t * 0.11 + 1.2);
+      return env * (
+        Math.sin(t * 2.17)  * 0.38 +
+        Math.sin(t * 4.83)  * 0.22 +
+        Math.sin(t * 7.05)  * 0.13 +
+        Math.sin(t * 11.4)  * 0.07 +
+        Math.sin(t * 0.63)  * 0.14 +
+        (Math.random() - 0.5) * 0.04
+      );
+    }
+
+    var raf;
+    function draw() {
+      if (!buf) { raf = requestAnimationFrame(draw); return; }
+
+      buf.copyWithin(0, 1);
+      buf[W - 1] = sample();
+      t += 0.072;
+
+      ctx.clearRect(0, 0, W, H);
+
+      var cy  = H * 0.5;
+      var amp = H * 0.42;
+
+      ctx.beginPath();
+      ctx.moveTo(0, cy + buf[0] * amp);
+      for (var x = 1; x < W; x++) {
+        ctx.lineTo(x, cy + buf[x] * amp);
+      }
+      ctx.strokeStyle = COLOR;
+      ctx.lineWidth   = 1.5;
+      ctx.shadowColor = GLOW;
+      ctx.shadowBlur  = 10;
+      ctx.stroke();
+
+      raf = requestAnimationFrame(draw);
+    }
+
+    resize();
+    new ResizeObserver(resize).observe(canvas);
+    draw();
+  }
+
+  var L = document.getElementById('wave-l');
+  var R = document.getElementById('wave-r');
+  if (L && R) {
+    makeWave(L, 0);
+    makeWave(R, Math.PI * 1.4);
+  }
+})();
+</script>
 </body>
 </html>
