@@ -65,6 +65,7 @@ impl TrackMixerAtomics {
     pub fn solo(&self) -> bool {
         self.solo.load(Ordering::Relaxed)
     }
+    #[allow(dead_code)]
     pub fn peak(&self) -> f32 {
         let l = f32::from_bits(self.peak_l.load(Ordering::Relaxed));
         let r = f32::from_bits(self.peak_r.load(Ordering::Relaxed));
@@ -79,6 +80,7 @@ impl TrackMixerAtomics {
     pub fn set_muted(&self, v: bool) {
         self.muted.store(v, Ordering::Relaxed);
     }
+    #[allow(dead_code)]
     pub fn set_solo(&self, v: bool) {
         self.solo.store(v, Ordering::Relaxed);
     }
@@ -140,6 +142,7 @@ impl DrumEngineAtomics {
     pub fn bpm(&self) -> f32 {
         f32::from_bits(self.bpm.load(Ordering::Relaxed))
     }
+    #[allow(dead_code)]
     pub fn swing(&self) -> f32 {
         f32::from_bits(self.swing.load(Ordering::Relaxed))
     }
@@ -152,6 +155,7 @@ impl DrumEngineAtomics {
     pub fn pan(&self) -> f32 {
         f32::from_bits(self.pan.load(Ordering::Relaxed))
     }
+    #[allow(dead_code)]
     pub fn peak(&self) -> f32 {
         let l = f32::from_bits(self.peak_l.load(Ordering::Relaxed));
         let r = f32::from_bits(self.peak_r.load(Ordering::Relaxed));
@@ -163,9 +167,11 @@ impl DrumEngineAtomics {
     pub fn set_swing(&self, v: f32) {
         self.swing.store(v.to_bits(), Ordering::Relaxed);
     }
+    #[allow(dead_code)]
     pub fn set_volume(&self, v: f32) {
         self.volume.store(v.to_bits(), Ordering::Relaxed);
     }
+    #[allow(dead_code)]
     pub fn set_pan(&self, v: f32) {
         self.pan.store(v.to_bits(), Ordering::Relaxed);
     }
@@ -648,7 +654,7 @@ impl TrackProcessor {
         self.dc_y_prev_r = dc_r;
 
         // Global volume + duck.
-        let target_global = self.state.global_vol.value() as f32;
+        let target_global = self.state.global_vol.value();
         self.global_vol_smooth =
             target_global + self.global_vol_coeff * (self.global_vol_smooth - target_global);
         let target_depth = self.state.gate_aenv_depth.value();
@@ -717,6 +723,7 @@ impl DrumVoice {
         }
     }
 
+    #[allow(dead_code)]
     fn trigger(&mut self) {
         self.env = 1.0;
         self.pitch_env = 1.0;

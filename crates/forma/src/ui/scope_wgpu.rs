@@ -436,12 +436,14 @@ pub struct ScopeGpuResources {
     harm_pipeline: wgpu::RenderPipeline,
     harm_params_buf: wgpu::Buffer,
     harm_bind_group: wgpu::BindGroup,
+    #[allow(dead_code)]
     harm_bgl: wgpu::BindGroupLayout,
 
     // Pipeline 4: voronoi fullscreen → offscreen texture
     vor_pipeline: wgpu::RenderPipeline,
     vor_params_buf: wgpu::Buffer,
     vor_bind_group: wgpu::BindGroup,
+    #[allow(dead_code)]
     vor_bgl: wgpu::BindGroupLayout,
 
     // Pipeline 5: spectrogram (ring-buffer texture → phosphor colormap)
@@ -449,6 +451,7 @@ pub struct ScopeGpuResources {
     sgr_tex: wgpu::Texture,
     sgr_params_buf: wgpu::Buffer,
     sgr_bind_group: wgpu::BindGroup,
+    #[allow(dead_code)]
     sgr_bgl: wgpu::BindGroupLayout,
     /// Next ring-buffer row to write into sgr_tex (wraps mod SGR_COLS).
     sgr_write_col: u32,

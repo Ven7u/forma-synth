@@ -2,6 +2,10 @@
 //! Run with: cargo run
 
 #![allow(clippy::precedence)]
+// egui 0.34 deprecated Panel::show(ctx) and TopBottomPanel in favour of
+// show_inside(ui) and Panel::top/bottom. Migrating requires restructuring
+// the eframe update loop; tracked for a follow-up PR.
+#![allow(deprecated)]
 
 mod audio;
 mod eq;
@@ -32,9 +36,15 @@ fn main() -> eframe::Result {
 
     let icon = {
         let bytes = include_bytes!("../assets/icons/icon_512x512@2x.png");
-        let img = image::load_from_memory(bytes).expect("valid icon PNG").into_rgba8();
+        let img = image::load_from_memory(bytes)
+            .expect("valid icon PNG")
+            .into_rgba8();
         let (w, h) = img.dimensions();
-        egui::IconData { rgba: img.into_raw(), width: w, height: h }
+        egui::IconData {
+            rgba: img.into_raw(),
+            width: w,
+            height: h,
+        }
     };
 
     let options = eframe::NativeOptions {
@@ -319,6 +329,7 @@ pub(crate) struct SynthApp {
     history_poll_timer: f32,
     pub(crate) patch_browser_open: bool,
     pub(crate) patch_browser_category: String,
+    #[allow(dead_code)]
     pub(crate) patch_browser_model: String,
     pub(crate) patch_load_fx: bool,
     pub(crate) patch_search: String,
@@ -400,6 +411,7 @@ pub(crate) struct SynthApp {
     pub(crate) show_kit_browser: bool,
 
     // Mixer panel visibility (LIVE mode)
+    #[allow(dead_code)]
     pub(crate) show_mixer: bool,
 
     // Scene management
@@ -493,13 +505,7 @@ impl SynthApp {
                 None
             };
             // Fall back to port 0 if no saved preference.
-            let idx = target_idx.or_else(|| {
-                if midi.port_names.is_empty() {
-                    None
-                } else {
-                    Some(0)
-                }
-            });
+            let idx = target_idx.or_else(|| (!midi.port_names.is_empty()).then_some(0));
             if let Some(i) = idx {
                 let _ = midi.connect(i);
             }
@@ -1225,9 +1231,11 @@ impl Lcg {
 /// sound is always audible; the caller can enable them afterwards.
 fn random_patch() -> Patch {
     let mut r = Lcg::new();
-    let mut p = Patch::default();
-    p.name = "Random".into();
-    p.category = "User".into();
+    let mut p = Patch {
+        name: "Random".into(),
+        category: "User".into(),
+        ..Default::default()
+    };
 
     // ── Oscillators ───────────────────────────────────────────────────────────
     // Always enable at least 1; 2 oscs most common, 3 is rare.
@@ -1370,7 +1378,7 @@ impl SynthApp {
         // try to reconnect to the first available port.
         if self.midi.connected_port.is_none() {
             self.midi_reconnect_tick = self.midi_reconnect_tick.wrapping_add(1);
-            if self.midi_reconnect_tick % 120 == 0 {
+            if self.midi_reconnect_tick.is_multiple_of(120) {
                 self.midi.list_ports();
                 if !self.midi.port_names.is_empty() {
                     let _ = self.midi.connect(0);
@@ -1937,10 +1945,17 @@ impl SynthApp {
         self.patch_recent.insert(0, rname);
         self.patch_recent.truncate(12);
 
-        eprintln!("[patch] loading \"{}\" (category={}  osc_enabled={:?}  noise={:.2}  \
+        eprintln!(
+            "[patch] loading \"{}\" (category={}  osc_enabled={:?}  noise={:.2}  \
                    amp_adsr={:?}  cutoff={:.0}  fenv_amt={:.2})",
-            p.name, p.category, p.osc_enabled, p.noise_vol,
-            p.amp_adsr, p.filter_cutoff, p.filter_env_amount);
+            p.name,
+            p.category,
+            p.osc_enabled,
+            p.noise_vol,
+            p.amp_adsr,
+            p.filter_cutoff,
+            p.filter_env_amount
+        );
 
         // Capture physically held hardware MIDI notes before all_notes_off clears the set,
         // so we can re-trigger them with the new patch parameters below.
@@ -2424,7 +2439,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_secondary)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         active,
                         egui::RichText::new(label).size(11.0).color(col),
                     ))
@@ -2462,7 +2477,7 @@ impl SynthApp {
                 self.theme.c(&self.theme.text_disabled)
             };
             if ui
-                .add(egui::SelectableLabel::new(
+                .add(egui::Button::selectable(
                     self.global_sync,
                     egui::RichText::new("SYNC").size(11.0).color(sync_col),
                 ))
@@ -2490,7 +2505,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         bq,
                         egui::RichText::new("BAR").size(11.0).color(bq_col),
                     ))
@@ -2649,8 +2664,10 @@ impl SynthApp {
                         .on_hover_text("Reset all parameters to the default Init state.")
                         .clicked()
                     {
-                        let mut p = Patch::default();
-                        p.name = "Init".into();
+                        let p = Patch {
+                            name: "Init".into(),
+                            ..Default::default()
+                        };
                         self.apply_patch(p);
                         ui.close();
                     }
@@ -2662,7 +2679,7 @@ impl SynthApp {
                     if ui.button("Save Patch…").clicked() {
                         let p = self.capture_patch();
                         if let Some(path) = rfd::FileDialog::new()
-                            .set_file_name(&format!("{}.json", p.name))
+                            .set_file_name(format!("{}.json", p.name))
                             .add_filter("Patch", &["json"])
                             .save_file()
                         {
@@ -2862,7 +2879,7 @@ impl SynthApp {
                         self.theme.c(&self.theme.text_secondary)
                     };
                     if ui
-                        .add(egui::SelectableLabel::new(
+                        .add(egui::Button::selectable(
                             active,
                             egui::RichText::new("MIDI").size(11.0).color(learn_col),
                         ))
@@ -3229,7 +3246,7 @@ impl SynthApp {
                                 } else {
                                     self.theme.c(&self.theme.text_primary)
                                 };
-                                let resp = ui.add(egui::SelectableLabel::new(
+                                let resp = ui.add(egui::Button::selectable(
                                     is_selected,
                                     egui::RichText::new(desc.name).size(11.0).color(label_col),
                                 ));

@@ -263,8 +263,8 @@ impl SynthApp {
                                             {
                                                 to_remove = Some(step);
                                             }
-                                            if step > 0 {
-                                                if ui
+                                            if step > 0
+                                                && ui
                                                     .add(
                                                         egui::Button::new(
                                                             egui::RichText::new("↑")
@@ -274,9 +274,8 @@ impl SynthApp {
                                                         .frame(false),
                                                     )
                                                     .clicked()
-                                                {
-                                                    swap_up = Some(step);
-                                                }
+                                            {
+                                                swap_up = Some(step);
                                             }
                                         },
                                     );

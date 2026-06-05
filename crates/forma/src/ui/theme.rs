@@ -140,7 +140,7 @@ impl SynthTheme {
         Color32::from_rgba_premultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
     }
 
-    /// Active/inactive — returns accent if `on`, else GRAY.
+    #[allow(dead_code)]
     pub fn active(&self, on: bool) -> Color32 {
         if on {
             self.c(&self.accent)

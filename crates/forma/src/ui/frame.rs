@@ -45,6 +45,7 @@ impl SynthFrame {
     ///
     /// Use for control groups, value readouts, or any area that should sit
     /// visually "below" the surrounding surface.
+    #[allow(dead_code)]
     pub fn inset(theme: &SynthTheme) -> Frame {
         Frame::new()
             .fill(theme.c(&theme.bg_sunken))
@@ -53,6 +54,7 @@ impl SynthFrame {
     }
 
     /// Screen — dark background for visualizers (scope, spectrum, etc.).
+    #[allow(dead_code)]
     pub fn screen(theme: &SynthTheme) -> Frame {
         Frame::new()
             .fill(theme.c(&theme.scope_bg))

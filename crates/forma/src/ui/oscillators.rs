@@ -41,7 +41,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         on,
                         RichText::new(title).size(11.0).italics().color(title_col),
                     ))
@@ -111,7 +111,7 @@ impl SynthApp {
                     if ui
                         .add_sized(
                             [chip_w, 22.0],
-                            egui::SelectableLabel::new(active, RichText::new(label).size(10.0)),
+                            egui::Button::selectable(active, RichText::new(label).size(10.0)),
                         )
                         .clicked()
                     {
@@ -199,7 +199,7 @@ impl SynthApp {
                 if ui
                     .add_sized(
                         [36.0, 22.0],
-                        egui::SelectableLabel::new(
+                        egui::Button::selectable(
                             uni_on,
                             RichText::new("UNI").size(10.0).color(uni_col),
                         ),
@@ -286,7 +286,7 @@ impl SynthApp {
             if ui
                 .add_sized(
                     [44.0, 22.0],
-                    egui::SelectableLabel::new(on, RichText::new("SYNC").size(10.0).color(col)),
+                    egui::Button::selectable(on, RichText::new("SYNC").size(10.0).color(col)),
                 )
                 .on_hover_text("Hard Sync — OSC 1 resets OSC 2 phase each cycle")
                 .clicked()
@@ -311,7 +311,7 @@ impl SynthApp {
             if ui
                 .add_sized(
                     [44.0, 22.0],
-                    egui::SelectableLabel::new(on, RichText::new("FM").size(10.0).color(col)),
+                    egui::Button::selectable(on, RichText::new("FM").size(10.0).color(col)),
                 )
                 .on_hover_text("Frequency Modulation — OSC 2 modulates OSC 1 pitch at audio rate")
                 .clicked()
@@ -344,7 +344,7 @@ impl SynthApp {
             if ui
                 .add_sized(
                     [44.0, 22.0],
-                    egui::SelectableLabel::new(on, RichText::new("RING").size(10.0).color(col)),
+                    egui::Button::selectable(on, RichText::new("RING").size(10.0).color(col)),
                 )
                 .on_hover_text("Ring Mod — OSC 1 × OSC 2: metallic, bell-like textures")
                 .clicked()
@@ -582,7 +582,7 @@ impl SynthApp {
                         if ui
                             .add_sized(
                                 [30.0, 22.0],
-                                egui::SelectableLabel::new(
+                                egui::Button::selectable(
                                     lim_on,
                                     RichText::new("LIM").size(10.0).color(lim_col),
                                 ),

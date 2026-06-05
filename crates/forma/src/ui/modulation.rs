@@ -45,7 +45,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         on,
                         RichText::new("LFO 1").size(12.0).strong().color(col),
                     ))
@@ -69,8 +69,8 @@ impl SynthApp {
                 // Rate + Depth knobs
                 ui.horizontal(|ui| {
                     let sync_on = self.lfo_sync_active();
-                    if !sync_on {
-                        if super::widgets::knob(
+                    if !sync_on
+                        && super::widgets::knob(
                             ui,
                             &mut self.lfo_rate,
                             0.1..=20.0,
@@ -82,9 +82,8 @@ impl SynthApp {
                             "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
                         )
                         .changed()
-                        {
-                            self.engine.set_lfo_rate(self.lfo_rate);
-                        }
+                    {
+                        self.engine.set_lfo_rate(self.lfo_rate);
                     }
                     if super::widgets::knob(
                         ui,
@@ -109,7 +108,7 @@ impl SynthApp {
                             self.theme.c(&self.theme.text_disabled)
                         };
                         if ui
-                            .add(egui::SelectableLabel::new(
+                            .add(egui::Button::selectable(
                                 sync_on,
                                 RichText::new("SYNC").size(10.0).color(sync_col),
                             ))
@@ -228,7 +227,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         on,
                         RichText::new("LFO 2").size(12.0).strong().color(col),
                     ))
@@ -332,7 +331,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         on,
                         RichText::new("PULSE").size(12.0).strong().color(col),
                     ))
@@ -430,7 +429,7 @@ impl SynthApp {
                     let edge = self.theme.c(&self.theme.text_disabled);
                     for i in 0..16u8 {
                         let on_step = (self.pulse_pattern >> i) & 1 != 0;
-                        let in_active_len = (i as u8) < self.pulse_length;
+                        let in_active_len = i < self.pulse_length;
                         let (rect, resp) = ui.allocate_exact_size(
                             egui::Vec2::new(step_w, cell_h),
                             egui::Sense::click(),
@@ -491,7 +490,7 @@ impl SynthApp {
                 self.theme.c(&self.theme.text_disabled)
             };
             if ui
-                .add(egui::SelectableLabel::new(
+                .add(egui::Button::selectable(
                     enabled,
                     RichText::new("RETRIG").size(10.0).strong().color(col),
                 ))
@@ -621,7 +620,7 @@ impl SynthApp {
                     self.theme.c(&self.theme.text_disabled)
                 };
                 if ui
-                    .add(egui::SelectableLabel::new(
+                    .add(egui::Button::selectable(
                         on,
                         RichText::new("FILTER").size(12.0).strong().color(col),
                     ))
@@ -654,14 +653,14 @@ impl SynthApp {
                 let accent = self.theme.c(&self.theme.accent);
                 let disabled = self.theme.c(&self.theme.text_disabled);
                 // LP — always selected
-                ui.add(egui::SelectableLabel::new(
+                ui.add(egui::Button::selectable(
                     true,
                     RichText::new("LP").size(10.0).strong().color(accent),
                 ));
                 for label in ["BP", "HP", "NOTCH"] {
                     ui.add_enabled(
                         false,
-                        egui::SelectableLabel::new(
+                        egui::Button::selectable(
                             false,
                             RichText::new(label).size(10.0).color(disabled),
                         ),
@@ -1369,7 +1368,7 @@ pub fn draw_adsr_visualizer(
         Stroke::NONE,
     ));
 
-    let pts = vec![p0, p1, p2, p3, p4];
+    let pts = [p0, p1, p2, p3, p4];
     let stroke = Stroke::new(1.5, theme.c(&theme.adsr_outline));
     for w in pts.windows(2) {
         painter.line_segment([w[0], w[1]], stroke);

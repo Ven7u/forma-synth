@@ -60,9 +60,9 @@ impl Default for DrumMachineState {
         a[0][12] = true;
         a[1][4] = true;
         a[1][12] = true;
-        for i in 0..STEP_COUNT {
+        for (i, slot) in a[2][..STEP_COUNT].iter_mut().enumerate() {
             if i % 2 == 0 {
-                a[2][i] = true;
+                *slot = true;
             }
         }
         Self {
@@ -146,9 +146,9 @@ pub fn factory_kits() -> Vec<DrumKit> {
     a[0][12] = true;
     a[1][4] = true;
     a[1][12] = true;
-    for i in 0..16 {
+    for (i, slot) in a[2][..16].iter_mut().enumerate() {
         if i % 2 == 0 {
-            a[2][i] = true;
+            *slot = true;
         }
     }
     let fof = DrumKit {
@@ -176,8 +176,8 @@ pub fn factory_kits() -> Vec<DrumKit> {
     a[1][12] = true;
     a[1][14] = true;
     // hat (all 16)
-    for i in 0..16 {
-        a[2][i] = true;
+    for slot in a[2][..16].iter_mut() {
+        *slot = true;
     }
     // clap on 4 & 12
     a[3][4] = true;
@@ -385,8 +385,7 @@ impl SynthApp {
             // ── Channel rows ─────────────────────────────────────────────
             let playhead = self.drums.current_step;
 
-            for ch in 0..CHANNEL_COUNT {
-                let ch_name = CHANNEL_NAMES[ch];
+            for (ch, &ch_name) in CHANNEL_NAMES.iter().enumerate().take(CHANNEL_COUNT) {
                 let muted = self.drums.muted[ch];
                 let soloed_any = self.drums.soloed.iter().any(|&s| s);
                 let effectively_muted = muted || (soloed_any && !self.drums.soloed[ch]);
@@ -845,7 +844,7 @@ impl SynthApp {
                     {
                         let kit = DrumKit::from_state(&self.drum_kit_name, &self.drums);
                         if let Some(path) = rfd::FileDialog::new()
-                            .set_file_name(&format!("{}.drumkit.json", self.drum_kit_name))
+                            .set_file_name(format!("{}.drumkit.json", self.drum_kit_name))
                             .add_filter("Drum Kit", &["json"])
                             .save_file()
                         {

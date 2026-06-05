@@ -462,9 +462,7 @@ fn build_track_graph(state: &TrackState, sr: f64) -> Box<dyn AudioUnit + Send> {
             ));
         let dyn_cutoff = (var(&state.effective_cutoff)
             + fenv * var(&state.filter_env_amount) * dc(12000.0_f32))
-            >> map(|x: &Frame<f32, U1>| -> Frame<f32, U1> {
-                [x[0].clamp(80.0, 18000.0)].into()
-            });
+            >> map(|x: &Frame<f32, U1>| -> Frame<f32, U1> { [x[0].clamp(80.0, 18000.0)].into() });
         let filtered = (osc | dyn_cutoff | var(&state.resonance)) >> moog();
 
         let env = var(vg)
@@ -732,12 +730,21 @@ impl MultiTrackEngine {
                 // Fire once when silence crosses 200 ms.
                 if self.silence_counter == (self.sr as u32) / 5 {
                     let t = &self.tracks[0];
-                    let gates: Vec<String> = t.voice_gates.iter()
-                        .map(|g| format!("{:.1}", g.value())).collect();
-                    let amps: Vec<String> = t.amp_cursors.iter()
-                        .map(|a| format!("{:.2}", a.value())).collect();
-                    let fenvs: Vec<String> = t.fenv_cursors.iter()
-                        .map(|f| format!("{:.2}", f.value())).collect();
+                    let gates: Vec<String> = t
+                        .voice_gates
+                        .iter()
+                        .map(|g| format!("{:.1}", g.value()))
+                        .collect();
+                    let amps: Vec<String> = t
+                        .amp_cursors
+                        .iter()
+                        .map(|a| format!("{:.2}", a.value()))
+                        .collect();
+                    let fenvs: Vec<String> = t
+                        .fenv_cursors
+                        .iter()
+                        .map(|f| format!("{:.2}", f.value()))
+                        .collect();
                     eprintln!(
                         "[silence] output=0 for 200ms after recent note\n  \
                          gates      = [{}]\n  \
@@ -745,8 +752,11 @@ impl MultiTrackEngine {
                          fenv_cursor= [{}]\n  \
                          cutoff={:.0}  eff_cutoff={:.0}  fenv_amt={:.3}  \
                          noise={:.2}  master={:.2}  out_pre={:.6}",
-                        gates.join(", "), amps.join(", "), fenvs.join(", "),
-                        t.cutoff.value(), t.effective_cutoff.value(),
+                        gates.join(", "),
+                        amps.join(", "),
+                        fenvs.join(", "),
+                        t.cutoff.value(),
+                        t.effective_cutoff.value(),
                         t.filter_env_amount.value(),
                         t.noise_vol.value(),
                         self.master_vol.value(),
