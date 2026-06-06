@@ -10,6 +10,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.3] — 2026-06-06
+
+### Fixed
+- Canonicalize the executable path when resolving the factory patch directory, so `forma` finds its patches when launched from a `PATH` symlink such as `/usr/local/bin/forma` → `Cellar/forma/<ver>/bin/forma`. Previously the patch library was empty after Homebrew formula install.
+
+---
+
 ## [0.1.2] — 2026-06-06
 
 ### Fixed

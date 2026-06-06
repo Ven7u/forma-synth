@@ -33,18 +33,23 @@ fn collect_patch_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>)
 }
 
 /// Locate the patches directory, trying (in order):
-///   1. `assets/patches` relative to CWD  — works with `cargo run`
-///   2. `../Resources/patches` relative to the executable — works inside a .app bundle
-///      (executable lives at `Contents/MacOS/`, resources at `Contents/Resources/`)
+///   1. `assets/patches` relative to CWD — works with `cargo run`
+///   2. `../Resources/assets/patches` relative to the executable — works inside
+///      a `.app` bundle (exe at `Contents/MacOS/`, resources at `Contents/Resources/`)
+///      and inside a Homebrew keg (exe at `<prefix>/bin/`, resources at
+///      `<prefix>/Resources/`). The exe path is canonicalized so PATH symlinks
+///      like `/usr/local/bin/forma → Cellar/forma/<ver>/bin/forma` resolve to
+///      the real keg layout.
 fn patches_dir() -> std::path::PathBuf {
     let cwd_path = std::path::Path::new("assets/patches");
     if cwd_path.is_dir() {
         return cwd_path.to_path_buf();
     }
     if let Ok(exe) = std::env::current_exe() {
-        let bundle_path = exe
-            .parent() // Contents/MacOS
-            .and_then(|p| p.parent()) // Contents
+        let real_exe = std::fs::canonicalize(&exe).unwrap_or(exe);
+        let bundle_path = real_exe
+            .parent() // Contents/MacOS or <prefix>/bin
+            .and_then(|p| p.parent()) // Contents or <prefix>
             .map(|p| p.join("Resources").join("assets").join("patches"));
         if let Some(p) = bundle_path {
             if p.is_dir() {
