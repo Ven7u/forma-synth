@@ -10,6 +10,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.2] — 2026-06-06
+
+### Fixed
+- Release `.app` bundle is now a true ARM + Intel universal binary. Previously `cargo bundle` was overwriting the lipo'd binary with a single-arch build, causing "bad CPU type in executable" on the non-host architecture.
+- Homebrew formula now installs the factory patches alongside the binary, so the patch library is no longer empty after `brew install ven7u/forma/forma`.
+
+---
+
 ## [0.1.1] — 2026-06-05
 
 ### Fixed

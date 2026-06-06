@@ -36,18 +36,22 @@ jobs:
       - name: Build — Intel
         run: cargo build --release --target x86_64-apple-darwin -p forma
 
-      - name: Create universal binary with lipo
-        run: |
-          lipo -create -output target/release/forma \
-            target/aarch64-apple-darwin/release/forma \
-            target/x86_64-apple-darwin/release/forma
-          lipo -info target/release/forma
-
-      - name: Bundle .app (uses the universal binary in target/release/)
+      - name: Bundle .app
+        # cargo-bundle re-runs `cargo build` for the host arch and writes
+        # the single-arch binary into Forma.app. We replace it with a
+        # universal binary in the next step.
         run: cargo bundle --release -p forma
 
+      - name: Replace bundle binary with universal (ARM + Intel) via lipo
+        run: |
+          lipo -create -output target/release/bundle/osx/Forma.app/Contents/MacOS/forma \
+            target/aarch64-apple-darwin/release/forma \
+            target/x86_64-apple-darwin/release/forma
+          lipo -info target/release/bundle/osx/Forma.app/Contents/MacOS/forma
+          file target/release/bundle/osx/Forma.app/Contents/MacOS/forma
+
       - name: Ad-hoc sign the app bundle
-        # lipo invalidates any existing signature; re-sign with ad-hoc (-) so
+        # lipo invalidates the binary signature; re-sign with ad-hoc (-) so
         # macOS does not report "damaged" when Homebrew removes quarantine.
         run: codesign --force --deep --sign - target/release/bundle/osx/Forma.app
 
