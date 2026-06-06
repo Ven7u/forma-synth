@@ -1618,11 +1618,22 @@ impl eframe::App for SynthApp {
         // Apply theme to egui Visuals + Style every frame — cheap struct copies.
         self.theme.apply_to_egui(ctx);
 
-        // Release all notes when the window loses focus so keys/MIDI can't get stuck.
+        // Release computer-keyboard notes when the window loses focus so they can't
+        // get stuck. Hardware MIDI notes are intentionally left playing — the MIDI
+        // device sends its own NoteOff events and doesn't need window focus.
         if ctx.input(|i| i.focused) != self.window_focused {
             self.window_focused = ctx.input(|i| i.focused);
             if !self.window_focused {
-                self.all_notes_off();
+                let held: Vec<u8> = self.piano_held_midi.drain().collect();
+                for n in held {
+                    self.engine.note_off(n);
+                }
+                let frozen: Vec<u8> = self.frozen_notes.drain().collect();
+                for n in frozen {
+                    self.engine.note_off(n);
+                }
+                self.chord_kb.held_pad = None;
+                self.chord_kb.kb_held.clear();
             }
         }
 
