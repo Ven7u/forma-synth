@@ -544,6 +544,120 @@
     footer a { color: var(--muted); text-decoration: underline; }
     footer a:hover { color: var(--phosphor); text-shadow: var(--glow-sm); }
 
+    /* ── AUDIO DEMOS ── */
+    .demos {
+      padding: 4rem 2rem;
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .audio-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .audio-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .audio-title {
+      font-size: 0.85rem;
+      color: var(--phosphor);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-shadow: var(--glow-sm);
+    }
+
+    .audio-meta {
+      font-size: 0.7rem;
+      color: var(--phosphor-dim);
+      letter-spacing: 0.06em;
+    }
+
+    .audio-player {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .play-btn {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: none;
+      border: 1px solid var(--phosphor-dim);
+      color: var(--phosphor);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .play-btn:hover {
+      border-color: var(--phosphor);
+      color: var(--phosphor-hi);
+      box-shadow: var(--glow-sm);
+    }
+
+    .play-btn.playing { border-color: var(--phosphor-hi); box-shadow: var(--glow-sm); }
+
+    .progress-wrap {
+      flex: 1;
+      position: relative;
+      height: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--phosphor);
+      box-shadow: var(--glow-sm);
+      width: 0%;
+      transition: width 0.1s linear;
+      pointer-events: none;
+    }
+
+    .progress-thumb {
+      position: absolute;
+      top: 50%;
+      left: 0%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: var(--phosphor-hi);
+      box-shadow: var(--glow-sm);
+      pointer-events: none;
+    }
+
+    .time-display {
+      font-size: 0.72rem;
+      color: var(--phosphor-dim);
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      min-width: 4.5rem;
+      text-align: right;
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 600px) {
       nav { padding: 0 1rem; }
@@ -562,6 +676,7 @@
     </a>
     <ul class="nav-links">
       <li><a href="#features">Features</a></li>
+      <li><a href="#demos">Listen</a></li>
       <li><a href="#guide">Guide</a></li>
       <li><a href="https://github.com/Ven7u/forma-synth">GitHub</a></li>
       <li><a href="https://github.com/Ven7u/forma-synth/releases">Releases</a></li>
@@ -603,6 +718,30 @@
       <img src="imgs/screen_3.png" alt="Forma filter, FX chain and chord keyboard" />
       <img src="imgs/screen_2.png" alt="Forma oscilloscope" />
     </div>
+  </section>
+
+  <div class="divider">// listen</div>
+
+  <section class="demos" id="demos">
+    <p class="section-label">Audio demos</p>
+
+    <div class="audio-card">
+      <div class="audio-card-header">
+        <span class="audio-title">Forma Demo</span>
+        <span class="audio-meta">3:23 &nbsp;·&nbsp; recorded in Forma</span>
+      </div>
+      <div class="audio-player" data-src="audio/forma-demo.m4a">
+        <button class="play-btn" aria-label="Play">▶</button>
+        <div class="progress-wrap">
+          <div class="progress-track">
+            <div class="progress-fill"></div>
+            <div class="progress-thumb"></div>
+          </div>
+        </div>
+        <span class="time-display">0:00 / 3:23</span>
+      </div>
+    </div>
+
   </section>
 
   <div class="divider">// features</div>
@@ -944,6 +1083,74 @@ cargo run -p forma --release</pre>
   resize();
   new ResizeObserver(function () { resize(); }).observe(L.parentElement);
   draw();
+})();
+</script>
+
+<script>
+(function () {
+  var players = document.querySelectorAll('.audio-player');
+  var current = null;
+
+  function fmt(s) {
+    s = Math.floor(s || 0);
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  players.forEach(function (wrap) {
+    var src  = wrap.dataset.src;
+    var btn  = wrap.querySelector('.play-btn');
+    var fill = wrap.querySelector('.progress-fill');
+    var thumb = wrap.querySelector('.progress-thumb');
+    var pw   = wrap.querySelector('.progress-wrap');
+    var time = wrap.querySelector('.time-display');
+    var audio = new Audio();
+    audio.preload = 'none';
+
+    function updateBar() {
+      var pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      fill.style.width  = pct + '%';
+      thumb.style.left  = pct + '%';
+      time.textContent  = fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+    }
+
+    audio.addEventListener('timeupdate', updateBar);
+    audio.addEventListener('ended', function () {
+      btn.textContent = '▶';
+      btn.classList.remove('playing');
+      current = null;
+      audio.currentTime = 0;
+      updateBar();
+    });
+    audio.addEventListener('loadedmetadata', updateBar);
+
+    btn.addEventListener('click', function () {
+      if (current && current !== audio) {
+        current.pause();
+        var prevBtn = document.querySelector('.play-btn.playing');
+        if (prevBtn) { prevBtn.textContent = '▶'; prevBtn.classList.remove('playing'); }
+      }
+      if (audio.paused) {
+        if (!audio.src) audio.src = src;
+        audio.play();
+        btn.textContent = '▐▐';
+        btn.classList.add('playing');
+        current = audio;
+      } else {
+        audio.pause();
+        btn.textContent = '▶';
+        btn.classList.remove('playing');
+        current = null;
+      }
+    });
+
+    pw.addEventListener('click', function (e) {
+      if (!audio.src) audio.src = src;
+      var rect = pw.getBoundingClientRect();
+      var pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      audio.currentTime = pct * (audio.duration || 0);
+      updateBar();
+    });
+  });
 })();
 </script>
 </body>
