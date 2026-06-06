@@ -13,7 +13,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [0.1.3] — 2026-06-06
 
 ### Fixed
-- Canonicalize the executable path when resolving the factory patch directory, so `forma` finds its patches when launched from a `PATH` symlink such as `/usr/local/bin/forma` → `Cellar/forma/<ver>/bin/forma`. Previously the patch library was empty after Homebrew formula install.
+- **Factory patches now always load**, regardless of install method. The 171 factory presets are embedded into the binary at compile time, so `cargo install --git …` and any other binary-only install path gets a populated patch library out of the box.
+- Canonicalize the executable path when resolving the on-disk patches directory so `forma` finds its patches when launched from a `PATH` symlink such as `/usr/local/bin/forma` → `Cellar/forma/<ver>/bin/forma`.
+
+### Behaviour
+The runtime resolves patches in this order:
+1. `assets/patches` relative to the current working directory — preserves the dev workflow where editing a JSON file and re-launching picks up changes.
+2. `Resources/assets/patches` relative to the canonicalized executable — used by the `.app` bundle and Homebrew formula.
+3. Embedded patches baked into the binary — used by `cargo install` and any future install method that ships only the binary.
 
 ---
 

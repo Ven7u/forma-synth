@@ -44,3 +44,4 @@ egui_dock   = "0.19"
 hound       = "3"
 image       = { version = "0.25", default-features = false, features = ["png"] }
 directories = "5"
+include_dir = { version = "0.7", features = ["glob"] }
