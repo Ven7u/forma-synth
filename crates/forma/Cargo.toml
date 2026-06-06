@@ -1,6 +1,6 @@
 [package]
 name = "forma"
-version = "0.1.2"
+version = "0.1.3"
 license = "GPL-3.0-only"
 edition = "2021"
 publish = false
@@ -8,7 +8,7 @@ publish = false
 [package.metadata.bundle]
 name = "Forma"
 identifier = "com.francescoventura.forma"
-version = "0.1.2"
+version = "0.1.3"
 license = "GPL-3.0-only"
 copyright = "© 2026 Francesco Ventura"
 category = "Music"
@@ -44,3 +44,4 @@ egui_dock   = "0.19"
 hound       = "3"
 image       = { version = "0.25", default-features = false, features = ["png"] }
 directories = "5"
+include_dir = { version = "0.7", features = ["glob"] }

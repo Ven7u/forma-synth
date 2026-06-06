@@ -1,17 +1,19 @@
-//! Patch re-export + disk loader.
+//! Patch re-export + factory-preset loader.
 //!
 //! The `Patch` struct itself lives in [`forma_engine::patch`] so that any
 //! frontend (egui, Bevy, Swift, web, DAW plugin) can round-trip patches
 //! through the engine handle without re-implementing the schema. This
 //! module keeps the `crate::patch::Patch` import path working and owns the
-//! UI-side concern of scanning `assets/patches/**/*.json` from disk.
+//! UI-side concern of loading the factory preset library.
 
 pub use forma_engine::Patch;
 
-// ---------------------------------------------------------------------------
-// Default patches — scanned from assets/patches/**/*.json at runtime.
-// Drop any .json file into a subfolder and it appears in both apps automatically.
-// ---------------------------------------------------------------------------
+use include_dir::{include_dir, Dir};
+
+/// All factory patches embedded into the binary at compile time. Guarantees
+/// the patch library is populated regardless of install method (cargo install
+/// copies only the binary, with no associated resources on disk).
+static EMBEDDED_PATCHES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/patches");
 
 fn collect_patch_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -32,38 +34,62 @@ fn collect_patch_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>)
     }
 }
 
-/// Locate the patches directory, trying (in order):
-///   1. `assets/patches` relative to CWD  — works with `cargo run`
-///   2. `../Resources/patches` relative to the executable — works inside a .app bundle
-///      (executable lives at `Contents/MacOS/`, resources at `Contents/Resources/`)
-fn patches_dir() -> std::path::PathBuf {
+/// Locate an on-disk patches directory, trying (in order):
+///   1. `assets/patches` relative to CWD — works with `cargo run` and lets devs
+///      edit patch files and reload them without recompiling.
+///   2. `../Resources/assets/patches` relative to the canonicalized executable —
+///      works inside a `.app` bundle (exe at `Contents/MacOS/`, resources at
+///      `Contents/Resources/`) and inside a Homebrew keg (exe at `<prefix>/bin/`,
+///      resources at `<prefix>/Resources/`). Canonicalisation resolves PATH
+///      symlinks like `/usr/local/bin/forma → Cellar/forma/<ver>/bin/forma`.
+///
+/// Returns `None` for `cargo install` and similar binary-only installs — the
+/// caller falls back to the embedded patches in that case.
+fn on_disk_patches_dir() -> Option<std::path::PathBuf> {
     let cwd_path = std::path::Path::new("assets/patches");
     if cwd_path.is_dir() {
-        return cwd_path.to_path_buf();
+        return Some(cwd_path.to_path_buf());
     }
-    if let Ok(exe) = std::env::current_exe() {
-        let bundle_path = exe
-            .parent() // Contents/MacOS
-            .and_then(|p| p.parent()) // Contents
-            .map(|p| p.join("Resources").join("assets").join("patches"));
-        if let Some(p) = bundle_path {
-            if p.is_dir() {
-                return p;
-            }
-        }
-    }
-    cwd_path.to_path_buf()
+    let exe = std::env::current_exe().ok()?;
+    let real_exe = std::fs::canonicalize(&exe).unwrap_or(exe);
+    let bundle_path = real_exe
+        .parent() // Contents/MacOS or <prefix>/bin
+        .and_then(|p| p.parent()) // Contents or <prefix>
+        .map(|p| p.join("Resources").join("assets").join("patches"))?;
+    bundle_path.is_dir().then_some(bundle_path)
+}
+
+fn parse_embedded_patches() -> Vec<Patch> {
+    let mut entries: Vec<&include_dir::File<'_>> = EMBEDDED_PATCHES
+        .find("**/*.json")
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.as_file())
+        .collect();
+    entries.sort_by_key(|f| f.path());
+    entries
+        .into_iter()
+        .filter_map(|f| f.contents_utf8())
+        .filter_map(|s| serde_json::from_str(s).ok())
+        .collect()
 }
 
 pub fn default_patches() -> Vec<Patch> {
-    let mut files = Vec::new();
-    collect_patch_files(&patches_dir(), &mut files);
-    files.sort();
-    files
-        .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
-        .filter_map(|s| serde_json::from_str(&s).ok())
-        .collect()
+    if let Some(dir) = on_disk_patches_dir() {
+        let mut files = Vec::new();
+        collect_patch_files(&dir, &mut files);
+        files.sort();
+        let parsed: Vec<Patch> = files
+            .iter()
+            .filter_map(|p| std::fs::read_to_string(p).ok())
+            .filter_map(|s| serde_json::from_str(&s).ok())
+            .collect();
+        if !parsed.is_empty() {
+            return parsed;
+        }
+    }
+    parse_embedded_patches()
 }
 
 #[cfg(test)]
@@ -73,6 +99,17 @@ mod tests {
     /// Every on-disk preset in `assets/patches/**/*.json` must continue to
     /// parse via the migrated `Patch` struct (now in `forma-engine`).
     /// Catches serde-field drift during the Stage 3 move.
+    #[test]
+    fn embedded_patches_load_at_least_one() {
+        // Guards against breakage in the include_dir glob, missing assets at
+        // build time, or schema drift that makes every patch fail to parse.
+        let parsed = parse_embedded_patches();
+        assert!(
+            !parsed.is_empty(),
+            "no embedded patches parsed — check the include_dir path and patch JSON schema",
+        );
+    }
+
     #[test]
     fn every_bundled_patch_json_deserialises() {
         // Walk relative to the workspace root; `cargo test` sets CWD there.
