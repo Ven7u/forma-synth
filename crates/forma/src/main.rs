@@ -521,6 +521,18 @@ impl SynthApp {
         // which always points to the focused track's handle. Phase 2 will add
         // focus switching; for now track 0 is permanently focused.
         let engine = audio.handles[0].clone();
+
+        // Dispatch MIDI note events directly from the midir callback thread so
+        // they reach the audio engine even when the window is on a different
+        // macOS Space and the eframe render loop is paused.
+        {
+            let e = engine.clone();
+            midi.set_on_event(move |ev| match ev {
+                MidiEvent::NoteOn { note, velocity, .. } => e.note_on(note, velocity),
+                MidiEvent::NoteOff { note, .. } => e.note_off(note),
+                _ => {}
+            });
+        }
         let track_engines = [
             audio.handles[0].clone(),
             audio.handles[1].clone(),
@@ -1423,18 +1435,22 @@ impl SynthApp {
             self.midi_monitor.truncate(32);
 
             match ev {
-                MidiEvent::NoteOn {
-                    note,
-                    velocity,
-                    channel,
-                } => {
-                    let _ = velocity;
+                MidiEvent::NoteOn { note, channel, .. } => {
                     self.midi_held_notes.insert(note);
-                    self.route_note_on(note, channel);
+                    // Notes are already dispatched by the midir callback thread
+                    // (set_on_event), so we skip engine dispatch here to avoid
+                    // doubling. LIVE-mode channel routing is applied below only
+                    // when the UI loop is actually running (window focused).
+                    if !self.midi.has_on_event() {
+                        self.route_note_on(note, channel);
+                    }
                 }
                 MidiEvent::NoteOff { note, .. } => {
                     self.midi_held_notes.remove(&note);
-                    self.push_note_off(note);
+                    // Same as above — callback already sent NoteOff to engine.
+                    if !self.midi.has_on_event() {
+                        self.push_note_off(note);
+                    }
                 }
                 MidiEvent::Aftertouch { value, .. } => {
                     self.engine.set_aftertouch(value as f32 / 127.0);
