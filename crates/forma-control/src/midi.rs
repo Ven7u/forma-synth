@@ -13,6 +13,7 @@
 
 use midir::{MidiInput, MidiInputConnection};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 
 // ---------------------------------------------------------------------------
 // MIDI event type
@@ -54,6 +55,8 @@ pub fn cc_name(cc: u8) -> &'static str {
 // Engine
 // ---------------------------------------------------------------------------
 
+type EventCallback = Arc<Mutex<Option<Box<dyn Fn(MidiEvent) + Send + 'static>>>>;
+
 pub struct MidiEngine {
     tx: Sender<MidiEvent>,
     rx: Receiver<MidiEvent>,
@@ -63,6 +66,10 @@ pub struct MidiEngine {
     pub port_names: Vec<String>,
     /// Index of the currently open port (None = disconnected).
     pub connected_port: Option<usize>,
+    /// Optional callback invoked from the midir thread for every event.
+    /// Use this to dispatch notes directly to the audio engine, bypassing
+    /// the UI render loop (which pauses when the window is on another Space).
+    on_event: EventCallback,
 }
 
 impl Default for MidiEngine {
@@ -80,7 +87,23 @@ impl MidiEngine {
             _connection: None,
             port_names: Vec::new(),
             connected_port: None,
+            on_event: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Register a callback invoked on the midir thread for every MIDI event.
+    /// Replaces any previously registered callback. The callback runs before
+    /// the event is enqueued for the UI, so notes reach the engine even when
+    /// the window is on a different macOS Space and the UI loop is paused.
+    pub fn set_on_event(&self, f: impl Fn(MidiEvent) + Send + 'static) {
+        if let Ok(mut guard) = self.on_event.lock() {
+            *guard = Some(Box::new(f));
+        }
+    }
+
+    /// Returns true if a direct-dispatch callback is active.
+    pub fn has_on_event(&self) -> bool {
+        self.on_event.lock().map(|g| g.is_some()).unwrap_or(false)
     }
 
     /// Enumerate available MIDI input ports. Updates `self.port_names`.
@@ -111,6 +134,7 @@ impl MidiEngine {
             .ok_or_else(|| anyhow::anyhow!("MIDI port index {index} out of range"))?;
 
         let tx = self.tx.clone();
+        let on_event = Arc::clone(&self.on_event);
 
         let conn = midi_in
             .connect(
@@ -118,6 +142,11 @@ impl MidiEngine {
                 "forma_conn",
                 move |_stamp, msg, _| {
                     if let Some(ev) = parse_midi(msg) {
+                        if let Ok(guard) = on_event.lock() {
+                            if let Some(f) = guard.as_ref() {
+                                f(ev.clone());
+                            }
+                        }
                         let _ = tx.send(ev);
                     }
                 },

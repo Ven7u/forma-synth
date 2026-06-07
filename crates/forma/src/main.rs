@@ -521,6 +521,18 @@ impl SynthApp {
         // which always points to the focused track's handle. Phase 2 will add
         // focus switching; for now track 0 is permanently focused.
         let engine = audio.handles[0].clone();
+
+        // Dispatch MIDI note events directly from the midir callback thread so
+        // they reach the audio engine even when the window is on a different
+        // macOS Space and the eframe render loop is paused.
+        {
+            let e = engine.clone();
+            midi.set_on_event(move |ev| match ev {
+                MidiEvent::NoteOn { note, velocity, .. } => e.note_on(note, velocity),
+                MidiEvent::NoteOff { note, .. } => e.note_off(note),
+                _ => {}
+            });
+        }
         let track_engines = [
             audio.handles[0].clone(),
             audio.handles[1].clone(),
@@ -1423,18 +1435,22 @@ impl SynthApp {
             self.midi_monitor.truncate(32);
 
             match ev {
-                MidiEvent::NoteOn {
-                    note,
-                    velocity,
-                    channel,
-                } => {
-                    let _ = velocity;
+                MidiEvent::NoteOn { note, channel, .. } => {
                     self.midi_held_notes.insert(note);
-                    self.route_note_on(note, channel);
+                    // Notes are already dispatched by the midir callback thread
+                    // (set_on_event), so we skip engine dispatch here to avoid
+                    // doubling. LIVE-mode channel routing is applied below only
+                    // when the UI loop is actually running (window focused).
+                    if !self.midi.has_on_event() {
+                        self.route_note_on(note, channel);
+                    }
                 }
                 MidiEvent::NoteOff { note, .. } => {
                     self.midi_held_notes.remove(&note);
-                    self.push_note_off(note);
+                    // Same as above — callback already sent NoteOff to engine.
+                    if !self.midi.has_on_event() {
+                        self.push_note_off(note);
+                    }
                 }
                 MidiEvent::Aftertouch { value, .. } => {
                     self.engine.set_aftertouch(value as f32 / 127.0);
@@ -1618,11 +1634,22 @@ impl eframe::App for SynthApp {
         // Apply theme to egui Visuals + Style every frame — cheap struct copies.
         self.theme.apply_to_egui(ctx);
 
-        // Release all notes when the window loses focus so keys/MIDI can't get stuck.
+        // Release computer-keyboard notes when the window loses focus so they can't
+        // get stuck. Hardware MIDI notes are intentionally left playing — the MIDI
+        // device sends its own NoteOff events and doesn't need window focus.
         if ctx.input(|i| i.focused) != self.window_focused {
             self.window_focused = ctx.input(|i| i.focused);
             if !self.window_focused {
-                self.all_notes_off();
+                let held: Vec<u8> = self.piano_held_midi.drain().collect();
+                for n in held {
+                    self.engine.note_off(n);
+                }
+                let frozen: Vec<u8> = self.frozen_notes.drain().collect();
+                for n in frozen {
+                    self.engine.note_off(n);
+                }
+                self.chord_kb.held_pad = None;
+                self.chord_kb.kb_held.clear();
             }
         }
 
