@@ -55,6 +55,8 @@ pub fn cc_name(cc: u8) -> &'static str {
 // Engine
 // ---------------------------------------------------------------------------
 
+type EventCallback = Arc<Mutex<Option<Box<dyn Fn(MidiEvent) + Send + 'static>>>>;
+
 pub struct MidiEngine {
     tx: Sender<MidiEvent>,
     rx: Receiver<MidiEvent>,
@@ -67,7 +69,7 @@ pub struct MidiEngine {
     /// Optional callback invoked from the midir thread for every event.
     /// Use this to dispatch notes directly to the audio engine, bypassing
     /// the UI render loop (which pauses when the window is on another Space).
-    on_event: Arc<Mutex<Option<Box<dyn Fn(MidiEvent) + Send + 'static>>>>,
+    on_event: EventCallback,
 }
 
 impl Default for MidiEngine {
