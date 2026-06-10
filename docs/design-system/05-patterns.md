@@ -259,3 +259,127 @@ held (shows current envelope position live).
 4. Patterns accept content closures (`FnOnce(&mut Ui)`) for their variable
    parts. Fixed structure is enforced by the pattern; variable content is
    provided by the caller.
+
+---
+
+## Section-level layout — general guidelines
+
+These guidelines govern how multiple cards or sections relate to each other
+within a panel. Detailed specifications for each panel are deferred until
+Phase 5+ of implementation, when real pixels can inform the decisions. This
+section captures the decision rules so they don't have to be re-derived
+mid-implementation.
+
+### The three layout shapes
+
+Every panel body is one of these three shapes. Identify which one before
+writing any layout code:
+
+| Shape | Description | Examples |
+|-------|-------------|---------|
+| **Strip** | N homogeneous cards in a row (all same type, same controls) | Oscillators, Mixer channels |
+| **Grid** | Rows × columns, both dimensions meaningful | Drum machine, Sequencer steps |
+| **Stack** | Vertical sequence of heterogeneous sections | Arpeggiator, Filter, LFO, MIDI settings |
+
+Stacks are the simplest and require no special layout logic beyond the default
+egui vertical flow. Strips and grids require explicit slot math.
+
+### The sizing contract
+
+Before placing any card or section, decide which direction the sizing
+authority flows:
+
+> **Fixed item count at compile time → container defines size, content adapts.**
+> **Item count driven by user data → content defines size, container scrolls.**
+
+| Fixed count (container authority) | Data-driven (content authority) |
+|-----------------------------------|----------------------------------|
+| 3 oscillator cards | Patch browser list |
+| 8 drum channels | Sequencer steps (variable length) |
+| N FX modules in the chain | Scene list |
+| 4 mixer tracks | Patch history entries |
+
+When in doubt: if you know the number while writing code, it's fixed. If you
+only know it at runtime, it's data-driven.
+
+### Strip math
+
+For N equal cards in a horizontal strip:
+
+```
+card_width = (available_width - gap * (N - 1)) / N
+```
+
+Where `gap` is `sp_md` for related cards (oscillators) or `sp_lg` for more
+visually distinct sections. Card height is always a fixed token (e.g. `CARD_H`),
+never derived from content.
+
+**Minimum card width:** Define a minimum below which the content becomes
+unusable (typically the width of the widest KnobRow it contains). If
+`card_width < minimum`, the strip switches to a horizontal `ScrollArea` rather
+than crushing content.
+
+### Grid math
+
+For a rows × columns grid:
+
+```
+cell_width  = (available_width  - row_header_width  - gap * (cols - 1)) / cols
+cell_height = (available_height - col_header_height - gap * (rows - 1)) / rows
+```
+
+In practice, one dimension is usually fixed (cell height for drum/sequencer
+grids) and the other fills available space. Overflow in the fixed dimension
+direction triggers a ScrollArea on the grid body only — control headers stay
+pinned above/beside.
+
+### The escape valve rule
+
+Every layout must have a named policy for what happens when content overflows.
+Decide this before implementing, not after:
+
+| Layout | Overflow direction | Escape valve |
+|--------|-------------------|--------------|
+| Horizontal strip (oscillators) | Too many cards or window too narrow | Horizontal scroll |
+| FX chain strip | Too many effects | Horizontal scroll |
+| Mixer strip | Too many channels | Horizontal scroll |
+| Sequencer grid | Too many steps (horizontal) | Horizontal scroll on grid body |
+| Drum machine grid | Too many channels (vertical) | Vertical scroll on grid body |
+| Stack panel (arp, LFO) | Too many controls | Vertical scroll |
+| Fixed card contents | Window too small | Minimum window size enforced (never scroll a fixed-count card) |
+
+The last row is important: if a card has a fixed number of knobs, the answer
+to overflow is **not** to scroll the card — it is to enforce the minimum window
+size so the card always has enough room.
+
+### Pinned vs. scrollable regions
+
+Within a panel that has a ScrollArea, not everything scrolls:
+
+- **Always pinned:** column/row headers, control bars above a grid, section titles
+- **Always scrollable:** the data grid body, long lists
+
+```
+┌──────────────────────────────────┐
+│  Controls bar (pinned)           │  ← play, mode, BPM — never scrolls
+├──────┬───────────────────────────┤
+│ Row  │                           │
+│ hdrs │   Grid body (scrollable)  │  ← steps/cells scroll; headers stay
+│(pin) │                           │
+└──────┴───────────────────────────┘
+```
+
+### Deferred details
+
+The following section-level layouts are documented here only at the
+decision-rule level. Full specs (exact widths, minimum sizes, scroll thresholds)
+are written during Phase 5–6 of the implementation plan, against real
+implemented content:
+
+- **Oscillator panel:** EqualStrip of 3 TieredCards
+- **FX Chain panel:** ScrollableStrip of FxModules
+- **Mixer panel:** EqualStrip of FaderColumns
+- **Sequencer panel:** Pinned control bar + scrollable step grid
+- **Drum Machine panel:** Pinned channel strip + scrollable step grid
+- **Arpeggiator panel:** Stack (no special layout needed)
+- **Keyboard panel:** Custom draw, width-driven key sizing
