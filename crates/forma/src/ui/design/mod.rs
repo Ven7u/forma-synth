@@ -5,7 +5,13 @@
 //! components. For now it exposes the two enums that the rest of the system
 //! is parameterized over.
 
-#![allow(dead_code)] // Phase 0 establishes the API; callers land in Phase 2+.
+#![allow(dead_code)] // Phase 0/2 establish the API; callers land in Phase 5+.
+
+pub mod knob;
+pub mod layout;
+
+#[allow(unused_imports)] // Re-exported for Phase 5+ panel migrations.
+pub use layout::SynthUi;
 
 use egui::Vec2;
 
