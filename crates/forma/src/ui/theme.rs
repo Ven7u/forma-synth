@@ -294,6 +294,21 @@ impl SynthTheme {
         style.spacing.menu_margin = Margin::same(self.sp_sm as i8);
         style.spacing.indent = self.sp_lg;
         style.spacing.interact_size = Vec2::new(40.0, 20.0);
+
+        // Bind every egui TextStyle to a token from this theme. This is
+        // what makes `ui.label()`, `RichText::small()`, `.heading()`,
+        // `.monospace()`, button labels, and menu text align to the design
+        // system without per-site `.font(...)` overrides.
+        use egui::TextStyle;
+        let text_styles = std::collections::BTreeMap::from([
+            (TextStyle::Heading, self.font_heading()),
+            (TextStyle::Body, self.font_body()),
+            (TextStyle::Button, self.font_body()),
+            (TextStyle::Small, self.font_small()),
+            (TextStyle::Monospace, self.font_value()),
+        ]);
+        style.text_styles = text_styles;
+
         ctx.set_global_style(style);
     }
 }
