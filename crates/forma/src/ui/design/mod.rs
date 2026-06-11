@@ -7,6 +7,7 @@
 
 #![allow(dead_code)] // Phase 0/2 establish the API; callers land in Phase 5+.
 
+pub mod gallery;
 pub mod knob;
 pub mod layout;
 

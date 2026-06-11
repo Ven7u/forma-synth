@@ -272,6 +272,9 @@ pub(crate) struct SynthApp {
     pub(crate) limiter_enabled: bool,
     pub(crate) window_focused: bool,
 
+    // Design-system gallery (debug window — Ctrl/Cmd+Shift+G).
+    pub(crate) show_design_gallery: bool,
+
     // ── UI scaling / window geometry persistence ─────────────────────────────
     pub(crate) zoom_factor: f32,
     /// True until the first `ui()` tick — used for one-shot monitor clamp.
@@ -686,6 +689,7 @@ impl SynthApp {
             peak_hold_timer: 0.0,
             limiter_enabled: true,
             window_focused: true,
+            show_design_gallery: false,
             zoom_factor: saved.zoom_factor.clamp(0.7, 1.4),
             first_frame: true,
             last_applied_ppp: 0.0,
@@ -1716,6 +1720,17 @@ impl eframe::App for SynthApp {
             _ => {}
         }
 
+        // Ctrl/Cmd+Shift+G toggles the design-system gallery window.
+        if ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            i.consume_shortcut(&KeyboardShortcut::new(
+                Modifiers::COMMAND | Modifiers::SHIFT,
+                Key::G,
+            ))
+        }) {
+            self.show_design_gallery = !self.show_design_gallery;
+        }
+
         // Apply pixels_per_point. NOTE: if text appears doubled on HiDPI,
         // the native_ppp multiplier double-applies — drop it and re-test.
         let native_ppp = ctx.native_pixels_per_point().unwrap_or(1.0);
@@ -1766,6 +1781,7 @@ impl eframe::App for SynthApp {
         self.ui_scope_fullscreen(ctx);
         self.ui_scene_browser(ctx);
         self.ui_midi_learn_window(ctx);
+        ui::design::gallery::show(ctx, &mut self.show_design_gallery, &self.theme);
 
         // ── Zone 1: global bar (top, always visible) ──────────────────────────
         egui::TopBottomPanel::top("global_bar")
