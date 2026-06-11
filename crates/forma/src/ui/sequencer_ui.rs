@@ -19,7 +19,11 @@ impl SynthApp {
         let seq_playing = self.seq.playing.load(Ordering::Relaxed);
 
         // --- Shared toolbar ---
-        ui.horizontal(|ui| {
+        // Use horizontal_wrapped so the toolbar gracefully wraps onto multiple
+        // rows on narrow windows instead of overflowing the panel.
+        // TODO(Phase 6): redesign as tier-stratified rows — transport (Tier 1) /
+        // mode + BPM (Tier 2) / length + division behind a menu (Tier 3).
+        ui.horizontal_wrapped(|ui| {
             // Mode tabs
             for &mode in &[SeqMode::NoteSeq, SeqMode::ChordSeq] {
                 let active = seq_mode == mode;
@@ -514,24 +518,26 @@ impl SynthApp {
             )
         };
 
+        // Step pads use a tighter gap than the global item_spacing —
+        // per the design system spec (04-components.md §StepPad).
+        const MIN_STEP_W: f32 = 18.0;
+        let step_gap = self.theme.sp_xxs;
         let n = length as f32;
-        let spacing = ui.spacing().item_spacing.x;
-        // step_w is computed against the outer panel width before the scroll
-        // area wraps the grid — so steps still divide evenly when there's
-        // room, and fall back to the 28 px floor when there isn't.
-        let step_w = ((ui.available_width() - spacing * (n - 1.0)) / n).max(28.0);
+        let natural_w = (ui.available_width() - step_gap * (n - 1.0)) / n;
+        let step_w = natural_w.max(MIN_STEP_W);
+        let needs_scroll = natural_w < MIN_STEP_W;
 
-        // Data-driven width: sequencer length is user-set (up to 32 steps).
-        // Scroll horizontally rather than crush steps below 28 px.
-        egui::ScrollArea::horizontal()
-            .id_salt("note_seq_h_scroll")
-            .show(ui, |ui| {
+        // Render closure — captures `self`, called from exactly one branch
+        // below. Lets us mount the ScrollArea conditionally so the wide-window
+        // path stays free of any scroll-area machinery.
+        let render = |this: &mut Self, ui: &mut egui::Ui| {
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = step_gap;
             for i in 0..length {
                 ui.vertical(|ui| {
                     ui.set_width(step_w);
                     let (is_on, note) = {
-                        let ns = self.seq.note_seq.lock().unwrap();
+                        let ns = this.seq.note_seq.lock().unwrap();
                         (ns.steps[i], ns.notes[i])
                     };
                     let is_current = seq_playing && seq_current_step == i;
@@ -546,7 +552,7 @@ impl SynthApp {
                     painter.rect_filled(
                         r,
                         CornerRadius::same(4),
-                        self.theme.c(&self.theme.bg_seq_bar),
+                        this.theme.c(&this.theme.bg_seq_bar),
                     );
                     let t = (note_f - midi_min) / (midi_max - midi_min);
                     let bar_h = (t * (bar_area_h - 4.0)).max(4.0);
@@ -555,11 +561,11 @@ impl SynthApp {
                         Vec2::new(step_w - 4.0, bar_h),
                     );
                     let bar_color = if is_current {
-                        self.theme.c(&self.theme.seq_current)
+                        this.theme.c(&this.theme.seq_current)
                     } else if is_on {
-                        self.theme.c(&self.theme.seq_note_bar_on)
+                        this.theme.c(&this.theme.seq_note_bar_on)
                     } else {
-                        self.theme.c(&self.theme.seq_note_bar_off)
+                        this.theme.c(&this.theme.seq_note_bar_off)
                     };
                     painter.rect_filled(bar_rect, CornerRadius::same(3), bar_color);
                     // Red border on rec cursor step.
@@ -575,12 +581,12 @@ impl SynthApp {
                         r.center(),
                         egui::Align2::CENTER_CENTER,
                         super::midi_note_name(note),
-                        self.theme.font_value(),
+                        this.theme.font_value(),
                         if is_on { Color32::WHITE } else { Color32::GRAY },
                     );
 
                     if bar_resp.dragged() {
-                        let mut ns = self.seq.note_seq.lock().unwrap();
+                        let mut ns = this.seq.note_seq.lock().unwrap();
                         ns.drag_accum[i] -= bar_resp.drag_delta().y * 0.3;
                         let steps = ns.drag_accum[i] as i32;
                         if steps != 0 {
@@ -594,32 +600,21 @@ impl SynthApp {
                             ns.notes[i] = SEQ_CHROMATIC[new_pos];
                         }
                     }
-                    // Scroll wheel: 1 tick = 1 semitone.
-                    if bar_resp.hovered() {
-                        let scroll = ui.input(|inp| inp.smooth_scroll_delta.y);
-                        if scroll != 0.0 {
-                            let mut ns = self.seq.note_seq.lock().unwrap();
-                            let pos = SEQ_CHROMATIC
-                                .iter()
-                                .position(|&n| n == ns.notes[i])
-                                .unwrap_or(0) as i32;
-                            let delta = if scroll > 0.0 { 1i32 } else { -1 };
-                            let new_pos =
-                                (pos + delta).clamp(0, SEQ_CHROMATIC.len() as i32 - 1) as usize;
-                            ns.notes[i] = SEQ_CHROMATIC[new_pos];
-                        }
-                    }
+                    // (Scroll-wheel pitch editing removed: it conflicted with
+                    // ScrollArea scrolling and dock-panel scrolling, where
+                    // trackpad swipes accidentally changed step notes.
+                    // Drag remains the primary pitch-edit gesture.)
                     if bar_resp.drag_stopped() {
-                        self.seq.note_seq.lock().unwrap().drag_accum[i] = 0.0;
+                        this.seq.note_seq.lock().unwrap().drag_accum[i] = 0.0;
                     }
 
                     // Step button
                     let fill = if is_current {
-                        self.theme.c(&self.theme.seq_current)
+                        this.theme.c(&this.theme.seq_current)
                     } else if is_on {
-                        self.theme.c(&self.theme.seq_step_on)
+                        this.theme.c(&this.theme.seq_step_on)
                     } else {
-                        self.theme.c(&self.theme.seq_step_off)
+                        this.theme.c(&this.theme.seq_step_off)
                     };
                     let (r, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
                     painter.rect_filled(r.rect, CornerRadius::same(5), fill);
@@ -637,13 +632,13 @@ impl SynthApp {
                         StrokeKind::Middle,
                     );
                     if r.clicked() {
-                        let mut ns = self.seq.note_seq.lock().unwrap();
+                        let mut ns = this.seq.note_seq.lock().unwrap();
                         ns.steps[i] = !ns.steps[i];
                     }
 
                     // Velocity bar — click/drag sets 0-127 by x position.
                     let vel_h = 14.0;
-                    let vel = self.seq.note_seq.lock().unwrap().velocities[i];
+                    let vel = this.seq.note_seq.lock().unwrap().velocities[i];
                     let (vel_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, vel_h), Sense::click_and_drag());
                     let vr = vel_resp.rect;
@@ -658,20 +653,20 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         format!("{vel}"),
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         Color32::from_rgb(180, 180, 180),
                     );
                     if vel_resp.dragged() || vel_resp.clicked() {
                         if let Some(pos) = vel_resp.interact_pointer_pos() {
                             let t = ((pos.x - vr.min.x) / vr.width()).clamp(0.0, 1.0);
-                            self.seq.note_seq.lock().unwrap().velocities[i] =
+                            this.seq.note_seq.lock().unwrap().velocities[i] =
                                 (t * 127.0).round() as u8;
                         }
                     }
 
                     // Probability bar — click/drag sets 0-100 by x position.
                     let prob_h = 10.0;
-                    let prob = self.seq.note_seq.lock().unwrap().probabilities[i];
+                    let prob = this.seq.note_seq.lock().unwrap().probabilities[i];
                     let (prob_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, prob_h), Sense::click_and_drag());
                     let pr = prob_resp.rect;
@@ -692,14 +687,24 @@ impl SynthApp {
                     if prob_resp.dragged() || prob_resp.clicked() {
                         if let Some(pos) = prob_resp.interact_pointer_pos() {
                             let t = ((pos.x - pr.min.x) / pr.width()).clamp(0.0, 1.0);
-                            self.seq.note_seq.lock().unwrap().probabilities[i] =
+                            this.seq.note_seq.lock().unwrap().probabilities[i] =
                                 (t * 100.0).round() as u8;
                         }
                     }
                 });
             }
         });
-            });
+        };
+
+        if needs_scroll {
+            egui::ScrollArea::horizontal()
+                .id_salt("note_seq_h_scroll")
+                // Step cells own click+drag — wheel and scrollbar drag still scroll.
+                .drag_to_scroll(false)
+                .show(ui, |ui| render(self, ui));
+        } else {
+            render(self, ui);
+        }
     }
 
     fn ui_chord_seq(&mut self, ui: &mut egui::Ui) {
@@ -714,21 +719,21 @@ impl SynthApp {
             (cs.length, cs.scale, cs.root)
         };
 
+        const MIN_STEP_W: f32 = 18.0;
+        let step_gap = self.theme.sp_xxs;
         let n = length as f32;
-        let spacing = ui.spacing().item_spacing.x;
-        let step_w = ((ui.available_width() - spacing * (n - 1.0)) / n).max(28.0);
+        let natural_w = (ui.available_width() - step_gap * (n - 1.0)) / n;
+        let step_w = natural_w.max(MIN_STEP_W);
+        let needs_scroll = natural_w < MIN_STEP_W;
 
-        // Data-driven width: chord sequence length is user-set.
-        // Scroll horizontally rather than crush steps below 28 px.
-        egui::ScrollArea::horizontal()
-            .id_salt("chord_seq_h_scroll")
-            .show(ui, |ui| {
+        let render = |this: &mut Self, ui: &mut egui::Ui| {
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = step_gap;
             for i in 0..length {
                 ui.vertical(|ui| {
                     ui.set_width(step_w);
                     let (is_on, degree, chord_type, oct_off) = {
-                        let cs = self.seq.chord_seq.lock().unwrap();
+                        let cs = this.seq.chord_seq.lock().unwrap();
                         (
                             cs.steps[i],
                             cs.degrees[i],
@@ -745,7 +750,7 @@ impl SynthApp {
                     painter.rect_filled(
                         r,
                         CornerRadius::same(4),
-                        self.theme.c(&self.theme.bg_seq_bar),
+                        this.theme.c(&this.theme.bg_seq_bar),
                     );
                     let t = degree as f32 / 6.0;
                     let bar_h = (t * (bar_area_h - 4.0)).max(4.0);
@@ -755,15 +760,15 @@ impl SynthApp {
                     );
                     let quality = chord_quality(scale, degree);
                     let bar_color = if is_current {
-                        self.theme.c(&self.theme.seq_current)
+                        this.theme.c(&this.theme.seq_current)
                     } else if !is_on {
-                        self.theme.c(&self.theme.seq_note_bar_off)
+                        this.theme.c(&this.theme.seq_note_bar_off)
                     } else if quality == "m" {
-                        self.theme.c(&self.theme.seq_chord_minor)
+                        this.theme.c(&this.theme.seq_chord_minor)
                     } else if quality == "°" {
-                        self.theme.c(&self.theme.seq_chord_dim)
+                        this.theme.c(&this.theme.seq_chord_dim)
                     } else {
-                        self.theme.c(&self.theme.seq_chord_major)
+                        this.theme.c(&this.theme.seq_chord_major)
                     };
                     painter.rect_filled(bar_rect, CornerRadius::same(3), bar_color);
                     // Rec cursor border.
@@ -781,14 +786,14 @@ impl SynthApp {
                         egui::pos2(r.center().x, r.min.y + 10.0),
                         egui::Align2::CENTER_CENTER,
                         &cname,
-                        self.theme.font_value(),
+                        this.theme.font_value(),
                         if is_on { Color32::WHITE } else { Color32::GRAY },
                     );
                     painter.text(
                         egui::pos2(r.center().x, r.min.y + 22.0),
                         egui::Align2::CENTER_CENTER,
                         DEGREE_LABELS[degree],
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         if is_on {
                             Color32::from_rgb(180, 180, 180)
                         } else {
@@ -800,7 +805,7 @@ impl SynthApp {
                         egui::pos2(r.center().x, r.max.y - 8.0),
                         egui::Align2::CENTER_CENTER,
                         chord_type.label(),
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         if is_on {
                             Color32::from_rgb(160, 200, 160)
                         } else {
@@ -810,7 +815,7 @@ impl SynthApp {
 
                     // Left drag: change degree.
                     if bar_resp.dragged() {
-                        let mut cs = self.seq.chord_seq.lock().unwrap();
+                        let mut cs = this.seq.chord_seq.lock().unwrap();
                         cs.drag_accum[i] -= bar_resp.drag_delta().y * 0.6;
                         let steps = cs.drag_accum[i] as i32;
                         if steps != 0 {
@@ -819,14 +824,14 @@ impl SynthApp {
                         }
                     }
                     if bar_resp.drag_stopped() {
-                        self.seq.chord_seq.lock().unwrap().drag_accum[i] = 0.0;
+                        this.seq.chord_seq.lock().unwrap().drag_accum[i] = 0.0;
                     }
                     // Scroll wheel: change degree.
                     if bar_resp.hovered() {
                         let scroll = ui.input(|inp| inp.smooth_scroll_delta.y);
                         if scroll != 0.0 {
                             let delta = if scroll > 0.0 { 1i32 } else { -1 };
-                            let mut cs = self.seq.chord_seq.lock().unwrap();
+                            let mut cs = this.seq.chord_seq.lock().unwrap();
                             cs.degrees[i] = (degree as i32 + delta).clamp(0, 6) as usize;
                         }
                     }
@@ -836,15 +841,15 @@ impl SynthApp {
                         let all = ChordType::all();
                         let cur_idx = all.iter().position(|&t| t == chord_type).unwrap_or(0);
                         let next = all[(cur_idx + 1) % all.len()];
-                        self.seq.chord_seq.lock().unwrap().chord_types[i] = next;
+                        this.seq.chord_seq.lock().unwrap().chord_types[i] = next;
                     }
 
                     let fill = if is_current {
-                        self.theme.c(&self.theme.seq_current)
+                        this.theme.c(&this.theme.seq_current)
                     } else if is_on {
-                        self.theme.c(&self.theme.seq_step_on)
+                        this.theme.c(&this.theme.seq_step_on)
                     } else {
-                        self.theme.c(&self.theme.seq_step_off)
+                        this.theme.c(&this.theme.seq_step_off)
                     };
                     let (r, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
                     painter.rect_filled(r.rect, CornerRadius::same(5), fill);
@@ -862,13 +867,13 @@ impl SynthApp {
                         StrokeKind::Middle,
                     );
                     if r.clicked() {
-                        let mut cs = self.seq.chord_seq.lock().unwrap();
+                        let mut cs = this.seq.chord_seq.lock().unwrap();
                         cs.steps[i] = !cs.steps[i];
                     }
 
                     // Velocity bar.
                     let vel_h = 14.0;
-                    let vel = self.seq.chord_seq.lock().unwrap().velocities[i];
+                    let vel = this.seq.chord_seq.lock().unwrap().velocities[i];
                     let (vel_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, vel_h), Sense::click_and_drag());
                     let vr = vel_resp.rect;
@@ -883,20 +888,20 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         format!("{vel}"),
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         Color32::from_rgb(180, 180, 180),
                     );
                     if vel_resp.dragged() || vel_resp.clicked() {
                         if let Some(pos) = vel_resp.interact_pointer_pos() {
                             let t = ((pos.x - vr.min.x) / vr.width()).clamp(0.0, 1.0);
-                            self.seq.chord_seq.lock().unwrap().velocities[i] =
+                            this.seq.chord_seq.lock().unwrap().velocities[i] =
                                 (t * 127.0).round() as u8;
                         }
                     }
 
                     // Probability bar.
                     let prob_h = 10.0;
-                    let prob = self.seq.chord_seq.lock().unwrap().probabilities[i];
+                    let prob = this.seq.chord_seq.lock().unwrap().probabilities[i];
                     let (prob_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, prob_h), Sense::click_and_drag());
                     let pr = prob_resp.rect;
@@ -917,7 +922,7 @@ impl SynthApp {
                     if prob_resp.dragged() || prob_resp.clicked() {
                         if let Some(pos) = prob_resp.interact_pointer_pos() {
                             let t = ((pos.x - pr.min.x) / pr.width()).clamp(0.0, 1.0);
-                            self.seq.chord_seq.lock().unwrap().probabilities[i] =
+                            this.seq.chord_seq.lock().unwrap().probabilities[i] =
                                 (t * 100.0).round() as u8;
                         }
                     }
@@ -944,7 +949,7 @@ impl SynthApp {
                         or_.center(),
                         egui::Align2::CENTER_CENTER,
                         oct_label,
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         Color32::from_rgb(200, 180, 220),
                     );
                     if oct_resp.clicked() {
@@ -955,14 +960,14 @@ impl SynthApp {
                             } else {
                                 (oct_off - 1).max(-2)
                             };
-                            self.seq.chord_seq.lock().unwrap().octave_offsets[i] = new_off;
+                            this.seq.chord_seq.lock().unwrap().octave_offsets[i] = new_off;
                         }
                     }
 
                     // Voicing row: click left = prev inversion, right = next inversion.
                     let voicing_h = 12.0;
-                    let voicing = self.seq.chord_seq.lock().unwrap().voicings[i];
-                    let voice_lead = self.seq.chord_seq.lock().unwrap().voice_lead;
+                    let voicing = this.seq.chord_seq.lock().unwrap().voicings[i];
+                    let voice_lead = this.seq.chord_seq.lock().unwrap().voice_lead;
                     let (v_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, voicing_h), Sense::click());
                     let vr = v_resp.rect;
@@ -982,7 +987,7 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         vlabel,
-                        self.theme.font_micro(),
+                        this.theme.font_micro(),
                         vcolor,
                     );
                     if v_resp.clicked() && !voice_lead {
@@ -992,13 +997,22 @@ impl SynthApp {
                             } else {
                                 voicing.prev()
                             };
-                            self.seq.chord_seq.lock().unwrap().voicings[i] = next;
+                            this.seq.chord_seq.lock().unwrap().voicings[i] = next;
                         }
                     }
                 });
             }
         });
-            });
+        };
+
+        if needs_scroll {
+            egui::ScrollArea::horizontal()
+                .id_salt("chord_seq_h_scroll")
+                .drag_to_scroll(false)
+                .show(ui, |ui| render(self, ui));
+        } else {
+            render(self, ui);
+        }
     }
 
     // -------------------------------------------------------------------------
