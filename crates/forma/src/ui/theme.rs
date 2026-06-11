@@ -34,6 +34,17 @@ pub struct SynthTheme {
     pub accent: [u8; 3],
     pub accent_dim: [u8; 3],
 
+    // ── Knob arc colors by tier ────────────────────────────────────────────
+    /// Tier 1 (performance) — full accent.
+    #[serde(default)]
+    pub knob_tier1_arc: [u8; 3],
+    /// Tier 2 (sound design) — dimmed accent.
+    #[serde(default)]
+    pub knob_tier2_arc: [u8; 3],
+    /// Tier 3 (config) — nearly neutral.
+    #[serde(default)]
+    pub knob_tier3_arc: [u8; 3],
+
     // ── Special accents ─────────────────────────────────────────────────────
     pub accent_hard_sync: [u8; 3],
     pub accent_fm: [u8; 3],
@@ -105,6 +116,9 @@ pub struct SynthTheme {
     pub bg_adsr: [u8; 3],
 
     // ── Geometry tokens (spacing, rounding, stroke) ─────────────────────────
+    /// 2 px — internal widget micro-gaps (step-pad gaps, knob arc padding).
+    #[serde(default = "default_sp_xxs")]
+    pub sp_xxs: f32,
     /// 4 px — tightest gap; used between related controls.
     pub sp_xs: f32,
     /// 8 px — standard item spacing.
@@ -115,18 +129,40 @@ pub struct SynthTheme {
     pub sp_lg: f32,
     /// 24 px — section-to-section gap.
     pub sp_xl: f32,
+    /// 40 px — major panel separation.
+    #[serde(default = "default_sp_xxl")]
+    pub sp_xxl: f32,
+    /// 2 px — tiny corner radius (step buttons, micro-chips).
+    #[serde(default = "default_rounding_xs")]
+    pub rounding_xs: f32,
     /// Small corner radius — step buttons, chips.
     pub rounding_sm: f32,
     /// Medium corner radius — section cards.
     pub rounding_md: f32,
     /// Large corner radius — windows, popovers.
     pub rounding_lg: f32,
+    /// Pill / badge — fully rounded.
+    #[serde(default = "default_rounding_full")]
+    pub rounding_full: f32,
     /// Default border stroke width.
     pub stroke_ui: f32,
     /// Focused / hovered border stroke width.
     pub stroke_focus: f32,
     /// Active / pressed border stroke width.
     pub stroke_active: f32,
+}
+
+fn default_sp_xxs() -> f32 {
+    2.0
+}
+fn default_sp_xxl() -> f32 {
+    40.0
+}
+fn default_rounding_xs() -> f32 {
+    2.0
+}
+fn default_rounding_full() -> f32 {
+    999.0
 }
 
 impl SynthTheme {
@@ -262,29 +298,86 @@ impl SynthTheme {
     }
 }
 
+// ── Font tokens ──────────────────────────────────────────────────────────────
+// Base sizes; the global pixels_per_point factor scales them at render time.
+// Theme-independent. Allowed dead_code while panel files still use hardcoded
+// `.size(N)` calls; Phase 3 migrates them.
+
+#[allow(dead_code)]
+impl SynthTheme {
+    /// 14 pt — panel / section title.
+    pub fn font_heading(&self) -> egui::FontId {
+        egui::FontId::proportional(14.0)
+    }
+
+    /// 12 pt — parameter labels, button text.
+    pub fn font_body(&self) -> egui::FontId {
+        egui::FontId::proportional(12.0)
+    }
+
+    /// 11 pt monospace — knob value readouts, numeric displays.
+    pub fn font_value(&self) -> egui::FontId {
+        egui::FontId::monospace(11.0)
+    }
+
+    /// 10 pt — secondary labels, unit suffixes.
+    pub fn font_small(&self) -> egui::FontId {
+        egui::FontId::proportional(10.0)
+    }
+
+    /// 9 pt — sequencer step indices, keyboard note names (absolute floor).
+    pub fn font_micro(&self) -> egui::FontId {
+        egui::FontId::proportional(9.0)
+    }
+}
+
 // ── Geometry defaults shared by all themes ───────────────────────────────────
 
-fn geometry() -> (f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32) {
-    (
-        4.0,  // sp_xs
-        8.0,  // sp_sm
-        12.0, // sp_md
-        16.0, // sp_lg
-        24.0, // sp_xl
-        4.0,  // rounding_sm
-        8.0,  // rounding_md
-        12.0, // rounding_lg
-        1.0,  // stroke_ui
-        1.5,  // stroke_focus
-        2.0,  // stroke_active
-    )
+/// All themes share the same geometry scale. Stored as a struct so additions
+/// don't ripple into every theme constructor.
+struct Geometry {
+    sp_xxs: f32,
+    sp_xs: f32,
+    sp_sm: f32,
+    sp_md: f32,
+    sp_lg: f32,
+    sp_xl: f32,
+    sp_xxl: f32,
+    rounding_xs: f32,
+    rounding_sm: f32,
+    rounding_md: f32,
+    rounding_lg: f32,
+    rounding_full: f32,
+    stroke_ui: f32,
+    stroke_focus: f32,
+    stroke_active: f32,
+}
+
+fn geometry() -> Geometry {
+    Geometry {
+        sp_xxs: 2.0,
+        sp_xs: 4.0,
+        sp_sm: 8.0,
+        sp_md: 12.0,
+        sp_lg: 16.0,
+        sp_xl: 24.0,
+        sp_xxl: 40.0,
+        rounding_xs: 2.0,
+        rounding_sm: 4.0,
+        rounding_md: 8.0,
+        rounding_lg: 12.0,
+        rounding_full: 999.0,
+        stroke_ui: 1.0,
+        stroke_focus: 1.5,
+        stroke_active: 2.0,
+    }
 }
 
 // ── Built-in themes ──────────────────────────────────────────────────────────
 
 /// Midnight — dark navy-blue with teal accent.
 pub fn midnight() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+    let g = geometry();
     SynthTheme {
         name: "Midnight".into(),
 
@@ -302,6 +395,10 @@ pub fn midnight() -> SynthTheme {
 
         accent: [0, 220, 160],
         accent_dim: [0, 180, 130],
+
+        knob_tier1_arc: [0, 220, 160],
+        knob_tier2_arc: [0, 140, 105],
+        knob_tier3_arc: [80, 95, 100],
 
         accent_hard_sync: [255, 180, 0],
         accent_fm: [120, 180, 255],
@@ -362,23 +459,27 @@ pub fn midnight() -> SynthTheme {
         bg_seq_bar: [25, 25, 35],
         bg_adsr: [8, 14, 10],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
 /// Winamp Classic — dark grey with vivid green.
 pub fn winamp_classic() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+    let g = geometry();
     SynthTheme {
         name: "Winamp Classic".into(),
 
@@ -396,6 +497,10 @@ pub fn winamp_classic() -> SynthTheme {
 
         accent: [0, 230, 0],
         accent_dim: [0, 180, 0],
+
+        knob_tier1_arc: [0, 230, 0],
+        knob_tier2_arc: [0, 140, 0],
+        knob_tier3_arc: [80, 100, 80],
 
         accent_hard_sync: [255, 200, 0],
         accent_fm: [150, 200, 60],
@@ -456,23 +561,27 @@ pub fn winamp_classic() -> SynthTheme {
         bg_seq_bar: [30, 30, 30],
         bg_adsr: [12, 12, 12],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
 /// Phosphor — CRT green-on-black.
 pub fn phosphor() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+    let g = geometry();
     SynthTheme {
         name: "Phosphor".into(),
 
@@ -490,6 +599,10 @@ pub fn phosphor() -> SynthTheme {
 
         accent: [30, 255, 120],
         accent_dim: [20, 200, 90],
+
+        knob_tier1_arc: [30, 255, 120],
+        knob_tier2_arc: [20, 160, 75],
+        knob_tier3_arc: [55, 95, 65],
 
         accent_hard_sync: [200, 255, 80],
         accent_fm: [80, 255, 180],
@@ -550,17 +663,21 @@ pub fn phosphor() -> SynthTheme {
         bg_seq_bar: [8, 20, 12],
         bg_adsr: [4, 12, 6],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
