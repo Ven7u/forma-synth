@@ -567,7 +567,7 @@ impl SynthApp {
                         r.center(),
                         egui::Align2::CENTER_CENTER,
                         super::midi_note_name(note),
-                        egui::FontId::monospace(10.0),
+                        self.theme.font_value(),
                         if is_on { Color32::WHITE } else { Color32::GRAY },
                     );
 
@@ -650,7 +650,7 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         format!("{vel}"),
-                        egui::FontId::monospace(8.0),
+                        self.theme.font_micro(),
                         Color32::from_rgb(180, 180, 180),
                     );
                     if vel_resp.dragged() || vel_resp.clicked() {
@@ -767,14 +767,14 @@ impl SynthApp {
                         egui::pos2(r.center().x, r.min.y + 10.0),
                         egui::Align2::CENTER_CENTER,
                         &cname,
-                        egui::FontId::monospace(9.0),
+                        self.theme.font_value(),
                         if is_on { Color32::WHITE } else { Color32::GRAY },
                     );
                     painter.text(
                         egui::pos2(r.center().x, r.min.y + 22.0),
                         egui::Align2::CENTER_CENTER,
                         DEGREE_LABELS[degree],
-                        egui::FontId::monospace(8.0),
+                        self.theme.font_micro(),
                         if is_on {
                             Color32::from_rgb(180, 180, 180)
                         } else {
@@ -786,7 +786,7 @@ impl SynthApp {
                         egui::pos2(r.center().x, r.max.y - 8.0),
                         egui::Align2::CENTER_CENTER,
                         chord_type.label(),
-                        egui::FontId::monospace(7.0),
+                        self.theme.font_micro(),
                         if is_on {
                             Color32::from_rgb(160, 200, 160)
                         } else {
@@ -869,7 +869,7 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         format!("{vel}"),
-                        egui::FontId::monospace(8.0),
+                        self.theme.font_micro(),
                         Color32::from_rgb(180, 180, 180),
                     );
                     if vel_resp.dragged() || vel_resp.clicked() {
@@ -930,7 +930,7 @@ impl SynthApp {
                         or_.center(),
                         egui::Align2::CENTER_CENTER,
                         oct_label,
-                        egui::FontId::monospace(8.0),
+                        self.theme.font_micro(),
                         Color32::from_rgb(200, 180, 220),
                     );
                     if oct_resp.clicked() {
@@ -968,7 +968,7 @@ impl SynthApp {
                         vr.center(),
                         egui::Align2::CENTER_CENTER,
                         vlabel,
-                        egui::FontId::monospace(8.0),
+                        self.theme.font_micro(),
                         vcolor,
                     );
                     if v_resp.clicked() && !voice_lead {

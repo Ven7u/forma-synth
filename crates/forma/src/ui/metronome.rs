@@ -243,7 +243,7 @@ impl SynthApp {
                         center,
                         egui::Align2::CENTER_CENTER,
                         format!("{}", i + 1),
-                        egui::FontId::proportional(11.0),
+                        self.theme.font_heading(),
                         label_col,
                     );
                 }

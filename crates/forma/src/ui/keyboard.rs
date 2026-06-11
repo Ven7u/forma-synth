@@ -698,7 +698,7 @@ impl SynthApp {
                             egui::pos2(r.center().x, r.top() + 14.0),
                             egui::Align2::CENTER_CENTER,
                             &display,
-                            egui::FontId::proportional(11.0),
+                            self.theme.font_heading(),
                             Color32::WHITE,
                         );
 
@@ -707,7 +707,7 @@ impl SynthApp {
                             egui::pos2(r.center().x, r.top() + 28.0),
                             egui::Align2::CENTER_CENTER,
                             DEGREE_LABELS[col],
-                            egui::FontId::monospace(9.0),
+                            self.theme.font_value(),
                             Color32::from_gray(160),
                         );
 
@@ -716,7 +716,7 @@ impl SynthApp {
                             egui::pos2(r.right() - 5.0, r.bottom() - 4.0),
                             egui::Align2::RIGHT_BOTTOM,
                             KEY_HINTS[row][col],
-                            egui::FontId::monospace(8.0),
+                            self.theme.font_micro(),
                             Color32::from_gray(110),
                         );
 

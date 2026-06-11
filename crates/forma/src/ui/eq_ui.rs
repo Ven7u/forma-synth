@@ -218,7 +218,7 @@ impl SynthApp {
                 pos,
                 egui::Align2::CENTER_CENTER,
                 short,
-                egui::FontId::proportional(8.0),
+                self.theme.font_small(),
                 self.theme.c(&self.theme.bg_sunken),
             );
         }
@@ -320,7 +320,7 @@ fn draw_response_curve(painter: &egui::Painter, rect: Rect, params: &EqParams, t
 
 fn draw_axis_labels(painter: &egui::Painter, rect: Rect, t: &SynthTheme) {
     let col = t.c(&t.text_secondary);
-    let font = egui::FontId::proportional(9.0);
+    let font = t.font_body();
 
     for &(freq, label) in &[
         (50.0_f32, "50"),

@@ -47,7 +47,7 @@ impl SynthApp {
                 if ui
                     .add(egui::Button::selectable(
                         on,
-                        RichText::new("LFO 1").size(12.0).strong().color(col),
+                        RichText::new("LFO 1").font(self.theme.font_heading()).strong().color(col),
                     ))
                     .on_hover_text(
                         "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
@@ -110,7 +110,7 @@ impl SynthApp {
                         if ui
                             .add(egui::Button::selectable(
                                 sync_on,
-                                RichText::new("SYNC").size(10.0).color(sync_col),
+                                RichText::new("SYNC").font(self.theme.font_body()).color(sync_col),
                             ))
                             .on_hover_text("Lock LFO rate to a note division of the Global BPM")
                             .clicked()
@@ -162,7 +162,7 @@ impl SynthApp {
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     let shape_tips = [
@@ -186,7 +186,7 @@ impl SynthApp {
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     let dest_tips = [
@@ -229,7 +229,7 @@ impl SynthApp {
                 if ui
                     .add(egui::Button::selectable(
                         on,
-                        RichText::new("LFO 2").size(12.0).strong().color(col),
+                        RichText::new("LFO 2").font(self.theme.font_heading()).strong().color(col),
                     ))
                     .on_hover_text("Second LFO — runs independently of LFO 1")
                     .clicked()
@@ -280,7 +280,7 @@ impl SynthApp {
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     for (s, label) in [(0usize, "Sin"), (1, "Tri"), (2, "Saw")] {
@@ -294,7 +294,7 @@ impl SynthApp {
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     for (d, label) in [(0usize, "Pitch"), (1, "Filter"), (2, "Amp")] {
@@ -333,7 +333,7 @@ impl SynthApp {
                 if ui
                     .add(egui::Button::selectable(
                         on,
-                        RichText::new("PULSE").size(12.0).strong().color(col),
+                        RichText::new("PULSE").font(self.theme.font_heading()).strong().color(col),
                     ))
                     .on_hover_text(
                         "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
@@ -366,7 +366,7 @@ impl SynthApp {
 
                     ui.label(
                         RichText::new("LEN")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     let mut len = self.pulse_length as i32;
@@ -416,7 +416,7 @@ impl SynthApp {
                 // 16-cell step row.
                 ui.label(
                     RichText::new("STEPS")
-                        .size(10.0)
+                        .font(self.theme.font_body())
                         .color(self.theme.c(&self.theme.text_secondary)),
                 );
                 ui.horizontal(|ui| {
@@ -492,7 +492,7 @@ impl SynthApp {
             if ui
                 .add(egui::Button::selectable(
                     enabled,
-                    RichText::new("RETRIG").size(10.0).strong().color(col),
+                    RichText::new("RETRIG").font(self.theme.font_body()).strong().color(col),
                 ))
                 .on_hover_text(
                     "Resets the LFO's phase to 0 on each \"on\" step (tempo-synced).\n\
@@ -622,7 +622,7 @@ impl SynthApp {
                 if ui
                     .add(egui::Button::selectable(
                         on,
-                        RichText::new("FILTER").size(12.0).strong().color(col),
+                        RichText::new("FILTER").font(self.theme.font_heading()).strong().color(col),
                     ))
                     .on_hover_text("Moog-style 4-pole lowpass filter")
                     .clicked()
@@ -639,7 +639,7 @@ impl SynthApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
                         RichText::new("LP24")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                 });
@@ -655,14 +655,14 @@ impl SynthApp {
                 // LP — always selected
                 ui.add(egui::Button::selectable(
                     true,
-                    RichText::new("LP").size(10.0).strong().color(accent),
+                    RichText::new("LP").font(self.theme.font_body()).strong().color(accent),
                 ));
                 for label in ["BP", "HP", "NOTCH"] {
                     ui.add_enabled(
                         false,
                         egui::Button::selectable(
                             false,
-                            RichText::new(label).size(10.0).color(disabled),
+                            RichText::new(label).font(self.theme.font_body()).color(disabled),
                         ),
                     );
                 }
@@ -758,7 +758,7 @@ impl SynthApp {
                             };
                             ui.label(
                                 RichText::new(format!("▲ {hz_str}"))
-                                    .size(9.0)
+                                    .font(self.theme.font_body())
                                     .color(Color32::from_rgb(180, 120, 255)),
                             )
                             .on_hover_text("Effective cutoff with mod wheel offset");
@@ -860,7 +860,7 @@ impl SynthApp {
             ui.set_min_width(ui.available_width());
             ui.label(
                 RichText::new("MOD MATRIX")
-                    .size(12.0)
+                    .font(self.theme.font_heading())
                     .strong()
                     .color(self.theme.c(&self.theme.accent)),
             );
@@ -874,7 +874,7 @@ impl SynthApp {
                     for label in ["#", "SOURCE", "→ DEST", "DEPTH"] {
                         ui.label(
                             RichText::new(label)
-                                .size(9.0)
+                                .font(self.theme.font_body())
                                 .color(self.theme.c(&self.theme.text_secondary)),
                         );
                     }
@@ -884,7 +884,7 @@ impl SynthApp {
                         // Row number
                         ui.label(
                             RichText::new(format!("{}", slot + 1))
-                                .size(10.0)
+                                .font(self.theme.font_body())
                                 .color(self.theme.c(&self.theme.text_disabled)),
                         );
 
@@ -949,7 +949,7 @@ impl SynthApp {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new("MOD WHEEL")
-                        .size(12.0)
+                        .font(self.theme.font_heading())
                         .strong()
                         .color(self.theme.c(&self.theme.accent)),
                 );
@@ -968,7 +968,7 @@ impl SynthApp {
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     for (d, label, tip) in [
@@ -1003,7 +1003,7 @@ impl SynthApp {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new("AFTERTOUCH")
-                        .size(12.0)
+                        .font(self.theme.font_heading())
                         .strong()
                         .color(self.theme.c(&self.theme.accent)),
                 );
@@ -1024,7 +1024,7 @@ impl SynthApp {
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(self.theme.c(&self.theme.text_secondary)),
                     );
                     for (d, label, tip) in [
@@ -1061,7 +1061,7 @@ impl SynthApp {
             // Header
             ui.label(
                 RichText::new(title)
-                    .size(12.0)
+                    .font(self.theme.font_heading())
                     .strong()
                     .color(self.theme.c(&self.theme.text_primary)),
             );
@@ -1102,7 +1102,7 @@ impl SynthApp {
                         // Label above slider
                         ui.label(
                             RichText::new(labels[i])
-                                .size(10.0)
+                                .font(self.theme.font_body())
                                 .color(self.theme.c(&self.theme.text_secondary)),
                         );
                         let log = i != 2;
@@ -1199,7 +1199,7 @@ fn draw_lp_response_curve(
     // ── Grid — log-spaced vertical frequency lines ────────────────────────
     let grid_col = Color32::from_gray(42);
     let label_col = Color32::from_gray(72);
-    let small = egui::FontId::proportional(8.0);
+    let small = theme.font_small();
     for (f, label) in [
         (100.0_f32, "100"),
         (200.0, "200"),
@@ -1375,7 +1375,7 @@ pub fn draw_adsr_visualizer(
     }
 
     let label_color = theme.ca(&theme.adsr_label);
-    let small = egui::FontId::proportional(9.0);
+    let small = theme.font_body();
     for (label, x) in [
         ("A", tx(a * 0.5)),
         ("D", tx(a + d * 0.5)),
