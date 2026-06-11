@@ -160,6 +160,48 @@ others will follow. Oscillators chosen because it has the most controls.
 
 ---
 
+## Token compliance — what panel migrations must clean up
+
+Phase 3 removed every hardcoded `.size(N)` / `FontId::proportional(N)` /
+`FontId::monospace(N)` from panel files, and Phase 3's tail commit bound
+egui's `TextStyle` map to our font tokens, so `ui.label()` and friends are
+on-system implicitly.
+
+Other off-system literals were deliberately *not* swept in Phase 3 because
+they are panel-internal: each panel rewrite in Phase 5/6 cleans them up as
+part of the wholesale migration, rather than being touched twice. Tally at
+the end of Phase 3 (panel files only, excluding `design/`, `widgets/`, and
+`theme.rs`):
+
+| Category | Sites | Notes |
+|----------|-------|-------|
+| `Color32::from_{rgb,gray,rgba}` / `WHITE` / `GRAY` literals | ~228 | Many derive arithmetically from a token (`accent.r() / 5` etc.) — those are fine. The off-system ones are e.g. `Color32::from_gray(70)` used directly for label color where `theme.text_secondary` exists. |
+| `ui.add_space(N)` literals | ~67 | Replace with `theme.sp_xs` / `sp_sm` / `sp_md` / `sp_lg` per the spacing scale. |
+| `Stroke::new(N, …)` / `CornerRadius::same(N)` in painter calls | ~99 | Replace stroke widths with `theme.stroke_*`; rounding with `theme.rounding_*`. |
+| `Margin::same(N)` literals | ~5 | Replace with `theme.sp_*` values. |
+
+### Phase 5/6 acceptance criterion — token compliance
+
+Every panel migration commit must, for the file it touches, drive these
+greps to zero:
+
+```bash
+# Off-system literals in the file being migrated
+grep -E '\.size\([0-9]|FontId::(proportional|monospace)\([0-9]' <file>
+grep -E 'Color32::(from_(rgb|gray|rgba)|WHITE|BLACK|GRAY|RED|GREEN|BLUE)' <file>
+grep -E '\.add_space\([0-9]' <file>
+grep -E 'Stroke::new\([0-9]+\.[0-9]' <file>
+grep -E '(CornerRadius|Rounding|Margin)::same\([0-9]' <file>
+```
+
+Exceptions are allowed only where a literal is mathematically derived from
+a token (`Color32::from_rgba_premultiplied(accent.r() / 5, …)`) or where
+the value is a custom-painter-internal constant unrelated to UI styling
+(e.g. a shader uniform). Each exception should have a one-line comment
+explaining why a token doesn't apply.
+
+---
+
 ## Phase 6 — Remaining panel migrations
 
 Migrate each panel, one at a time. Order by visual impact:

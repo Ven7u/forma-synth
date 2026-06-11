@@ -57,6 +57,31 @@ all of them with six named roles.
 - Monospace font applies to: BPM readouts, step indices, scope overlays,
   frequency/Hz values.
 
+### How implicit text styles bind to tokens
+
+`SynthTheme::apply_to_egui` writes the entire `style.text_styles` map every
+frame, binding egui's built-in `TextStyle` enum to our font tokens:
+
+| `egui::TextStyle` | Token | Affects |
+|-------------------|-------|---------|
+| `Body` | `font_body` | `ui.label("…")`, plain text without `.font(...)` |
+| `Button` | `font_body` | Button labels, menu items, dropdown text |
+| `Heading` | `font_heading` | `RichText::heading()`, `ui.heading()` |
+| `Small` | `font_small` | `RichText::small()`, `.weak().small()` chains |
+| `Monospace` | `font_value` | `RichText::monospace()`, `.code()` |
+
+This means there are **two valid ways** for a panel to render text on-system:
+1. Explicit: `RichText::new("CUT").font(theme.font_body())` — required when
+   the visual role (label vs. value vs. heading) doesn't match the default
+   `TextStyle::Body`.
+2. Implicit: `ui.label("foo")` — picks up `TextStyle::Body` → `font_body`
+   automatically via the global style binding.
+
+A panel that uses only `ui.label()` / `.small()` / `.heading()` / `.monospace()`
+without ever writing `.size(N)` or constructing a `FontId` is already
+token-compliant. Phase 3 audited and migrated every explicit `.size(N)` site;
+the implicit ones are covered by the `TextStyle` map.
+
 ---
 
 ## 3. Color tokens
