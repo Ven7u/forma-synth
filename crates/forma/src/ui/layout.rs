@@ -66,6 +66,19 @@ pub struct LayoutState {
     /// Last connected MIDI port name — used to auto-reconnect on startup.
     #[serde(default)]
     pub midi_port_name: Option<String>,
+    /// Last window inner size, in logical px. None on first launch.
+    #[serde(default)]
+    pub window_size: Option<[f32; 2]>,
+    /// Last window outer position. None on first launch.
+    #[serde(default)]
+    pub window_pos: Option<[f32; 2]>,
+    /// Global UI zoom factor. 0.7..=1.4. Default 0.9.
+    #[serde(default = "default_zoom")]
+    pub zoom_factor: f32,
+}
+
+fn default_zoom() -> f32 {
+    0.9
 }
 
 /// Serializable mirror of PanelVisibility.
@@ -90,6 +103,9 @@ impl Default for LayoutState {
             patch_favorites: Vec::new(),
             patch_recent: Vec::new(),
             midi_port_name: None,
+            window_size: None,
+            window_pos: None,
+            zoom_factor: default_zoom(),
             panels: PanelVisibilityState {
                 oscillators: true,
                 modulation: true,
