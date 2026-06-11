@@ -6,7 +6,11 @@
 
 use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
-use super::{knob::knob as design_knob, KnobSize, Tier};
+use super::{
+    knob::knob as design_knob,
+    step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
+    KnobSize, Tier,
+};
 use crate::ui::theme::SynthTheme;
 
 /// Per-session demo state — knob values the user can drag around.
@@ -79,6 +83,10 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &SynthTheme) {
             ui.add_space(theme.sp_xl);
             section_header(ui, "Font tokens", theme);
             font_samples(ui, theme);
+
+            ui.add_space(theme.sp_xl);
+            section_header(ui, "Step pads — 2 sizes × 3 states", theme);
+            step_pad_grid(ui, theme);
 
             ui.add_space(theme.sp_xl);
             section_header(ui, "Tier arc colors", theme);
@@ -179,6 +187,53 @@ fn knob_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
                 ui.end_row();
             }
         });
+}
+
+fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
+    let sizes = [
+        (StepPadSize::Drum, "Drum (26×24)"),
+        (StepPadSize::Note, "Note (20×20)"),
+    ];
+    // Sample velocities so the "velocity = inner fill height" property
+    // is visible at a glance. None = binary on/off.
+    let active_samples = [
+        ("Active 100%", StepState::Active { velocity: Some(1.0) }),
+        ("Active 50%",  StepState::Active { velocity: Some(0.5) }),
+        ("Active 20%",  StepState::Active { velocity: Some(0.2) }),
+        ("Active none", StepState::Active { velocity: None }),
+        ("Current 80%", StepState::Current { velocity: Some(0.8) }),
+        ("Inactive",    StepState::Inactive),
+    ];
+
+    for (size, size_label) in sizes {
+        ui.add_space(theme.sp_sm);
+        ui.label(
+            egui::RichText::new(size_label)
+                .font(theme.font_small())
+                .color(theme.c(&theme.text_secondary)),
+        );
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+            for (_, state) in &active_samples {
+                design_step_pad(ui, *state, size, theme);
+            }
+        });
+        // Labels under the row.
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+            for (label, _) in &active_samples {
+                ui.add_sized(
+                    size.rect(),
+                    egui::Label::new(
+                        egui::RichText::new(*label)
+                            .font(theme.font_micro())
+                            .color(theme.c(&theme.text_secondary)),
+                    )
+                    .wrap(),
+                );
+            }
+        });
+    }
 }
 
 fn font_samples(ui: &mut Ui, theme: &SynthTheme) {

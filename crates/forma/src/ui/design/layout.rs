@@ -10,7 +10,11 @@
 
 use egui::{Response, Ui};
 
-use super::{knob::knob, KnobSize, Tier};
+use super::{
+    knob::knob,
+    step_pad::{step_pad, StepPadSize, StepState},
+    KnobSize, Tier,
+};
 use crate::ui::theme::SynthTheme;
 
 pub trait SynthUi {
@@ -32,6 +36,14 @@ pub trait SynthUi {
     /// allocation will land when `knob_row` callers actually exist
     /// (Phase 5+). For now this is `ui.horizontal()` with the standard gap.
     fn knob_row<R>(&mut self, theme: &SynthTheme, content: impl FnOnce(&mut Ui) -> R) -> R;
+
+    /// Render a step pad — sequencer / drum grid cell.
+    fn synth_step_pad(
+        &mut self,
+        state: StepState,
+        size: StepPadSize,
+        theme: &SynthTheme,
+    ) -> Response;
 }
 
 impl SynthUi for Ui {
@@ -54,5 +66,14 @@ impl SynthUi for Ui {
             content(ui)
         })
         .inner
+    }
+
+    fn synth_step_pad(
+        &mut self,
+        state: StepState,
+        size: StepPadSize,
+        theme: &SynthTheme,
+    ) -> Response {
+        step_pad(self, state, size, theme)
     }
 }

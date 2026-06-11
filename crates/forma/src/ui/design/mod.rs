@@ -10,6 +10,7 @@
 pub mod gallery;
 pub mod knob;
 pub mod layout;
+pub mod step_pad;
 
 #[allow(unused_imports)] // Re-exported for Phase 5+ panel migrations.
 pub use layout::SynthUi;
