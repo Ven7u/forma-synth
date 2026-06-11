@@ -25,6 +25,12 @@ impl SynthApp {
         let col_rev = self.theme.c(&self.theme.fx_reverb);
         let col_crys = self.theme.c(&self.theme.fx_crystallizer);
 
+        // Data-driven width: the FX chain holds ~11 modules at ≥110 px each,
+        // so it overflows the minimum window width of 720 px by design.
+        // Scroll horizontally rather than crush modules below their minimum.
+        egui::ScrollArea::horizontal()
+            .id_salt("fx_chain_h_scroll")
+            .show(ui, |ui| {
         ui.horizontal(|ui| {
             // ---- Overdrive ----
             ui.group(|ui| {
@@ -496,5 +502,6 @@ impl SynthApp {
                 });
             });
         });
+            });
     }
 }

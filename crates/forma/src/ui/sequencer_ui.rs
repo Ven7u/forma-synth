@@ -516,8 +516,16 @@ impl SynthApp {
 
         let n = length as f32;
         let spacing = ui.spacing().item_spacing.x;
+        // step_w is computed against the outer panel width before the scroll
+        // area wraps the grid — so steps still divide evenly when there's
+        // room, and fall back to the 28 px floor when there isn't.
         let step_w = ((ui.available_width() - spacing * (n - 1.0)) / n).max(28.0);
 
+        // Data-driven width: sequencer length is user-set (up to 32 steps).
+        // Scroll horizontally rather than crush steps below 28 px.
+        egui::ScrollArea::horizontal()
+            .id_salt("note_seq_h_scroll")
+            .show(ui, |ui| {
         ui.horizontal(|ui| {
             for i in 0..length {
                 ui.vertical(|ui| {
@@ -691,6 +699,7 @@ impl SynthApp {
                 });
             }
         });
+            });
     }
 
     fn ui_chord_seq(&mut self, ui: &mut egui::Ui) {
@@ -709,6 +718,11 @@ impl SynthApp {
         let spacing = ui.spacing().item_spacing.x;
         let step_w = ((ui.available_width() - spacing * (n - 1.0)) / n).max(28.0);
 
+        // Data-driven width: chord sequence length is user-set.
+        // Scroll horizontally rather than crush steps below 28 px.
+        egui::ScrollArea::horizontal()
+            .id_salt("chord_seq_h_scroll")
+            .show(ui, |ui| {
         ui.horizontal(|ui| {
             for i in 0..length {
                 ui.vertical(|ui| {
@@ -984,6 +998,7 @@ impl SynthApp {
                 });
             }
         });
+            });
     }
 
     // -------------------------------------------------------------------------
@@ -1034,7 +1049,7 @@ impl SynthApp {
                 });
                 ui.separator();
 
-                // Preset list
+                // Preset list — data-driven (HARMONY_PRESETS table).
                 egui::ScrollArea::vertical()
                     .max_height(260.0)
                     .show(ui, |ui| {
@@ -1159,6 +1174,7 @@ impl SynthApp {
                 // Base MIDI: C in the user's current piano octave
                 let base_midi = ((self.piano_octave * 12) + 12).clamp(21, 108) as u8;
 
+                // Data-driven: MELODY_PRESETS table.
                 egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
                     for (idx, preset) in MELODY_PRESETS.iter().enumerate() {
                         if let Some(cat) = self.pattern_lib_category {

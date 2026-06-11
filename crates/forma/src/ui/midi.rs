@@ -209,6 +209,7 @@ impl SynthApp {
         ui.add_space(2.0);
 
         let monitor_h = (ui.available_height() - 4.0).clamp(60.0, 200.0);
+        // Data-driven: MIDI event log grows continuously while connected.
         egui::ScrollArea::vertical()
             .max_height(monitor_h)
             .show(ui, |ui| {

@@ -882,6 +882,7 @@ impl SynthApp {
                 // ── Kit list ──────────────────────────────────────────────
                 let row_h = 22.0;
                 let avail = ui.available_height();
+                // Data-driven: drum kit library grows with user content.
                 egui::ScrollArea::vertical()
                     .max_height(avail)
                     .show(ui, |ui| {

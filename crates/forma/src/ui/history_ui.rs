@@ -70,6 +70,7 @@ impl SynthApp {
                 let mut to_delete: Option<usize> = None;
                 let mut rename: Option<(usize, String)> = None;
 
+                // Data-driven: history grows over the session. Scroll the list.
                 egui::ScrollArea::vertical()
                     .max_height(avail)
                     .show(ui, |ui| {

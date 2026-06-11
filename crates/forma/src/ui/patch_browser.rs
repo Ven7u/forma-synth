@@ -266,6 +266,8 @@ impl SynthApp {
         let mut load_idx: Option<usize> = None;
         let mut toggle_fav: Option<String> = None;
 
+        // Data-driven: the patch library grows with user content. Scroll
+        // rather than truncate, per the design-system scrollable-vs-bounded rule.
         egui::ScrollArea::vertical().show(ui, |ui| {
             // ── Favourites section ────────────────────────────────────────
             let fav_indices: Vec<usize> = filtered

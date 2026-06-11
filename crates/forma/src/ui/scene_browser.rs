@@ -71,6 +71,7 @@ impl SynthApp {
                     ui.label(egui::RichText::new("SCENES").font(self.theme.font_body()).color(text_sec));
                     ui.add_space(4.0);
 
+                    // Data-driven: scene library grows with user content.
                     egui::ScrollArea::vertical()
                         .id_salt("scene_list")
                         .max_height(180.0)
@@ -219,6 +220,7 @@ impl SynthApp {
                     );
                 } else {
                     ui.add_space(4.0);
+                    // Data-driven: scene chain is user-built and unbounded.
                     egui::ScrollArea::vertical()
                         .id_salt("chain_list")
                         .max_height(120.0)
