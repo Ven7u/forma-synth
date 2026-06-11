@@ -8,6 +8,11 @@ the foundation that later phases depend on.
 
 ---
 
+> **Phase order note:** Phase 1 (window + zoom) ships first — it's
+> self-contained, delivers an immediate user-visible win, and de-risks the
+> `pixels_per_point` formula before any token plumbing depends on it.
+> Phase 0 follows as a small token-plumbing step.
+
 ## Phase 0 — Foundation (no visible change)
 
 **Goal:** Set up the module structure and token extensions without changing
@@ -19,12 +24,13 @@ any existing behavior. Everything compiles, nothing looks different.
 - [ ] Add `font_heading`, `font_body`, `font_value`, `font_small`, `font_micro`
       methods to `SynthTheme` (returns `FontId` with the base sizes from
       `06-window-scaling.md`)
-- [ ] Add `knob_size_lg`, `knob_size_sm` to geometry tokens (Standard already
-      exists implicitly as the current knob)
+- [ ] Expose `KnobSize::rect()` / `radius()` / `arc_stroke()` as constants on
+      the enum in `ui/design/mod.rs` (theme-independent, so they don't belong
+      on `SynthTheme`)
 - [ ] Add `KnobSize` enum and `Tier` enum to `ui/design/mod.rs`
 - [ ] Add `zoom_factor: f32` to the user settings struct (default 0.9),
       persisted but not yet applied
-- [ ] Add `font_tier1_arc`, `font_tier2_arc`, `font_tier3_arc` color tokens
+- [ ] Add `knob_tier1_arc`, `knob_tier2_arc`, `knob_tier3_arc` color tokens
       to all three themes
 
 **Acceptance:** `cargo check` passes. No visual change.
@@ -68,9 +74,10 @@ user-facing fix and does not require the component system to be complete.
       - Interaction sensitivity scaled by KnobSize (larger = finer per-pixel)
       - All sizes from tokens (no hardcoded px values inside knob.rs)
 - [ ] Implement `SynthUi::synth_knob()` calling the new Knob
-- [ ] Implement `SynthUi::knob_row()` using `egui_flex`
-      (add `egui_flex` to Cargo.toml)
-- [ ] Add `egui_flex` dependency
+- [ ] Implement `SynthUi::knob_row()` using a plain `ui.horizontal()` + equal
+      column allocation from `ui.available_width()`. The pattern docs treat
+      `egui_flex` as an implementation detail — defer adding the dependency
+      until a real case (FX chain reflow, Phase 6) needs more than equal split.
 - [ ] Keep old knob path working via re-export (so panel files don't break yet)
 
 **Acceptance:**
