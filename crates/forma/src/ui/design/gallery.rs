@@ -158,11 +158,18 @@ fn knob_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
                         .color(theme.c(&theme.text_secondary)),
                 );
                 for (tier_i, (tier, _)) in tiers.iter().enumerate() {
+                    // Use short labels — real knob labels are 3–4 chars
+                    // ("CUT", "RES"); the row header already names the size.
+                    let knob_label = match tier {
+                        Tier::Primary => "T1",
+                        Tier::Secondary => "T2",
+                        Tier::Tertiary => "T3",
+                    };
                     design_knob(
                         ui,
                         &mut state.knob_values[size_i][tier_i],
                         0.0..=1.0,
-                        size_label,
+                        knob_label,
                         theme,
                         false,
                         *size,

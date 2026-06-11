@@ -7,11 +7,51 @@
 //! The legacy `widgets::knob` keeps its 18 callers until Phases 5–6 migrate
 //! them; this new path is what `SynthUi::synth_knob` calls into.
 
-use egui::{Color32, Pos2, Response, Sense, Stroke, Ui};
+use egui::{Color32, FontId, Pos2, Response, Sense, Stroke, Ui};
 use std::f32::consts::PI;
 
 use super::{KnobSize, Tier};
 use crate::ui::theme::SynthTheme;
+
+/// Per-size font selection. Smaller knobs use smaller tokens so text
+/// fits inside the allocated rect without clipping or overlap.
+fn label_font(size: KnobSize, theme: &SynthTheme) -> FontId {
+    match size {
+        KnobSize::Large => theme.font_body(),     // 12 pt
+        KnobSize::Standard => theme.font_small(), // 10 pt
+        KnobSize::Small => theme.font_micro(),    // 9 pt
+    }
+}
+
+fn value_font(size: KnobSize, theme: &SynthTheme) -> FontId {
+    match size {
+        KnobSize::Large => theme.font_value(),         // 11 pt mono
+        KnobSize::Standard => FontId::monospace(9.0),  // 9 pt mono
+        KnobSize::Small => FontId::monospace(8.0),     // 8 pt mono — below font_micro by design
+    }
+}
+
+/// Vertical gap between the knob bottom edge and the value-text top.
+fn value_gap(size: KnobSize) -> f32 {
+    match size {
+        KnobSize::Large => 5.0,
+        KnobSize::Standard => 3.0,
+        KnobSize::Small => 2.0,
+    }
+}
+
+/// Radius of the indicator dot at the current-value position on the arc.
+/// Slightly fatter than the arc stroke so it reads as a distinct marker.
+fn dot_radius(size: KnobSize) -> f32 {
+    size.arc_stroke() + 1.0
+}
+
+/// Vertical offset from `rect.top()` to the knob center. Must leave room
+/// for the indicator dot at its topmost position (angle 270°, value 0.5),
+/// otherwise the dot clips against the clipped painter.
+fn knob_center_y_offset(size: KnobSize) -> f32 {
+    size.radius() + dot_radius(size) + 1.0
+}
 
 /// Pixels of drag per full-range traversal — larger knob = finer control.
 /// Matches `04-components.md` ("sensitivity: (max - min) / 300 px for
@@ -42,7 +82,10 @@ pub fn knob(
     let (rect, mut response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
 
     let knob_radius = size.radius();
-    let center = Pos2::new(rect.center().x, rect.top() + knob_radius + 2.0);
+    let center = Pos2::new(
+        rect.center().x,
+        rect.top() + knob_center_y_offset(size),
+    );
 
     let old_value = *value;
 
@@ -130,7 +173,7 @@ pub fn knob(
             center.x + indicator_angle.cos() * knob_radius,
             center.y + indicator_angle.sin() * knob_radius,
         );
-        painter.circle_filled(dot_pos, arc_stroke + 1.0, arc_color);
+        painter.circle_filled(dot_pos, dot_radius(size), arc_color);
 
         // Center dot — brightens on interaction.
         let center_color = if response.hovered() || response.dragged() {
@@ -148,10 +191,10 @@ pub fn knob(
             format!("{:.2}", *value)
         };
         painter.text(
-            Pos2::new(center.x, center.y + knob_radius + 5.0),
+            Pos2::new(center.x, center.y + knob_radius + value_gap(size)),
             egui::Align2::CENTER_TOP,
             &value_text,
-            theme.font_value(),
+            value_font(size, theme),
             theme.c(&theme.text_secondary),
         );
 
@@ -164,12 +207,114 @@ pub fn knob(
             Pos2::new(center.x, rect.bottom() - 1.0),
             egui::Align2::CENTER_BOTTOM,
             label,
-            theme.font_body(),
+            label_font(size, theme),
             label_color,
         );
     }
 
     response
+}
+
+/// Returns `(value_y_top, value_y_bottom, label_y_top, label_y_bottom)` for
+/// a knob of `size` placed at the given `rect_top`. Used by tests to assert
+/// the value text and label text never overlap each other or escape the
+/// allocated rect.
+#[cfg(test)]
+fn vertical_text_extents(size: KnobSize, rect_top: f32) -> (f32, f32, f32, f32) {
+    // Mirrors the layout math in `knob()`.
+    let radius = size.radius();
+    let center_y = rect_top + knob_center_y_offset(size);
+    let value_top = center_y + radius + value_gap(size);
+    // Font heights are approximate (≈ pt × 1.1). Conservative.
+    let value_font_pt = match size {
+        KnobSize::Large => 11.0,
+        KnobSize::Standard => 9.0,
+        KnobSize::Small => 8.0,
+    };
+    let label_font_pt = match size {
+        KnobSize::Large => 12.0,
+        KnobSize::Standard => 10.0,
+        KnobSize::Small => 9.0,
+    };
+    let value_bottom = value_top + value_font_pt * 1.1;
+    let label_bottom = rect_top + size.rect().y - 1.0;
+    let label_top = label_bottom - label_font_pt * 1.1;
+    (value_top, value_bottom, label_top, label_bottom)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// At every value 0..=1 the indicator dot must stay inside the
+    /// allocated rect. The clipped painter would otherwise crop it.
+    #[test]
+    fn indicator_dot_stays_inside_rect() {
+        let start_angle = PI * 0.75;
+        let sweep = PI * 1.5;
+        for size in [KnobSize::Large, KnobSize::Standard, KnobSize::Small] {
+            let rect_top = 0.0;
+            let rect = size.rect();
+            let center_x = rect.x / 2.0;
+            let center_y = rect_top + knob_center_y_offset(size);
+            let radius = size.radius();
+            let dot_r = dot_radius(size);
+            // Sample the sweep finely — covers all extremes (top, sides, bottom).
+            for i in 0..=100 {
+                let t = i as f32 / 100.0;
+                let angle = start_angle + sweep * t;
+                let dot_x = center_x + angle.cos() * radius;
+                let dot_y = center_y + angle.sin() * radius;
+                assert!(
+                    dot_y - dot_r >= rect_top,
+                    "{size:?} t={t}: dot top {} above rect top {rect_top}",
+                    dot_y - dot_r
+                );
+                assert!(
+                    dot_y + dot_r <= rect_top + rect.y,
+                    "{size:?} t={t}: dot bottom {} below rect bottom {}",
+                    dot_y + dot_r,
+                    rect_top + rect.y
+                );
+                assert!(
+                    dot_x - dot_r >= 0.0,
+                    "{size:?} t={t}: dot left {} outside rect",
+                    dot_x - dot_r
+                );
+                assert!(
+                    dot_x + dot_r <= rect.x,
+                    "{size:?} t={t}: dot right {} outside rect width {}",
+                    dot_x + dot_r,
+                    rect.x
+                );
+            }
+        }
+    }
+
+    /// For every knob size, the value text and the label text must fit
+    /// inside the allocated rect and must not overlap each other.
+    #[test]
+    fn text_fits_within_rect_and_does_not_overlap() {
+        for size in [KnobSize::Large, KnobSize::Standard, KnobSize::Small] {
+            let rect_top = 0.0;
+            let rect_height = size.rect().y;
+            let (v_top, v_bot, l_top, l_bot) = vertical_text_extents(size, rect_top);
+
+            assert!(
+                v_top >= rect_top,
+                "{size:?}: value text top {v_top} above rect top {rect_top}"
+            );
+            assert!(
+                l_bot <= rect_top + rect_height,
+                "{size:?}: label text bottom {l_bot} below rect bottom {}",
+                rect_top + rect_height
+            );
+            assert!(
+                v_bot <= l_top,
+                "{size:?}: value bottom {v_bot} overlaps label top {l_top}"
+            );
+        }
+    }
 }
 
 fn draw_arc(
