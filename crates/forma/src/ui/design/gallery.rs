@@ -1,8 +1,10 @@
-//! Design System Gallery — Storybook-style viewer for design system
-//! components. A debug window that renders every component in every
-//! variant against the live theme and zoom factor.
+//! Design System Gallery — categorized Storybook-style viewer.
 //!
-//! Toggle with Ctrl/Cmd + Shift + G or via the menu.
+//! A debug window that renders every token, component, and pattern in the
+//! design system against the live theme and zoom factor. Categories live
+//! in a left sidebar; the right side shows samples for the active category.
+//!
+//! Toggle with Ctrl/Cmd + Shift + G.
 
 use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
@@ -12,33 +14,73 @@ use super::{
     section::section_header as design_section_header,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
     toggle::{toggle_button as design_toggle, ToggleSize},
-    KnobSize, Tier,
+    KnobSize, SynthUi, Tier,
 };
+use crate::ui::frame::SynthFrame;
 use crate::ui::theme::SynthTheme;
 
-/// Per-session demo state — knob values the user can drag around.
-#[derive(Clone)]
+/// Top-level navigation categories.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+enum Category {
+    Tokens,
+    Components,
+    Patterns,
+    Frames,
+    Examples,
+}
+
+impl Category {
+    const ALL: &'static [Category] = &[
+        Category::Tokens,
+        Category::Components,
+        Category::Patterns,
+        Category::Frames,
+        Category::Examples,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Category::Tokens => "Tokens",
+            Category::Components => "Components",
+            Category::Patterns => "Patterns",
+            Category::Frames => "Frames",
+            Category::Examples => "Examples",
+        }
+    }
+}
+
+/// Persistent demo state.
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct GalleryState {
-    /// 3 sizes × 3 tiers of knob values, plus 1 for the legacy comparison.
+    category: Category,
     knob_values: [[f32; 3]; 3],
     legacy_value: f32,
-    /// 3 toggle samples — one per size.
     toggle_states: [bool; 3],
-    /// Chip selector demo.
     chip_choice: usize,
-    /// Independent toggle for the section-header right-slot sample so it
-    /// doesn't shadow one of the `toggle_states` entries.
     section_header_toggle: bool,
+    /// Per-section-card toggle so the three card variants are independent.
+    card_toggles: [bool; 3],
+    /// Example OSC card state (waveform, detune, PW, unison on).
+    example_wave: usize,
+    example_detune: f32,
+    example_pw: f32,
+    example_uni: bool,
 }
 
 impl Default for GalleryState {
     fn default() -> Self {
         Self {
+            category: Category::Components,
             knob_values: [[0.3; 3]; 3],
             legacy_value: 0.3,
             toggle_states: [false, true, false],
             chip_choice: 1,
             section_header_toggle: true,
+            card_toggles: [true, false, false],
+            example_wave: 1,
+            example_detune: 12.0,
+            example_pw: 0.5,
+            example_uni: false,
         }
     }
 }
@@ -64,90 +106,354 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &SynthTheme) {
 
     Window::new("Design System Gallery")
         .open(open)
-        .default_size([720.0, 640.0])
+        .default_size([900.0, 640.0])
         .resizable(true)
-        .scroll([false, true])
         .show(ctx, |ui| {
-            section_header(ui, "Knobs — 3 sizes × 3 tiers", theme);
-            knob_grid(ui, theme, &mut state);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Legacy knob (widgets::knob) — visual baseline", theme);
             ui.horizontal(|ui| {
-                crate::ui::widgets::knob(
-                    ui,
-                    &mut state.legacy_value,
-                    0.0..=1.0,
-                    "LEGACY",
-                    theme,
-                    false,
-                );
-                ui.add_space(theme.sp_md);
-                ui.label(
-                    RichText::new(
-                        "Old path — Standard size only, accent-colored arc, 9 pt label.\n\
-                         New Standard + Tier Secondary above should match in dimensions.",
-                    )
-                    .font(theme.font_small())
-                    .color(theme.c(&theme.text_secondary)),
-                );
+                sidebar(ui, theme, &mut state);
+                ui.separator();
+                ui.vertical(|ui| {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| match state.category {
+                            Category::Tokens => render_tokens(ui, theme),
+                            Category::Components => render_components(ui, theme, &mut state),
+                            Category::Patterns => render_patterns(ui, theme, &mut state),
+                            Category::Frames => render_frames(ui, theme),
+                            Category::Examples => render_examples(ui, theme, &mut state),
+                        });
+                });
             });
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Font tokens", theme);
-            font_samples(ui, theme);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Toggle buttons — 3 sizes, on/off", theme);
-            toggle_row(ui, theme, &mut state);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Chip selector — content-driven width", theme);
-            chip_row_sample(ui, theme, &mut state);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Section header — title + optional right slot", theme);
-            section_header_sample(ui, theme, &mut state);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Step pads — 2 sizes × 3 states", theme);
-            step_pad_grid(ui, theme);
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Tier arc colors", theme);
-            color_swatches(
-                ui,
-                theme,
-                &[
-                    ("accent", theme.accent),
-                    ("knob_tier1_arc", theme.knob_tier1_arc),
-                    ("knob_tier2_arc", theme.knob_tier2_arc),
-                    ("knob_tier3_arc", theme.knob_tier3_arc),
-                ],
-            );
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Surfaces", theme);
-            color_swatches(
-                ui,
-                theme,
-                &[
-                    ("bg_app", theme.bg_app),
-                    ("bg_surface", theme.bg_surface),
-                    ("bg_sunken", theme.bg_sunken),
-                    ("bg_bar", theme.bg_bar),
-                ],
-            );
-
-            ui.add_space(theme.sp_xl);
-            section_header(ui, "Spacing scale", theme);
-            spacing_bars(ui, theme);
         });
 
     save_state(ctx, state);
 }
 
-fn section_header(ui: &mut Ui, label: &str, theme: &SynthTheme) {
+fn sidebar(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.vertical(|ui| {
+        ui.set_min_width(140.0);
+        ui.set_max_width(160.0);
+        ui.add_space(theme.sp_sm);
+        ui.label(
+            RichText::new("Categories")
+                .font(theme.font_small())
+                .color(theme.c(&theme.text_secondary)),
+        );
+        ui.add_space(theme.sp_xs);
+        for cat in Category::ALL {
+            let active = state.category == *cat;
+            let label = RichText::new(cat.label())
+                .font(if active {
+                    theme.font_body()
+                } else {
+                    theme.font_body()
+                })
+                .color(if active {
+                    theme.c(&theme.text_primary)
+                } else {
+                    theme.c(&theme.text_secondary)
+                });
+            if ui
+                .add_sized([130.0, 26.0], egui::SelectableLabel::new(active, label))
+                .clicked()
+            {
+                state.category = *cat;
+            }
+        }
+    });
+}
+
+// ─── Category renderers ─────────────────────────────────────────────────────
+
+fn render_tokens(ui: &mut Ui, theme: &SynthTheme) {
+    sub_header(ui, "Typography", theme);
+    font_samples(ui, theme);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Surfaces", theme);
+    color_swatches(
+        ui,
+        theme,
+        &[
+            ("bg_app", theme.bg_app),
+            ("bg_surface", theme.bg_surface),
+            ("bg_sunken", theme.bg_sunken),
+            ("bg_bar", theme.bg_bar),
+        ],
+    );
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Accent + tier arc colors", theme);
+    color_swatches(
+        ui,
+        theme,
+        &[
+            ("accent", theme.accent),
+            ("accent_dim", theme.accent_dim),
+            ("knob_tier1_arc", theme.knob_tier1_arc),
+            ("knob_tier2_arc", theme.knob_tier2_arc),
+            ("knob_tier3_arc", theme.knob_tier3_arc),
+            ("text_on_accent", theme.text_on_accent),
+        ],
+    );
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Domain accents", theme);
+    color_swatches(
+        ui,
+        theme,
+        &[
+            ("accent_hard_sync", theme.accent_hard_sync),
+            ("accent_fm", theme.accent_fm),
+            ("accent_ring", theme.accent_ring),
+            ("accent_hold", theme.accent_hold),
+            ("accent_walker", theme.accent_walker),
+            ("accent_limiter", theme.accent_limiter),
+        ],
+    );
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "FX colors", theme);
+    color_swatches(
+        ui,
+        theme,
+        &[
+            ("fx_overdrive", theme.fx_overdrive),
+            ("fx_distortion", theme.fx_distortion),
+            ("fx_chorus", theme.fx_chorus),
+            ("fx_delay", theme.fx_delay),
+            ("fx_reverb", theme.fx_reverb),
+            ("fx_shimmer", theme.fx_shimmer),
+            ("fx_crystallizer", theme.fx_crystallizer),
+        ],
+    );
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Spacing scale", theme);
+    spacing_bars(ui, theme);
+}
+
+fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    sub_header(ui, "Knob — 3 sizes × 3 tiers", theme);
+    knob_grid(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Knob — legacy widget for comparison", theme);
+    ui.horizontal(|ui| {
+        crate::ui::widgets::knob(ui, &mut state.legacy_value, 0.0..=1.0, "LEGACY", theme, false);
+        ui.add_space(theme.sp_md);
+        ui.label(
+            RichText::new(
+                "Old path: standard size only, full-accent arc, 9 pt label.\n\
+                 New Standard + Tier Secondary above is the migration target.",
+            )
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+        );
+    });
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "ToggleButton — 3 sizes", theme);
+    toggle_row(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "ChipSelector", theme);
+    chip_row_sample(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "SectionHeader — title + optional right slot", theme);
+    section_header_sample(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "StepPad — 2 sizes × velocity-encoded fill", theme);
+    step_pad_grid(ui, theme);
+}
+
+fn render_patterns(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    sub_header(ui, "SectionCard — one per Tier", theme);
+    ui.horizontal(|ui| {
+        for (i, tier) in [Tier::Primary, Tier::Secondary, Tier::Tertiary]
+            .iter()
+            .enumerate()
+        {
+            ui.vertical(|ui| {
+                ui.set_max_width(240.0);
+                let title = match tier {
+                    Tier::Primary => "Tier 1 — Primary",
+                    Tier::Secondary => "Tier 2 — Secondary",
+                    Tier::Tertiary => "Tier 3 — Tertiary",
+                };
+                ui.section_card(title, *tier, theme, |ui| {
+                    ui.label(
+                        RichText::new("Card content")
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
+                    );
+                    ui.add_space(theme.sp_xs);
+                    design_toggle(
+                        ui,
+                        &mut state.card_toggles[i],
+                        "ENABLE",
+                        ToggleSize::Small,
+                        Tier::Tertiary,
+                        theme,
+                        None,
+                    );
+                });
+            });
+        }
+    });
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "KnobRow — uniform spacing", theme);
+    ui.knob_row(theme, |ui| {
+        for col in 0..3 {
+            design_knob(
+                ui,
+                &mut state.knob_values[1][col],
+                0.0..=1.0,
+                ["CUT", "RES", "ENV"][col],
+                theme,
+                false,
+                KnobSize::Standard,
+                Tier::Secondary,
+            );
+        }
+    });
+}
+
+fn render_frames(ui: &mut Ui, theme: &SynthTheme) {
+    sub_header(ui, "SynthFrame variants", theme);
+    ui.label(
+        RichText::new(
+            "Each frame is a `SynthFrame` factory that pulls its fill / border / \
+             rounding / margin from theme tokens.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_md);
+
+    let demo = |ui: &mut Ui, name: &'static str, frame: egui::Frame| {
+        ui.vertical(|ui| {
+            ui.label(
+                RichText::new(name)
+                    .font(theme.font_small())
+                    .color(theme.c(&theme.text_secondary)),
+            );
+            ui.add_space(theme.sp_xxs);
+            frame.show(ui, |ui| {
+                ui.set_min_size(Vec2::new(160.0, 60.0));
+                ui.label(
+                    RichText::new("sample content")
+                        .font(theme.font_body())
+                        .color(theme.c(&theme.text_primary)),
+                );
+            });
+        });
+    };
+
+    egui::Grid::new("frame_grid")
+        .num_columns(2)
+        .spacing(Vec2::new(theme.sp_lg, theme.sp_md))
+        .show(ui, |ui| {
+            demo(ui, "section()", SynthFrame::section(theme));
+            demo(ui, "tier1()", SynthFrame::tier1(theme));
+            ui.end_row();
+            demo(ui, "inset()", SynthFrame::inset(theme));
+            demo(ui, "screen()", SynthFrame::screen(theme));
+            ui.end_row();
+            demo(ui, "bar()", SynthFrame::bar(theme));
+            demo(ui, "transport()", SynthFrame::transport(theme));
+            ui.end_row();
+        });
+}
+
+fn render_examples(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    sub_header(ui, "Mini OSC card — components composed", theme);
+    ui.label(
+        RichText::new(
+            "Realistic composition using the design-system vocabulary only. \
+             No raw egui widgets, no token-violating literals.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_md);
+
+    let wave_options: &[(usize, &str)] =
+        &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
+
+    ui.set_max_width(360.0);
+    SynthFrame::tier1(theme).show(ui, |ui| {
+        ui.set_min_width(ui.available_width());
+        design_section_header(
+            ui,
+            "OSC 1",
+            theme,
+            Some(|ui: &mut Ui| {
+                let mut enabled = state.card_toggles[0];
+                design_toggle(
+                    ui,
+                    &mut enabled,
+                    "ON",
+                    ToggleSize::Small,
+                    Tier::Tertiary,
+                    theme,
+                    None,
+                );
+                state.card_toggles[0] = enabled;
+            }),
+        );
+        ui.add_space(theme.sp_xs);
+
+        design_chip(
+            ui,
+            &mut state.example_wave,
+            wave_options,
+            theme,
+            Some(ui.available_width()),
+        );
+        ui.add_space(theme.sp_sm);
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_md;
+            design_knob(
+                ui,
+                &mut state.example_detune,
+                -100.0..=100.0,
+                "DET",
+                theme,
+                false,
+                KnobSize::Standard,
+                Tier::Secondary,
+            );
+            design_knob(
+                ui,
+                &mut state.example_pw,
+                0.01..=0.99,
+                "PW",
+                theme,
+                false,
+                KnobSize::Standard,
+                Tier::Secondary,
+            );
+            design_toggle(
+                ui,
+                &mut state.example_uni,
+                "UNI",
+                ToggleSize::Standard,
+                Tier::Secondary,
+                theme,
+                None,
+            );
+        });
+    });
+}
+
+// ─── Building blocks ────────────────────────────────────────────────────────
+
+fn sub_header(ui: &mut Ui, label: &str, theme: &SynthTheme) {
     ui.add_space(theme.sp_sm);
     ui.label(
         RichText::new(label)
@@ -173,7 +479,6 @@ fn knob_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
         .num_columns(4)
         .spacing(Vec2::new(theme.sp_lg, theme.sp_md))
         .show(ui, |ui| {
-            // Header row: tier names.
             ui.label("");
             for (_, tier_label) in &tiers {
                 ui.label(
@@ -191,8 +496,6 @@ fn knob_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
                         .color(theme.c(&theme.text_secondary)),
                 );
                 for (tier_i, (tier, _)) in tiers.iter().enumerate() {
-                    // Use short labels — real knob labels are 3–4 chars
-                    // ("CUT", "RES"); the row header already names the size.
                     let knob_label = match tier {
                         Tier::Primary => "T1",
                         Tier::Secondary => "T2",
@@ -235,7 +538,7 @@ fn toggle_row(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
                 );
                 let cap = sizes[i].1;
                 ui.label(
-                    egui::RichText::new(cap)
+                    RichText::new(cap)
                         .font(theme.font_micro())
                         .color(theme.c(&theme.text_secondary)),
                 );
@@ -274,21 +577,19 @@ fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
         (StepPadSize::Drum, "Drum (26×24)"),
         (StepPadSize::Note, "Note (20×20)"),
     ];
-    // Sample velocities so the "velocity = inner fill height" property
-    // is visible at a glance. None = binary on/off.
     let active_samples = [
         ("Active 100%", StepState::Active { velocity: Some(1.0) }),
-        ("Active 50%",  StepState::Active { velocity: Some(0.5) }),
-        ("Active 20%",  StepState::Active { velocity: Some(0.2) }),
+        ("Active 50%", StepState::Active { velocity: Some(0.5) }),
+        ("Active 20%", StepState::Active { velocity: Some(0.2) }),
         ("Active none", StepState::Active { velocity: None }),
         ("Current 80%", StepState::Current { velocity: Some(0.8) }),
-        ("Inactive",    StepState::Inactive),
+        ("Inactive", StepState::Inactive),
     ];
 
     for (size, size_label) in sizes {
         ui.add_space(theme.sp_sm);
         ui.label(
-            egui::RichText::new(size_label)
+            RichText::new(size_label)
                 .font(theme.font_small())
                 .color(theme.c(&theme.text_secondary)),
         );
@@ -298,14 +599,13 @@ fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
                 design_step_pad(ui, *state, size, theme);
             }
         });
-        // Labels under the row.
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = theme.sp_xxs;
             for (label, _) in &active_samples {
                 ui.add_sized(
                     size.rect(),
                     egui::Label::new(
-                        egui::RichText::new(*label)
+                        RichText::new(*label)
                             .font(theme.font_micro())
                             .color(theme.c(&theme.text_secondary)),
                     )
@@ -334,11 +634,11 @@ fn font_samples(ui: &mut Ui, theme: &SynthTheme) {
 }
 
 fn color_swatches(ui: &mut Ui, theme: &SynthTheme, swatches: &[(&str, [u8; 3])]) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         for (label, rgb) in swatches {
             ui.vertical(|ui| {
                 let (rect, _) =
-                    ui.allocate_exact_size(Vec2::new(64.0, 40.0), egui::Sense::hover());
+                    ui.allocate_exact_size(Vec2::new(80.0, 40.0), egui::Sense::hover());
                 ui.painter().rect_filled(
                     rect,
                     theme.rounding_sm,
