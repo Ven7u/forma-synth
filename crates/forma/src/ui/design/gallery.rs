@@ -26,6 +26,9 @@ struct GalleryState {
     toggle_states: [bool; 3],
     /// Chip selector demo.
     chip_choice: usize,
+    /// Independent toggle for the section-header right-slot sample so it
+    /// doesn't shadow one of the `toggle_states` entries.
+    section_header_toggle: bool,
 }
 
 impl Default for GalleryState {
@@ -35,6 +38,7 @@ impl Default for GalleryState {
             legacy_value: 0.3,
             toggle_states: [false, true, false],
             chip_choice: 1,
+            section_header_toggle: true,
         }
     }
 }
@@ -246,7 +250,7 @@ fn chip_row_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
 }
 
 fn section_header_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
-    let toggle_ref = &mut state.toggle_states[0];
+    let toggle_ref = &mut state.section_header_toggle;
     design_section_header(
         ui,
         "FILTER",

@@ -80,8 +80,8 @@ pub fn toggle_button(
 
     let (fill, text_color, stroke) = match (*value, response.hovered()) {
         (true, _) => {
-            // Active: accent fill, contrasting text, no border.
-            let text = theme.c(&theme.text_primary);
+            // Active: accent fill, high-contrast text-on-accent, no border.
+            let text = theme.c(&theme.text_on_accent);
             (accent, text, Stroke::NONE)
         }
         (false, true) => {

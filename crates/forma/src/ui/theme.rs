@@ -29,6 +29,10 @@ pub struct SynthTheme {
     pub text_primary: [u8; 3],
     pub text_secondary: [u8; 3],
     pub text_disabled: [u8; 3],
+    /// Text color for use on top of an accent fill — must contrast clearly
+    /// against the bright accent. Typically a very dark color.
+    #[serde(default)]
+    pub text_on_accent: [u8; 3],
 
     // ── Accent ─────────────────────────────────────────────────────────────
     pub accent: [u8; 3],
@@ -407,6 +411,7 @@ pub fn midnight() -> SynthTheme {
         text_primary: [210, 218, 230],
         text_secondary: [110, 125, 145],
         text_disabled: [50, 60, 78],
+        text_on_accent: [6, 8, 12],
 
         accent: [0, 220, 160],
         accent_dim: [0, 180, 130],
@@ -509,6 +514,7 @@ pub fn winamp_classic() -> SynthTheme {
         text_primary: [215, 215, 215],
         text_secondary: [130, 130, 130],
         text_disabled: [65, 65, 65],
+        text_on_accent: [10, 10, 10],
 
         accent: [0, 230, 0],
         accent_dim: [0, 180, 0],
@@ -611,6 +617,7 @@ pub fn phosphor() -> SynthTheme {
         text_primary: [170, 235, 190],
         text_secondary: [70, 140, 88],
         text_disabled: [28, 65, 38],
+        text_on_accent: [4, 10, 7],
 
         accent: [30, 255, 120],
         accent_dim: [20, 200, 90],

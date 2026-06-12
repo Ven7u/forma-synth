@@ -94,7 +94,7 @@ pub fn chip_selector<T: Copy + PartialEq>(
                     StrokeKind::Inside,
                 );
                 let text_color = if active {
-                    theme.c(&theme.text_primary)
+                    theme.c(&theme.text_on_accent)
                 } else {
                     theme.c(&theme.text_secondary)
                 };
