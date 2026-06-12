@@ -109,21 +109,36 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &SynthTheme) {
         .default_size([900.0, 640.0])
         .resizable(true)
         .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                sidebar(ui, theme, &mut state);
-                ui.separator();
-                ui.vertical(|ui| {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| match state.category {
-                            Category::Tokens => render_tokens(ui, theme),
-                            Category::Components => render_components(ui, theme, &mut state),
-                            Category::Patterns => render_patterns(ui, theme, &mut state),
-                            Category::Frames => render_frames(ui, theme),
-                            Category::Examples => render_examples(ui, theme, &mut state),
-                        });
-                });
-            });
+            // Claim the full available size so the inner horizontal layout
+            // can grow with the window — without this the row sizes to its
+            // tallest child (the sidebar) and the window can't be enlarged
+            // vertically beyond the sidebar's natural height.
+            let avail = ui.available_size_before_wrap();
+            ui.allocate_ui_with_layout(
+                avail,
+                egui::Layout::left_to_right(egui::Align::TOP),
+                |ui| {
+                    sidebar(ui, theme, &mut state);
+                    ui.separator();
+                    ui.vertical(|ui| {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| match state.category {
+                                Category::Tokens => render_tokens(ui, theme),
+                                Category::Components => {
+                                    render_components(ui, theme, &mut state)
+                                }
+                                Category::Patterns => {
+                                    render_patterns(ui, theme, &mut state)
+                                }
+                                Category::Frames => render_frames(ui, theme),
+                                Category::Examples => {
+                                    render_examples(ui, theme, &mut state)
+                                }
+                            });
+                    });
+                },
+            );
         });
 
     save_state(ctx, state);
