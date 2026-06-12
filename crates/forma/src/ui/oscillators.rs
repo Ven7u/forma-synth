@@ -1,9 +1,11 @@
+use crate::ui::design::{toggle::ToggleSize, KnobSize, SynthUi, Tier};
 use crate::ui::frame::SynthFrame;
 use crate::SynthApp;
 use eframe::egui;
 use egui::{Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 
-pub const WAVE_LABELS: &[&str] = &["Sin", "Saw", "Sqr", "Tri"];
+const WAVE_OPTIONS: &[(usize, &str)] =
+    &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
 
 /// Shared fixed height for all dock cards (inner content, before section margins).
 /// Raise or lower this to resize all four cards together.
@@ -11,78 +13,69 @@ const CARD_H: f32 = 260.0;
 
 impl SynthApp {
     pub fn ui_osc_panel(&mut self, ui: &mut egui::Ui, i: usize) {
-        let sp_xs = self.theme.sp_xs;
-        let _sp_sm = self.theme.sp_sm;
+        let theme = self.theme.clone();
         let is_osc1 = i == 0;
         let flip = is_osc1 && self.osc1_mod_view;
 
-        // Back face gets a slightly different tint via a modified frame.
-        let frame = if flip {
-            SynthFrame::section(&self.theme).fill(self.theme.c(&self.theme.bg_sunken))
-        } else {
-            SynthFrame::section(&self.theme)
-        };
+        // Tier 1 frame: this is a major sound-shaping zone even though the
+        // controls themselves are Tier 2/3.
+        let frame = SynthFrame::tier1(&theme);
+
+        // Track header interactions inside the closure; apply after the frame
+        // returns to avoid borrow-checker contortions.
+        let mut new_enabled = self.osc_enabled[i];
+        let mut flip_clicked = false;
 
         frame.show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
             // ── Header ────────────────────────────────────────────────────
-            let on = self.osc_enabled[i];
+            let title = if flip {
+                format!("OSC {} · MOD", i + 1)
+            } else {
+                format!("OSC {}", i + 1)
+            };
             ui.horizontal(|ui| {
-                // Title
-                let title = if flip {
-                    format!("OSC {} · MOD", i + 1)
-                } else {
-                    format!("OSC {}", i + 1)
-                };
-                let title_col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new(title).font(self.theme.font_heading()).italics().color(title_col),
-                    ))
-                    .on_hover_text("Toggle oscillator on/off")
-                    .clicked()
-                {
-                    self.osc_enabled[i] = !on;
-                    let vol = if self.osc_enabled[i] {
-                        self.osc_vol[i]
-                    } else {
-                        0.0
-                    };
-                    self.engine.set_osc_vol(i as u8, vol);
-                }
+                ui.synth_toggle(
+                    &mut new_enabled,
+                    &title,
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text("Toggle oscillator on/off");
 
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // MOD / back flip button (OSC 1 only)
-                    if is_osc1 {
-                        let flip_label = if flip { "‹ back" } else { "mod ›" };
-                        let flip_col = self.theme.c(&self.theme.text_secondary);
-                        if ui
-                            .add(
-                                egui::Label::new(
-                                    RichText::new(flip_label).font(self.theme.font_body()).color(flip_col),
+                if is_osc1 {
+                    ui.with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            let flip_label = if flip { "‹ back" } else { "mod ›" };
+                            let flip_col = theme.c(&theme.text_secondary);
+                            if ui
+                                .add(
+                                    egui::Label::new(
+                                        RichText::new(flip_label)
+                                            .font(theme.font_body())
+                                            .color(flip_col),
+                                    )
+                                    .sense(Sense::click()),
                                 )
-                                .sense(egui::Sense::click()),
-                            )
-                            .on_hover_text(if flip {
-                                "Back to main controls"
-                            } else {
-                                "Sync / FM / Ring mod"
-                            })
-                            .clicked()
-                        {
-                            self.osc1_mod_view = !self.osc1_mod_view;
-                        }
-                    }
-                });
+                                .on_hover_text(if flip {
+                                    "Back to main controls"
+                                } else {
+                                    "Sync / FM / Ring mod"
+                                })
+                                .clicked()
+                            {
+                                flip_clicked = true;
+                            }
+                        },
+                    );
+                }
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
             if flip {
                 self.ui_osc1_mod_back(ui);
@@ -92,48 +85,52 @@ impl SynthApp {
             // Pad to shared fixed card height so all dock cards are the same size.
             ui.add_space((CARD_H - ui.min_rect().height()).max(0.0));
         });
+
+        if new_enabled != self.osc_enabled[i] {
+            self.osc_enabled[i] = new_enabled;
+            let vol = if new_enabled { self.osc_vol[i] } else { 0.0 };
+            self.engine.set_osc_vol(i as u8, vol);
+        }
+        if flip_clicked {
+            self.osc1_mod_view = !self.osc1_mod_view;
+        }
     }
 
     // ── Front face (identical for all 3 OSCs) ────────────────────────────────
 
     fn ui_osc_front(&mut self, ui: &mut egui::Ui, i: usize) {
-        let sp_xs = self.theme.sp_xs;
-        let sp_sm = self.theme.sp_sm;
+        let theme = self.theme.clone();
         let on = self.osc_enabled[i];
 
         ui.add_enabled_ui(on, |ui| {
-            // ── Waveform chips ────────────────────────────────────────────
-            let chip_w = (ui.available_width() - sp_xs * 3.0) / 4.0;
+            // ── Waveform chips (Tier 3 — configuration) ────────────────────
+            let mut wave_choice = self.osc_wave[i];
+            let chip_resp = ui.chip_selector(
+                &mut wave_choice,
+                WAVE_OPTIONS,
+                &theme,
+                Some(ui.available_width()),
+            );
+            chip_resp.on_hover_text("Waveform: sine, sawtooth, square (PW), triangle");
+            if wave_choice != self.osc_wave[i] {
+                self.osc_wave[i] = wave_choice;
+                self.engine.set_osc_wave(i as u8, wave_choice as u8);
+            }
+
+            ui.add_space(theme.sp_sm);
+
+            // ── Knob row: OCT · DET · PW (Tier 2/3 — sound design + config) ─
             ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = sp_xs;
-                for (w, &label) in WAVE_LABELS.iter().enumerate() {
-                    let active = self.osc_wave[i] == w;
-                    if ui
-                        .add_sized(
-                            [chip_w, 22.0],
-                            egui::Button::selectable(active, RichText::new(label).font(self.theme.font_body())),
-                        )
-                        .clicked()
-                    {
-                        self.osc_wave[i] = w;
-                        self.engine.set_osc_wave(i as u8, w as u8);
-                    }
-                }
-            });
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
 
-            ui.add_space(sp_sm);
-
-            // ── Knob row 1: OCT · DET · PW ───────────────────────────────
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = sp_xs;
-
-                // OCT — integer DragValue styled like a knob column
+                // OCT — integer DragValue. Tier 3 (rarely touched mid-perf).
                 ui.vertical(|ui| {
-                    ui.set_width(44.0);
-                    ui.add_space(4.0);
+                    let col_w = KnobSize::Standard.rect().x;
+                    ui.set_width(col_w);
+                    ui.add_space(theme.sp_xs);
                     if ui
                         .add_sized(
-                            [44.0, 32.0],
+                            [col_w, 28.0],
                             egui::DragValue::new(&mut self.osc_octave[i])
                                 .range(-2..=2)
                                 .prefix("Oct "),
@@ -143,71 +140,71 @@ impl SynthApp {
                     {
                         self.update_freq_mult(i);
                     }
-                    ui.add_space(2.0);
+                    ui.add_space(theme.sp_xxs);
                     ui.label(
                         RichText::new("OCT")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                 });
 
-                // DET knob (±100 ¢)
-                if super::widgets::knob(
-                    ui,
-                    &mut self.osc_detune[i],
-                    -100.0..=100.0,
-                    "DET",
-                    &self.theme,
-                    false,
-                )
-                .on_hover_text("Detune ±100 ¢. Shift+drag for fine control.")
-                .changed()
+                // DET knob (±100 ¢) — Tier 2.
+                if ui
+                    .synth_knob(
+                        &mut self.osc_detune[i],
+                        -100.0..=100.0,
+                        "DET",
+                        &theme,
+                        false,
+                        KnobSize::Standard,
+                        Tier::Secondary,
+                    )
+                    .on_hover_text("Detune ±100 ¢. Shift+drag for fine control.")
+                    .changed()
                 {
                     self.update_freq_mult(i);
                 }
 
-                // PW knob (only meaningful for square, but always shown for layout consistency)
+                // PW knob — Tier 2, only active for square waveform.
                 let pw_enabled = self.osc_wave[i] == 2;
                 ui.add_enabled_ui(pw_enabled, |ui| {
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.osc_pulse_width[i],
-                        0.01..=0.99,
-                        "PW",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("Pulse Width — duty cycle of the square wave.\n0.5 = symmetric square (hollow/woody).\nLower or higher = thin, nasal tone.\nModulate with LFO for classic PWM sweep.\nOnly active on Sqr waveform.")
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut self.osc_pulse_width[i],
+                            0.01..=0.99,
+                            "PW",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("Pulse Width — duty cycle of the square wave.\n0.5 = symmetric square (hollow/woody).\nLower or higher = thin, nasal tone.\nModulate with LFO for classic PWM sweep.\nOnly active on Sqr waveform.")
+                        .changed()
                     {
                         self.engine.set_osc_pulse_width(i as u8, self.osc_pulse_width[i]);
                     }
                 });
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
-            // ── Unison row ────────────────────────────────────────────────
+            // ── Unison row (Tier 2) ───────────────────────────────────────
             ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = sp_xs;
-                let uni_on = self.osc_unison_enabled[i];
-                let uni_col = if uni_on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
+                ui.spacing_mut().item_spacing.x = theme.sp_xs;
+                let mut uni_on = self.osc_unison_enabled[i];
                 if ui
-                    .add_sized(
-                        [36.0, 22.0],
-                        egui::Button::selectable(
-                            uni_on,
-                            RichText::new("UNI").font(self.theme.font_body()).color(uni_col),
-                        ),
+                    .synth_toggle(
+                        &mut uni_on,
+                        "UNI",
+                        ToggleSize::Standard,
+                        Tier::Secondary,
+                        &theme,
+                        None,
                     )
                     .on_hover_text("Stack detuned voices for a thick, wide sound")
                     .clicked()
                 {
-                    self.osc_unison_enabled[i] = !uni_on;
+                    self.osc_unison_enabled[i] = uni_on;
                     self.update_unison(i);
                 }
 
@@ -215,30 +212,32 @@ impl SynthApp {
                     let mut changed = false;
                     changed |= ui
                         .add_sized(
-                            [36.0, 22.0],
+                            [40.0, 24.0],
                             egui::DragValue::new(&mut self.osc_unison_count[i])
                                 .range(2..=5)
                                 .prefix("×"),
                         )
                         .on_hover_text("Number of unison voices (2–5)")
                         .changed();
-                    changed |= super::widgets::knob(
-                        ui,
-                        &mut self.osc_unison_spread[i],
-                        0.0..=50.0,
-                        "SPRD",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("Total pitch spread across unison voices (cents)")
-                    .changed();
+                    changed |= ui
+                        .synth_knob(
+                            &mut self.osc_unison_spread[i],
+                            0.0..=50.0,
+                            "SPRD",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("Total pitch spread across unison voices (cents)")
+                        .changed();
                     if changed {
                         self.update_unison(i);
                     }
                 }
             });
 
-            ui.add_space(sp_sm);
+            ui.add_space(theme.sp_sm);
 
             // ── Mini waveform preview ─────────────────────────────────────
             let notes_held = !self.piano_held_midi.is_empty()
@@ -248,24 +247,23 @@ impl SynthApp {
             let preview_h = 36.0_f32;
             let (rect, _) = ui.allocate_exact_size(
                 Vec2::new(ui.available_width(), preview_h),
-                egui::Sense::hover(),
+                Sense::hover(),
             );
             if ui.is_rect_visible(rect) {
-                // Oscilloscope style: waveform is always stationary (triggered at zero crossing).
-                // Only brightness changes to signal active/idle state.
                 let line_color = if active {
-                    self.theme.c(&self.theme.accent)
+                    theme.c(&theme.accent)
                 } else {
-                    self.theme.c(&self.theme.accent).linear_multiply(0.3)
+                    theme.c(&theme.accent).linear_multiply(0.3)
                 };
                 draw_wave_preview(
                     ui.painter(),
                     rect,
                     self.osc_wave[i],
                     self.osc_pulse_width[i],
-                    self.theme.c(&self.theme.scope_bg),
+                    theme.c(&theme.scope_bg),
                     line_color,
-                    self.theme.rounding_sm,
+                    theme.rounding_sm,
+                    theme.stroke_focus,
                 );
             }
         });
@@ -274,56 +272,63 @@ impl SynthApp {
     // ── Back face: OSC 1 mod controls ────────────────────────────────────────
 
     fn ui_osc1_mod_back(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
-        let sp_sm = self.theme.sp_sm;
-        // SYNC
+        let theme = self.theme.clone();
+        let sync_accent = theme.c(&theme.accent_hard_sync);
+        let fm_accent = theme.c(&theme.accent_fm);
+        let ring_accent = theme.c(&theme.accent_ring);
+
+        // SYNC toggle + → OSC 2 label
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = sp_xs;
-            let on = self.hard_sync;
-            let col = self
-                .theme
-                .active_with(on, &self.theme.accent_hard_sync.clone());
+            ui.spacing_mut().item_spacing.x = theme.sp_xs;
+            let mut on = self.hard_sync;
             if ui
-                .add_sized(
-                    [44.0, 22.0],
-                    egui::Button::selectable(on, RichText::new("SYNC").font(self.theme.font_body()).color(col)),
+                .synth_toggle(
+                    &mut on,
+                    "SYNC",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    Some(sync_accent),
                 )
                 .on_hover_text("Hard Sync — OSC 1 resets OSC 2 phase each cycle")
                 .clicked()
             {
-                self.hard_sync = !on;
+                self.hard_sync = on;
                 self.engine.set_hard_sync_enabled(self.hard_sync);
             }
             ui.label(
                 RichText::new("→ OSC 2")
-                    .font(self.theme.font_body())
-                    .color(self.theme.c(&self.theme.text_disabled)),
+                    .font(theme.font_body())
+                    .color(theme.c(&theme.text_disabled)),
             );
         });
 
-        ui.add_space(sp_sm);
+        ui.add_space(theme.sp_sm);
 
-        // FM chip + depth slider
+        // FM toggle + depth slider
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = sp_xs;
-            let on = self.fm_enabled;
-            let col = self.theme.active_with(on, &self.theme.accent_fm.clone());
+            ui.spacing_mut().item_spacing.x = theme.sp_xs;
+            let mut on = self.fm_enabled;
             if ui
-                .add_sized(
-                    [44.0, 22.0],
-                    egui::Button::selectable(on, RichText::new("FM").font(self.theme.font_body()).color(col)),
+                .synth_toggle(
+                    &mut on,
+                    "FM",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    Some(fm_accent),
                 )
                 .on_hover_text("Frequency Modulation — OSC 2 modulates OSC 1 pitch at audio rate")
                 .clicked()
             {
-                self.fm_enabled = !on;
+                self.fm_enabled = on;
                 self.engine
                     .set_fm_depth(if self.fm_enabled { self.fm_depth } else { 0.0 });
             }
             ui.add_enabled_ui(self.fm_enabled, |ui| {
                 if ui
                     .add_sized(
-                        [ui.available_width(), 22.0],
+                        [ui.available_width(), 24.0],
                         egui::Slider::new(&mut self.fm_depth, 0.0..=10.0).fixed_decimals(1),
                     )
                     .on_hover_text("FM depth — ~1 subtle, 3–5 bells, 8+ chaotic sidebands")
@@ -334,22 +339,25 @@ impl SynthApp {
             });
         });
 
-        ui.add_space(sp_xs);
+        ui.add_space(theme.sp_xs);
 
-        // RING chip + depth slider
+        // RING toggle + depth slider
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = sp_xs;
-            let on = self.ring_enabled;
-            let col = self.theme.active_with(on, &self.theme.accent_ring.clone());
+            ui.spacing_mut().item_spacing.x = theme.sp_xs;
+            let mut on = self.ring_enabled;
             if ui
-                .add_sized(
-                    [44.0, 22.0],
-                    egui::Button::selectable(on, RichText::new("RING").font(self.theme.font_body()).color(col)),
+                .synth_toggle(
+                    &mut on,
+                    "RING",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    Some(ring_accent),
                 )
                 .on_hover_text("Ring Mod — OSC 1 × OSC 2: metallic, bell-like textures")
                 .clicked()
             {
-                self.ring_enabled = !on;
+                self.ring_enabled = on;
                 self.engine.set_ring_depth(if self.ring_enabled {
                     self.ring_depth
                 } else {
@@ -359,7 +367,7 @@ impl SynthApp {
             ui.add_enabled_ui(self.ring_enabled, |ui| {
                 if ui
                     .add_sized(
-                        [ui.available_width(), 22.0],
+                        [ui.available_width(), 24.0],
                         egui::Slider::new(&mut self.ring_depth, 0.0..=2.0).fixed_decimals(2),
                     )
                     .on_hover_text("Ring mod depth — mute OSC 1 and 2 in mixer for pure ring mod")
@@ -715,6 +723,7 @@ fn draw_wave_preview(
     bg: Color32,
     line_color: Color32,
     rounding: f32,
+    stroke_w: f32,
 ) {
     painter.rect_filled(rect, egui::CornerRadius::same(rounding as u8), bg);
 
@@ -759,6 +768,6 @@ fn draw_wave_preview(
     let clip = painter.clip_rect();
     let painter = painter.with_clip_rect(clip.intersect(rect));
     for pair in points.windows(2) {
-        painter.line_segment([pair[0], pair[1]], Stroke::new(1.5, line_color));
+        painter.line_segment([pair[0], pair[1]], Stroke::new(stroke_w, line_color));
     }
 }

@@ -189,14 +189,6 @@ impl SynthTheme {
         }
     }
 
-    pub fn active_with(&self, on: bool, color: &[u8; 3]) -> Color32 {
-        if on {
-            self.c(color)
-        } else {
-            Color32::GRAY
-        }
-    }
-
     // ── egui integration ─────────────────────────────────────────────────────
 
     /// Apply this theme to egui's global `Visuals` and `Style`.
