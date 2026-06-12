@@ -72,7 +72,11 @@ pub fn default_dock_state() -> DockState<Tab> {
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
     // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators.
-    let [_osc, _mod] = surface.split_below(top_left, 0.55, vec![Tab::Modulation, Tab::Filter]);
+    // Oscillators get the larger share (0.65) so the four CARD_H=260 cards
+    // fit without the mixer's lower controls (LIM row) being clipped.
+    // TODO(Phase 6): split mixer to its own tab; oscillators alone will
+    // need less vertical space.
+    let [_osc, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
 
     // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
