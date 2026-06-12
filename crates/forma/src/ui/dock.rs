@@ -6,6 +6,7 @@ use egui_dock::{DockState, NodeIndex, TabViewer};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tab {
     Oscillators,
+    Mixer,
     Modulation,
     Filter,
     Sequencer,
@@ -20,6 +21,7 @@ impl Tab {
     pub fn title(self) -> &'static str {
         match self {
             Tab::Oscillators => "Oscillators",
+            Tab::Mixer => "Mixer",
             Tab::Modulation => "Modulation",
             Tab::Filter => "Filter & Envelopes",
             Tab::Sequencer => "Sequencer",
@@ -33,6 +35,7 @@ impl Tab {
 
     pub const ALL: &[Tab] = &[
         Tab::Oscillators,
+        Tab::Mixer,
         Tab::Modulation,
         Tab::Filter,
         Tab::Sequencer,
@@ -72,13 +75,14 @@ pub fn default_dock_state() -> DockState<Tab> {
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
     // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators.
-    // Oscillators get the larger share (0.65) so the four CARD_H=260 cards
-    // fit without the mixer's lower controls (LIM row) being clipped.
-    // TODO(Phase 6): split mixer to its own tab; oscillators alone will
-    // need less vertical space.
-    let [_osc, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
+    let [osc_area, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
 
-    // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
+    // 4. Split osc_area horizontally: Mixer takes the rightmost ~22%.
+    // Phase 6 separation — Oscillators no longer share their pane with the
+    // mixer, so the 3 OSC cards get the full width of their column.
+    let [_osc, _mixer] = surface.split_right(osc_area, 0.78, vec![Tab::Mixer]);
+
+    // 5. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
 
     state
@@ -169,12 +173,14 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Tab) {
         match tab {
             Tab::Oscillators => {
-                ui.columns(4, |cols| {
+                ui.columns(3, |cols| {
                     self.app.ui_osc_panel(&mut cols[0], 0);
                     self.app.ui_osc_panel(&mut cols[1], 1);
                     self.app.ui_osc_panel(&mut cols[2], 2);
-                    self.app.ui_mixer_panel(&mut cols[3]);
                 });
+            }
+            Tab::Mixer => {
+                self.app.ui_mixer_panel(ui);
             }
             Tab::Modulation => {
                 ui.vertical(|ui| {
