@@ -7,10 +7,13 @@
 
 #![allow(dead_code)] // Phase 0/2 establish the API; callers land in Phase 5+.
 
+pub mod chip;
 pub mod gallery;
 pub mod knob;
 pub mod layout;
+pub mod section;
 pub mod step_pad;
+pub mod toggle;
 
 #[allow(unused_imports)] // Re-exported for Phase 5+ panel migrations.
 pub use layout::SynthUi;

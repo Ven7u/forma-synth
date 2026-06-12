@@ -7,8 +7,11 @@
 use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
 use super::{
+    chip::chip_selector as design_chip,
     knob::knob as design_knob,
+    section::section_header as design_section_header,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
+    toggle::{toggle_button as design_toggle, ToggleSize},
     KnobSize, Tier,
 };
 use crate::ui::theme::SynthTheme;
@@ -19,6 +22,10 @@ struct GalleryState {
     /// 3 sizes × 3 tiers of knob values, plus 1 for the legacy comparison.
     knob_values: [[f32; 3]; 3],
     legacy_value: f32,
+    /// 3 toggle samples — one per size.
+    toggle_states: [bool; 3],
+    /// Chip selector demo.
+    chip_choice: usize,
 }
 
 impl Default for GalleryState {
@@ -26,6 +33,8 @@ impl Default for GalleryState {
         Self {
             knob_values: [[0.3; 3]; 3],
             legacy_value: 0.3,
+            toggle_states: [false, true, false],
+            chip_choice: 1,
         }
     }
 }
@@ -83,6 +92,18 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &SynthTheme) {
             ui.add_space(theme.sp_xl);
             section_header(ui, "Font tokens", theme);
             font_samples(ui, theme);
+
+            ui.add_space(theme.sp_xl);
+            section_header(ui, "Toggle buttons — 3 sizes, on/off", theme);
+            toggle_row(ui, theme, &mut state);
+
+            ui.add_space(theme.sp_xl);
+            section_header(ui, "Chip selector — content-driven width", theme);
+            chip_row_sample(ui, theme, &mut state);
+
+            ui.add_space(theme.sp_xl);
+            section_header(ui, "Section header — title + optional right slot", theme);
+            section_header_sample(ui, theme, &mut state);
 
             ui.add_space(theme.sp_xl);
             section_header(ui, "Step pads — 2 sizes × 3 states", theme);
@@ -187,6 +208,61 @@ fn knob_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
                 ui.end_row();
             }
         });
+}
+
+fn toggle_row(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    let sizes = [
+        (ToggleSize::Large, "Large", "PLAY"),
+        (ToggleSize::Standard, "Std", "SYNC"),
+        (ToggleSize::Small, "Small", "M"),
+    ];
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_md;
+        for (i, (size, _, label)) in sizes.iter().enumerate() {
+            ui.vertical(|ui| {
+                design_toggle(
+                    ui,
+                    &mut state.toggle_states[i],
+                    label,
+                    *size,
+                    Tier::Secondary,
+                    theme,
+                    None,
+                );
+                let cap = sizes[i].1;
+                ui.label(
+                    egui::RichText::new(cap)
+                        .font(theme.font_micro())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+            });
+        }
+    });
+}
+
+fn chip_row_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    let options: &[(usize, &str)] = &[(0, "SIN"), (1, "SAW"), (2, "SQR"), (3, "TRI")];
+    design_chip(ui, &mut state.chip_choice, options, theme, None);
+}
+
+fn section_header_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    let toggle_ref = &mut state.toggle_states[0];
+    design_section_header(
+        ui,
+        "FILTER",
+        theme,
+        Some(|ui: &mut Ui| {
+            design_toggle(
+                ui,
+                toggle_ref,
+                "ON",
+                ToggleSize::Small,
+                Tier::Tertiary,
+                theme,
+                None,
+            );
+        }),
+    );
 }
 
 fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
