@@ -219,6 +219,32 @@ Migrate each panel, one at a time. Order by visual impact:
 
 ---
 
+## Mixer follow-ups (parked)
+
+The mixer panel rewrite (Phase 6) restructured the layout into three
+cards — CHANNELS, MASTER, VOICE & SAFETY — and consumed the new
+Fader / LevelMeter / FaderColumn pieces. A few enhancements are
+deliberately deferred:
+
+- **Per-OSC peak meters.** Each channel strip would pass
+  `Some((level, peak_hold))` into `fader_column` to render an inline
+  LevelMeter beside its Fader. Needs an engine getter
+  `osc_peak(i) -> f32` (post-volume, per-channel). Requires backend
+  work; cosmetically high-value because at a glance the user can see
+  which oscillator dominates the mix.
+- **dB conversion for the master peak readout.** Currently we show
+  the linear `peak_l().max(peak_r())` value. Converting to dBFS
+  (20·log10(level), with a -inf / clip clamp) reads more professional
+  and matches the convention every DAW uses. Pure UI change, can land
+  any time.
+- **Mute / Solo per channel.** The existing `osc_enabled` flag is
+  effectively mute. Solo needs a parallel `osc_soloed: [bool; 4]`
+  field and engine logic that silences non-soloed channels when any
+  solo is active. Optional; not present in the current voice rig.
+- **Master fader dB markings.** A vertical scale (0, -3, -6, -12,
+  -24 dB) beside the master Fader would help users visually estimate
+  level without reading the numeric readout.
+
 ## Phase 7 — Polish
 
 Only after all panels are migrated.

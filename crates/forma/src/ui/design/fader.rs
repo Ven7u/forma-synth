@@ -57,7 +57,13 @@ impl FaderSize {
 }
 
 /// Track width perpendicular to the slide direction.
-const TRACK_WIDTH: f32 = 8.0;
+///
+/// 04-components.md originally specified 8 px (`fader_track_w`), but in
+/// practice that read as a thin pencil line in real panels — Ableton
+/// uses ~22 px, Logic ~20 px. Bumped to 18 px for visual weight and
+/// grab-ability; thumb width is `TRACK_WIDTH + 4` so the thumb still
+/// overhangs the track cleanly.
+const TRACK_WIDTH: f32 = 18.0;
 
 /// Shift-drag fine-mode factor — matches Knob's FINE_FACTOR.
 const FINE_FACTOR: f32 = 0.2;

@@ -1,8 +1,14 @@
-use crate::ui::design::{toggle::ToggleSize, KnobSize, SynthUi, Tier};
+use crate::ui::design::{
+    fader::FaderSize,
+    layout::fader_column,
+    level_meter::{LevelMeterOrientation, LevelMeterSize},
+    toggle::ToggleSize,
+    KnobSize, SynthUi, Tier,
+};
 use crate::ui::frame::SynthFrame;
 use crate::SynthApp;
 use eframe::egui;
-use egui::{Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, Vec2};
+use egui::{Color32, Pos2, RichText, Sense, Stroke, Vec2};
 
 const WAVE_OPTIONS: &[(usize, &str)] =
     &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
@@ -425,291 +431,303 @@ impl SynthApp {
         let theme = self.theme.clone();
         let limiter_accent = theme.c(&theme.accent_limiter);
 
-        SynthFrame::section(&theme).show(ui, |ui| {
-            let total_h = CARD_H;
-            const FADER_COL_W: f32 = 20.0;
-            const SLIDER_W: f32 = 8.0;
-            const CH_W_CONST: f32 = 5.0;
-            const CH_GAP_CONST: f32 = 1.0;
-            const METER_TOTAL_W_CONST: f32 = CH_W_CONST * 2.0 + CH_GAP_CONST + 4.0;
+        // Update the smoothed peak meter state ahead of rendering.
+        let peak_raw_l = self.engine.peak_l();
+        let peak_raw_r = self.engine.peak_r();
+        let dt = 1.0 / 60.0_f32;
+        self.peak_display =
+            (self.peak_display * 0.85 + peak_raw_l * 0.15).max(peak_raw_l * 0.3);
+        let peak_raw_max = peak_raw_l.max(peak_raw_r);
+        if peak_raw_max > self.peak_hold {
+            self.peak_hold = peak_raw_max;
+            self.peak_hold_timer = 0.0;
+        } else {
+            self.peak_hold_timer += dt;
+            if self.peak_hold_timer > 1.5 {
+                self.peak_hold *= 0.97;
+            }
+        }
+        let peak_hold = self.peak_hold;
 
-            // Cap the section's inner width so ui.horizontal() doesn't grab the
-            // full column width (which would leave empty space between controls
-            // and meters and cause overflow on small screens).
-            let sp = ui.spacing().item_spacing.x;
-            let controls_w = FADER_COL_W * 4.0 + sp * 3.0;
-            let meter_w = METER_TOTAL_W_CONST + theme.sp_xs * 2.0; // +frame inner margins
-            ui.set_max_width(controls_w + sp + meter_w);
+        // ── Three cards side by side ─────────────────────────────────────
+        // Cards naturally fill the same height because each one uses Large
+        // (120 px) faders or a Large GLIDE knob (88 px) plus surrounding
+        // groups, so no `set_min_height` is needed.
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_sm;
 
-            ui.horizontal(|ui| {
-                // ── Left: all mixer controls ────────────────────────────────
-                ui.vertical(|ui| {
-                    let max_w = controls_w;
-                    ui.set_max_width(max_w);
-                    ui.label(
-                        RichText::new("MIX")
-                            .font(theme.font_heading())
-                            .italics()
-                            .color(theme.c(&theme.text_primary)),
-                    );
-                    ui.add_space(theme.sp_xs);
-
-                    // Per-channel volume faders for OSC 1/2/3 + Noise.
-                    // egui::Slider until the design-system Fader component
-                    // lands (04-components.md §Fader, Phase 6+).
-                    ui.horizontal(|ui| {
-                        for i in 0..3 {
-                            ui.vertical(|ui| {
-                                ui.set_width(FADER_COL_W);
-                                ui.label(
-                                    RichText::new(format!("O{}", i + 1))
-                                        .font(theme.font_body())
-                                        .color(if self.osc_enabled[i] {
-                                            theme.c(&theme.text_primary)
-                                        } else {
-                                            theme.c(&theme.text_disabled)
-                                        }),
-                                );
-                                if ui
-                                    .add_sized(
-                                        [SLIDER_W, 80.0],
-                                        egui::Slider::new(&mut self.osc_vol[i], 0.0..=1.0)
-                                            .vertical()
-                                            .fixed_decimals(2),
-                                    )
-                                    .on_hover_text(format!("OSC {} volume in the mix", i + 1))
-                                    .changed()
-                                    && self.osc_enabled[i]
-                                {
-                                    self.engine.set_osc_vol(i as u8, self.osc_vol[i]);
-                                }
-                            });
-                        }
-
+            // ── Card 1: CHANNELS ──────────────────────────────────────────
+            // 4 Large faders for O1/O2/O3/N, with an on/off toggle below
+            // each strip to act as per-channel mute.
+            // TODO(Phase 6+): per-OSC peak meters require an engine getter
+            // `osc_peak(i)` so each strip can pass `Some((level, hold))` to
+            // fader_column. Until then, channel-level metering lives only
+            // in the MASTER card.
+            SynthFrame::section(&theme).show(ui, |ui| {
+                ui.label(
+                    RichText::new("CHANNELS")
+                        .font(theme.font_heading())
+                        .color(theme.c(&theme.text_primary)),
+                );
+                ui.add_space(theme.sp_sm);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    for i in 0..3 {
                         ui.vertical(|ui| {
-                            ui.set_width(FADER_COL_W);
-                            ui.label(
-                                RichText::new("N")
-                                    .font(theme.font_body())
-                                    .color(theme.c(&theme.text_secondary)),
-                            );
-                            let mut noise_vol = self.engine.noise_vol();
-                            if ui
-                                .add_sized(
-                                    [SLIDER_W, 80.0],
-                                    egui::Slider::new(&mut noise_vol, 0.0..=1.0)
-                                        .vertical()
-                                        .fixed_decimals(2),
-                                )
-                                .on_hover_text("White noise volume")
-                                .changed()
-                            {
-                                self.engine.set_noise_vol(noise_vol);
-                            }
-                        });
-                    });
-
-                    ui.add_space(theme.sp_xs);
-                    ui.separator();
-                    ui.add_space(theme.sp_xs);
-
-                    ui.horizontal(|ui| {
-                        // MAST — Master volume is Tier 1 per the philosophy
-                        // doc ("performance controls"). Standard size to fit
-                        // the existing mixer column width; Tier::Primary gives
-                        // it the full accent arc.
-                        let mut master = self.engine.master_volume();
-                        if ui
-                            .synth_knob(
-                                &mut master,
+                            let label = format!("O{}", i + 1);
+                            let enabled = self.osc_enabled[i];
+                            if fader_column(
+                                ui,
+                                &label,
+                                &mut self.osc_vol[i],
                                 0.0..=1.0,
-                                "MAST",
-                                &theme,
-                                false,
-                                KnobSize::Standard,
-                                Tier::Primary,
-                            )
-                            .on_hover_text("Master output volume — applied after all FX")
-                            .changed()
-                        {
-                            self.engine.set_master_volume(master);
-                        }
-                        // GLIDE — Tier 2 sound design.
-                        let mut glide = self.engine.glide_time();
-                        if ui
-                            .synth_knob(
-                                &mut glide,
-                                0.0..=0.5,
-                                "GLIDE",
-                                &theme,
-                                false,
-                                KnobSize::Standard,
-                                Tier::Secondary,
-                            )
-                            .on_hover_text("Pitch slide time between notes (seconds)")
-                            .changed()
-                        {
-                            self.engine.set_glide_time(glide);
-                        }
-
-                        // VOICE — chip selector for POLY / MONO / LEGATO.
-                        ui.vertical(|ui| {
-                            ui.label(
-                                RichText::new("VOICE")
-                                    .weak()
-                                    .font(theme.font_body())
-                                    .color(theme.c(&theme.text_secondary)),
-                            );
-                            let mut mode = self.engine.mono_mode();
-                            let prev = mode;
-                            ui.chip_selector(
-                                &mut mode,
-                                &[
-                                    (0u8, "POLY"),
-                                    (1u8, "MONO"),
-                                    (2u8, "LEG"),
-                                ],
-                                &theme,
                                 None,
+                                enabled,
+                                FaderSize::Large,
+                                &theme,
                             )
-                            .on_hover_text(
-                                "POLY: multiple voices · MONO: single voice retriggered · LEG: single voice with glide",
-                            );
-                            if mode != prev {
-                                self.engine.set_mono_mode(mode);
+                            .on_hover_text(format!(
+                                "OSC {} volume in the mix",
+                                i + 1
+                            ))
+                            .changed()
+                                && enabled
+                            {
+                                self.engine.set_osc_vol(i as u8, self.osc_vol[i]);
+                            }
+                            ui.add_space(theme.sp_xs);
+                            let mut on = self.osc_enabled[i];
+                            if ui
+                                .synth_toggle(
+                                    &mut on,
+                                    "ON",
+                                    ToggleSize::Small,
+                                    Tier::Tertiary,
+                                    &theme,
+                                    None,
+                                )
+                                .on_hover_text(format!(
+                                    "Mute / un-mute OSC {} in the mix",
+                                    i + 1
+                                ))
+                                .clicked()
+                            {
+                                self.osc_enabled[i] = on;
+                                let vol = if on { self.osc_vol[i] } else { 0.0 };
+                                self.engine.set_osc_vol(i as u8, vol);
                             }
                         });
-                    });
-
-                    ui.add_space(theme.sp_xs);
-
-                    ui.horizontal(|ui| {
-                        let mut lim_on = self.limiter_enabled;
-                        if ui
-                            .synth_toggle(
-                                &mut lim_on,
-                                "LIM",
-                                ToggleSize::Standard,
-                                Tier::Secondary,
-                                &theme,
-                                Some(limiter_accent),
-                            )
-                            .on_hover_text("Limiter — prevents output clipping")
-                            .clicked()
+                    }
+                    ui.vertical(|ui| {
+                        let mut noise_vol = self.engine.noise_vol();
+                        if fader_column(
+                            ui,
+                            "N",
+                            &mut noise_vol,
+                            0.0..=1.0,
+                            None,
+                            true,
+                            FaderSize::Large,
+                            &theme,
+                        )
+                        .on_hover_text("White noise volume")
+                        .changed()
                         {
-                            self.limiter_enabled = lim_on;
-                            self.engine.set_limiter_enabled(self.limiter_enabled);
+                            self.engine.set_noise_vol(noise_vol);
                         }
-                        ui.add_enabled_ui(self.limiter_enabled, |ui| {
-                            let mut thr = self.engine.limiter_threshold();
-                            if ui
-                                .add(
-                                    egui::DragValue::new(&mut thr)
-                                        .range(0.5..=1.0)
-                                        .speed(0.005)
-                                        .fixed_decimals(2),
-                                )
-                                .on_hover_text("Threshold — lower = more compression")
-                                .changed()
-                                && self.limiter_enabled
-                            {
-                                self.engine.set_limiter_threshold(thr);
-                            }
+                        // Filler the same vertical extent as the OSC toggle
+                        // so the row aligns at the bottom.
+                        ui.add_space(theme.sp_xs + ToggleSize::Small.min_rect().y);
+                    });
+                });
+            });
+
+            // ── Card 2: MASTER (accent border) ────────────────────────────
+            // Channel-strip-style: Large fader + paired L/R meters at the
+            // same height, with numeric readouts and a clip marker below.
+            SynthFrame::tier1(&theme).show(ui, |ui| {
+                ui.label(
+                    RichText::new("MASTER")
+                        .font(theme.font_heading())
+                        .color(theme.c(&theme.text_primary)),
+                );
+                ui.add_space(theme.sp_sm);
+
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+
+                    let mut master = self.engine.master_volume();
+                    if fader_column(
+                        ui,
+                        "MAST",
+                        &mut master,
+                        0.0..=1.0,
+                        None,
+                        true,
+                        FaderSize::Large,
+                        &theme,
+                    )
+                    .on_hover_text("Master output volume — applied after all FX")
+                    .changed()
+                    {
+                        self.engine.set_master_volume(master);
+                    }
+
+                    // OUT — paired L/R meters.
+                    ui.vertical(|ui| {
+                        ui.label(
+                            RichText::new("OUT")
+                                .font(theme.font_small())
+                                .color(theme.c(&theme.text_secondary)),
+                        );
+                        ui.add_space(theme.sp_xxs);
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+                            // Standard-size LevelMeter is 80 px; for the
+                            // master section we want it visually paired with
+                            // a 120 px Large fader, so render two at full
+                            // height by reusing the Standard glyph stacked.
+                            ui.synth_level_meter(
+                                peak_raw_l,
+                                peak_hold,
+                                LevelMeterOrientation::Vertical,
+                                LevelMeterSize::Standard,
+                                &theme,
+                            );
+                            ui.synth_level_meter(
+                                peak_raw_r,
+                                peak_hold,
+                                LevelMeterOrientation::Vertical,
+                                LevelMeterSize::Standard,
+                                &theme,
+                            );
                         });
                     });
                 });
 
-                // ── Right: L/R peak meters, full card height ─────────────────
-                let peak_raw_l = self.engine.peak_l();
-                let peak_raw_r = self.engine.peak_r();
-                let dt = 1.0 / 60.0_f32;
-                self.peak_display =
-                    (self.peak_display * 0.85 + peak_raw_l * 0.15).max(peak_raw_l * 0.3);
-                let peak_raw_max = peak_raw_l.max(peak_raw_r);
-                if peak_raw_max > self.peak_hold {
-                    self.peak_hold = peak_raw_max;
-                    self.peak_hold_timer = 0.0;
+                ui.add_space(theme.sp_sm);
+
+                // Numeric readouts beneath the strip cluster.
+                ui.label(
+                    RichText::new(format!("MAST  {:.2}", self.engine.master_volume()))
+                        .font(theme.font_value())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+                let peak_color = if peak_hold >= 1.0 {
+                    theme.c(&theme.meter_clip)
                 } else {
-                    self.peak_hold_timer += dt;
-                    if self.peak_hold_timer > 1.5 {
-                        self.peak_hold *= 0.97;
-                    }
+                    theme.c(&theme.text_secondary)
+                };
+                let clip_marker = if peak_hold >= 1.0 { " CLIP" } else { "" };
+                ui.label(
+                    RichText::new(format!("Peak  {:.2}{clip_marker}", peak_raw_max))
+                        .font(theme.font_value())
+                        .color(peak_color),
+                );
+            });
+
+            // ── Card 3: VOICE & SAFETY ────────────────────────────────────
+            // Three logical groups stack vertically (VOICE / GLIDE / LIMITER)
+            // with their own captions. The Large GLIDE knob fills the middle
+            // band, balancing the height of the fader-bearing cards.
+            SynthFrame::section(&theme).show(ui, |ui| {
+                ui.label(
+                    RichText::new("VOICE & SAFETY")
+                        .font(theme.font_heading())
+                        .color(theme.c(&theme.text_primary)),
+                );
+                ui.add_space(theme.sp_sm);
+
+                // VOICE group.
+                ui.label(
+                    RichText::new("VOICE")
+                        .font(theme.font_small())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+                ui.add_space(theme.sp_xxs);
+                let mut mode = self.engine.mono_mode();
+                let prev_mode = mode;
+                ui.chip_selector(
+                    &mut mode,
+                    &[(0u8, "POLY"), (1u8, "MONO"), (2u8, "LEG")],
+                    &theme,
+                    None,
+                )
+                .on_hover_text(
+                    "POLY: multiple voices · MONO: single voice retriggered · LEG: single voice with glide",
+                );
+                if mode != prev_mode {
+                    self.engine.set_mono_mode(mode);
                 }
 
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(theme.sp_xs as i8, 0))
-                    .show(ui, |ui| {
-                        let (resp, painter) = ui.allocate_painter(
-                            Vec2::new(METER_TOTAL_W_CONST, total_h),
-                            Sense::hover(),
-                        );
-                        let mr = resp.rect;
+                ui.add_space(theme.sp_md);
 
-                        painter.rect_filled(
-                            mr,
-                            CornerRadius::same(theme.rounding_xs as u8),
-                            theme.c(&theme.meter_bg),
-                        );
+                // GLIDE — Large knob for visual centerpiece; this is the
+                // band that fills the vertical height of the card.
+                ui.vertical_centered(|ui| {
+                    let mut glide = self.engine.glide_time();
+                    if ui
+                        .synth_knob(
+                            &mut glide,
+                            0.0..=0.5,
+                            "GLIDE",
+                            &theme,
+                            false,
+                            KnobSize::Large,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("Pitch slide time between notes (seconds)")
+                        .changed()
+                    {
+                        self.engine.set_glide_time(glide);
+                    }
+                });
 
-                        for (ci, &peak_raw) in [peak_raw_l, peak_raw_r].iter().enumerate() {
-                            let x_left = mr.left() + 2.0 + ci as f32 * (CH_W_CONST + CH_GAP_CONST);
-                            let ch_rect = Rect::from_min_size(
-                                Pos2::new(x_left, mr.top() + 2.0),
-                                Vec2::new(CH_W_CONST, mr.height() - 14.0),
-                            );
-                            let level = peak_raw.clamp(0.0, 1.0);
-                            let bar_h = ch_rect.height() * level;
-                            if bar_h > 0.5 {
-                                let color = if peak_raw < 0.7 {
-                                    theme.c(&theme.meter_green)
-                                } else if peak_raw < 1.0 {
-                                    // Token-derived: interpolation between
-                                    // theme.meter_green and theme.meter_clip.
-                                    let t = (peak_raw - 0.7) / 0.3;
-                                    let g = theme.meter_green;
-                                    let c = theme.meter_clip;
-                                    Color32::from_rgb(
-                                        (g[0] as f32 + (c[0] as f32 - g[0] as f32) * t) as u8,
-                                        (g[1] as f32 + (c[1] as f32 - g[1] as f32) * t) as u8,
-                                        (g[2] as f32 + (c[2] as f32 - g[2] as f32) * t) as u8,
-                                    )
-                                } else {
-                                    theme.c(&theme.meter_clip)
-                                };
-                                let bar_rect = Rect::from_min_size(
-                                    Pos2::new(ch_rect.left(), ch_rect.bottom() - bar_h),
-                                    Vec2::new(CH_W_CONST, bar_h),
-                                );
-                                painter.rect_filled(bar_rect, CornerRadius::ZERO, color);
-                            }
+                ui.add_space(theme.sp_md);
 
-                            let hold_frac = self.peak_hold.clamp(0.0, 1.0);
-                            let hold_y = ch_rect.bottom() - ch_rect.height() * hold_frac;
-                            let hold_color = if self.peak_hold >= 1.0 {
-                                theme.c(&theme.meter_clip)
-                            } else {
-                                theme.c(&theme.text_primary)
-                            };
-                            painter.line_segment(
-                                [
-                                    Pos2::new(ch_rect.left(), hold_y),
-                                    Pos2::new(ch_rect.right(), hold_y),
-                                ],
-                                Stroke::new(theme.stroke_focus, hold_color),
-                            );
-
-                            painter.text(
-                                Pos2::new(ch_rect.center_top().x, mr.bottom() - 2.0),
-                                egui::Align2::CENTER_BOTTOM,
-                                if ci == 0 { "L" } else { "R" },
-                                theme.font_micro(),
-                                theme.c(&theme.text_secondary),
-                            );
+                // LIMITER group.
+                ui.label(
+                    RichText::new("LIMITER")
+                        .font(theme.font_small())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+                ui.add_space(theme.sp_xxs);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_xs;
+                    let mut lim_on = self.limiter_enabled;
+                    if ui
+                        .synth_toggle(
+                            &mut lim_on,
+                            "LIM",
+                            ToggleSize::Standard,
+                            Tier::Secondary,
+                            &theme,
+                            Some(limiter_accent),
+                        )
+                        .on_hover_text("Limiter — prevents output clipping")
+                        .clicked()
+                    {
+                        self.limiter_enabled = lim_on;
+                        self.engine.set_limiter_enabled(self.limiter_enabled);
+                    }
+                    ui.add_enabled_ui(self.limiter_enabled, |ui| {
+                        let mut thr = self.engine.limiter_threshold();
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut thr)
+                                    .range(0.5..=1.0)
+                                    .speed(0.005)
+                                    .fixed_decimals(2),
+                            )
+                            .on_hover_text("Threshold — lower = more compression")
+                            .changed()
+                            && self.limiter_enabled
+                        {
+                            self.engine.set_limiter_threshold(thr);
                         }
-                    }); // Frame::new inner_margin
+                    });
+                });
             });
-            // Pad to shared fixed card height.
-            ui.add_space((CARD_H - ui.min_rect().height()).max(0.0));
         });
     }
 }

@@ -12,6 +12,7 @@ use super::{
     chip::chip_selector as design_chip,
     fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
+    layout::fader_column as design_fader_column,
     level_meter::{level_meter as design_level_meter, LevelMeterOrientation, LevelMeterSize},
     section::section_header as design_section_header,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
@@ -70,6 +71,8 @@ struct GalleryState {
     /// 3 sizes of vertical fader sample, plus 1 horizontal.
     fader_values: [f32; 3],
     fader_horizontal: f32,
+    /// FaderColumn pattern demo — 4 channel volumes.
+    column_values: [f32; 4],
 }
 
 impl Default for GalleryState {
@@ -88,6 +91,7 @@ impl Default for GalleryState {
             example_uni: false,
             fader_values: [0.8, 0.5, 0.2],
             fader_horizontal: 0.6,
+            column_values: [0.75, 0.55, 0.3, 0.4],
         }
     }
 }
@@ -333,6 +337,10 @@ fn render_patterns(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
             });
         }
     });
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "FaderColumn — mixer channel strip", theme);
+    fader_column_row(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "KnobRow — uniform spacing", theme);
@@ -642,6 +650,43 @@ fn fader_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
             &mut state.fader_horizontal,
             0.0..=1.0,
             FaderOrientation::Horizontal,
+            FaderSize::Standard,
+            theme,
+        );
+    });
+}
+
+fn fader_column_row(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    // First three columns demo the with-meter variant (LIVE-style strip).
+    // Fourth column demos the no-meter variant (Studio mixer-style).
+    let with_meter = [
+        ("O1", state.column_values[0], 0.45, 0.78),
+        ("O2", state.column_values[1], 0.62, 0.90),
+        ("O3", state.column_values[2], 0.20, 0.55),
+    ];
+    let without_meter_label = "N (no meter)";
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_md;
+        for (i, (label, _, level, peak)) in with_meter.iter().enumerate() {
+            design_fader_column(
+                ui,
+                label,
+                &mut state.column_values[i],
+                0.0..=1.0,
+                Some((*level, *peak)),
+                true,
+                FaderSize::Standard,
+                theme,
+            );
+        }
+        design_fader_column(
+            ui,
+            without_meter_label,
+            &mut state.column_values[3],
+            0.0..=1.0,
+            None,
+            true,
             FaderSize::Standard,
             theme,
         );

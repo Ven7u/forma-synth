@@ -265,3 +265,69 @@ impl SynthUi for Ui {
         }
     }
 }
+
+/// FaderColumn pattern — per `05-patterns.md` §FaderColumn. Composes a
+/// label, a vertical Fader, and an optional LevelMeter into a mixer
+/// channel strip. Returns the Fader's Response so callers can detect
+/// drag changes and gate engine updates.
+///
+/// When `meter` is `Some((level, peak_hold))` the meter sits to the
+/// right of the fader (Standard size, paired). When `None` only the
+/// fader renders — used by the Studio mixer where there's a single
+/// shared L/R meter rather than per-channel meters.
+///
+/// `size` controls the fader length. Defaults usefully to `Standard`
+/// for typical channel strips, but real mixers (Ableton, Logic, hardware)
+/// use the **same** fader size on channel strips and the master strip
+/// so the row reads as visually balanced — distinguish the master via
+/// `SynthFrame::tier1` and a paired LevelMeter, not via fader length.
+///
+/// `enabled` controls the label color only — pass `false` to dim it
+/// (e.g. for an oscillator that's been toggled off).
+pub fn fader_column(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    meter: Option<(f32, f32)>,
+    enabled: bool,
+    size: FaderSize,
+    theme: &SynthTheme,
+) -> Response {
+    let mut response = None;
+    ui.vertical(|ui| {
+        ui.label(
+            egui::RichText::new(label)
+                .font(theme.font_small())
+                .color(if enabled {
+                    theme.c(&theme.text_primary)
+                } else {
+                    theme.c(&theme.text_disabled)
+                }),
+        );
+        ui.add_space(theme.sp_xxs);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+            let resp = fader(
+                ui,
+                value,
+                range,
+                FaderOrientation::Vertical,
+                size,
+                theme,
+            );
+            response = Some(resp);
+            if let Some((level, peak_hold)) = meter {
+                level_meter(
+                    ui,
+                    level,
+                    peak_hold,
+                    LevelMeterOrientation::Vertical,
+                    LevelMeterSize::Standard,
+                    theme,
+                );
+            }
+        });
+    });
+    response.expect("fader_column always renders the fader")
+}

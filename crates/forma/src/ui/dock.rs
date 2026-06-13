@@ -60,8 +60,9 @@ impl Tab {
 /// └─────────────────────────────────────────────────┘
 /// ```
 pub fn default_dock_state() -> DockState<Tab> {
-    // Start with Oscillators as root.
-    let mut state = DockState::new(vec![Tab::Oscillators]);
+    // Oscillators + Mixer share the root node as sibling tabs. Click between
+    // them; both get the same full width of the upper-left dock column.
+    let mut state = DockState::new(vec![Tab::Oscillators, Tab::Mixer]);
     let surface = state.main_surface_mut();
 
     // 1. Split bottom from root: Sequencer + ArpWalker tabbed — bottom 32%.
@@ -74,15 +75,10 @@ pub fn default_dock_state() -> DockState<Tab> {
     // 2. In top area, split right: Oscilloscope — right takes 40%.
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
-    // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators.
-    let [osc_area, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
+    // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators/Mixer.
+    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
 
-    // 4. Split osc_area horizontally: Mixer takes the rightmost ~22%.
-    // Phase 6 separation — Oscillators no longer share their pane with the
-    // mixer, so the 3 OSC cards get the full width of their column.
-    let [_osc, _mixer] = surface.split_right(osc_area, 0.78, vec![Tab::Mixer]);
-
-    // 5. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
+    // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
 
     state
