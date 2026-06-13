@@ -30,6 +30,7 @@ performance, not just during patch editing.
 | [05-patterns.md](05-patterns.md) | **Layer 4** — Composed patterns: knob rows, FX modules, cards |
 | [06-window-scaling.md](06-window-scaling.md) | Window sizing strategy; global zoom factor; DPI handling |
 | [07-implementation-plan.md](07-implementation-plan.md) | Phased migration roadmap with acceptance criteria |
+| [08-ux-conventions.md](08-ux-conventions.md) | Field-tested rules for card layout, sizing, interaction, color, spacing |
 
 ---
 
