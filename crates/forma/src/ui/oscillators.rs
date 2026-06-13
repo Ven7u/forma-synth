@@ -453,6 +453,14 @@ impl SynthApp {
         // Cards naturally fill the same height because each one uses Large
         // (120 px) faders or a Large GLIDE knob (88 px) plus surrounding
         // groups, so no `set_min_height` is needed.
+        //
+        // Each card declares an explicit max width so it doesn't sprawl
+        // across the dock pane. Without this, any `ui.vertical_centered`
+        // or similar "use available width" call grabs all the leftover
+        // space and pushes content into a void.
+        const CARD_W_CHANNELS: f32 = 240.0;
+        const CARD_W_MASTER: f32 = 180.0;
+        const CARD_W_VOICE_SAFETY: f32 = 220.0;
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = theme.sp_sm;
 
@@ -464,6 +472,9 @@ impl SynthApp {
             // fader_column. Until then, channel-level metering lives only
             // in the MASTER card.
             SynthFrame::section(&theme).show(ui, |ui| {
+              ui.vertical(|ui| {
+                ui.set_max_width(CARD_W_CHANNELS);
+                ui.set_min_width(CARD_W_CHANNELS);
                 ui.label(
                     RichText::new("CHANNELS")
                         .font(theme.font_heading())
@@ -495,7 +506,19 @@ impl SynthApp {
                             {
                                 self.engine.set_osc_vol(i as u8, self.osc_vol[i]);
                             }
-                            ui.add_space(theme.sp_xs);
+                            // Volume readout — mirrors MASTER's MAST/Peak
+                            // block so CHANNELS card matches its height.
+                            ui.add_space(theme.sp_xxs);
+                            ui.label(
+                                RichText::new(format!("{:.2}", self.osc_vol[i]))
+                                    .font(theme.font_value())
+                                    .color(if enabled {
+                                        theme.c(&theme.text_secondary)
+                                    } else {
+                                        theme.c(&theme.text_disabled)
+                                    }),
+                            );
+                            ui.add_space(theme.sp_xxs);
                             let mut on = self.osc_enabled[i];
                             if ui
                                 .synth_toggle(
@@ -535,17 +558,28 @@ impl SynthApp {
                         {
                             self.engine.set_noise_vol(noise_vol);
                         }
-                        // Filler the same vertical extent as the OSC toggle
-                        // so the row aligns at the bottom.
-                        ui.add_space(theme.sp_xs + ToggleSize::Small.min_rect().y);
+                        ui.add_space(theme.sp_xxs);
+                        ui.label(
+                            RichText::new(format!("{:.2}", self.engine.noise_vol()))
+                                .font(theme.font_value())
+                                .color(theme.c(&theme.text_secondary)),
+                        );
+                        // Filler matching the ON toggle vertical extent so
+                        // the noise column's bottom aligns with the OSC
+                        // columns.
+                        ui.add_space(theme.sp_xxs + ToggleSize::Small.min_rect().y);
                     });
                 });
+              });
             });
 
             // ── Card 2: MASTER (accent border) ────────────────────────────
             // Channel-strip-style: Large fader + paired L/R meters at the
             // same height, with numeric readouts and a clip marker below.
             SynthFrame::tier1(&theme).show(ui, |ui| {
+              ui.vertical(|ui| {
+                ui.set_max_width(CARD_W_MASTER);
+                ui.set_min_width(CARD_W_MASTER);
                 ui.label(
                     RichText::new("MASTER")
                         .font(theme.font_heading())
@@ -622,6 +656,7 @@ impl SynthApp {
                         .font(theme.font_value())
                         .color(peak_color),
                 );
+              });
             });
 
             // ── Card 3: VOICE & SAFETY ────────────────────────────────────
@@ -629,6 +664,9 @@ impl SynthApp {
             // with their own captions. The Large GLIDE knob fills the middle
             // band, balancing the height of the fader-bearing cards.
             SynthFrame::section(&theme).show(ui, |ui| {
+              ui.vertical(|ui| {
+                ui.set_max_width(CARD_W_VOICE_SAFETY);
+                ui.set_min_width(CARD_W_VOICE_SAFETY);
                 ui.label(
                     RichText::new("VOICE & SAFETY")
                         .font(theme.font_heading())
@@ -660,26 +698,26 @@ impl SynthApp {
 
                 ui.add_space(theme.sp_md);
 
-                // GLIDE — Large knob for visual centerpiece; this is the
-                // band that fills the vertical height of the card.
-                ui.vertical_centered(|ui| {
-                    let mut glide = self.engine.glide_time();
-                    if ui
-                        .synth_knob(
-                            &mut glide,
-                            0.0..=0.5,
-                            "GLIDE",
-                            &theme,
-                            false,
-                            KnobSize::Large,
-                            Tier::Secondary,
-                        )
-                        .on_hover_text("Pitch slide time between notes (seconds)")
-                        .changed()
-                    {
-                        self.engine.set_glide_time(glide);
-                    }
-                });
+                // GLIDE — Large knob; the band that fills the vertical
+                // height of the card. Left-aligned (no `vertical_centered`)
+                // so the card stays at its declared width instead of
+                // grabbing leftover horizontal space to center within.
+                let mut glide = self.engine.glide_time();
+                if ui
+                    .synth_knob(
+                        &mut glide,
+                        0.0..=0.5,
+                        "GLIDE",
+                        &theme,
+                        false,
+                        KnobSize::Large,
+                        Tier::Secondary,
+                    )
+                    .on_hover_text("Pitch slide time between notes (seconds)")
+                    .changed()
+                {
+                    self.engine.set_glide_time(glide);
+                }
 
                 ui.add_space(theme.sp_md);
 
@@ -725,6 +763,7 @@ impl SynthApp {
                         }
                     });
                 });
+              });
             });
         });
     }

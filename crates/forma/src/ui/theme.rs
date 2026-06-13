@@ -417,7 +417,7 @@ pub fn midnight() -> SynthTheme {
         accent_ring: [255, 130, 200],
         accent_hold: [255, 200, 0],
         accent_walker: [100, 180, 255],
-        accent_limiter: [0, 255, 0],
+        accent_limiter: [40, 220, 130],
 
         fx_overdrive: [255, 140, 60],
         fx_distortion: [220, 60, 60],
@@ -622,16 +622,20 @@ pub fn phosphor() -> SynthTheme {
         accent_fm: [80, 255, 180],
         accent_ring: [160, 255, 100],
         accent_hold: [220, 255, 60],
-        accent_walker: [80, 255, 180],
-        accent_limiter: [30, 255, 120],
+        accent_walker: [180, 255, 100],
+        accent_limiter: [120, 255, 80],
 
-        fx_overdrive: [200, 255, 60],
-        fx_distortion: [255, 160, 60],
-        fx_chorus: [40, 255, 160],
-        fx_delay: [60, 200, 255],
-        fx_reverb: [140, 180, 255],
-        fx_shimmer: [80, 240, 255],
-        fx_crystallizer: [200, 255, 100],
+        // Phosphor — CRT-green aesthetic. Cool FX colors (delay / reverb /
+        // shimmer) are shifted from blue toward green-cyan so the FX chain
+        // stays within the theme's phosphor palette while each effect
+        // remains visually distinct.
+        fx_overdrive: [255, 220, 80],
+        fx_distortion: [255, 100, 60],
+        fx_chorus: [80, 255, 180],
+        fx_delay: [80, 220, 180],
+        fx_reverb: [150, 220, 200],
+        fx_shimmer: [180, 255, 220],
+        fx_crystallizer: [240, 255, 100],
 
         seq_step_on: [20, 220, 100],
         seq_step_off: [10, 30, 18],

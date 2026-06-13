@@ -29,6 +29,27 @@ Forcing a min-height creates dead space inside short cards. Redesign content
 heights match. Reserve `set_min_height` for truly variable content (data-driven
 lists where height genuinely varies with state).
 
+**egui has no built-in flex** (no CSS-style stretch). For equal-height cards,
+the options are:
+
+1. **Content-design equalization** (what these rules advocate). Each card's
+   anchor component and supporting groups are sized so the natural heights
+   match. The Mixer's CHANNELS card uses Large fader + volume readout + ON
+   toggle; MASTER uses Large fader + readouts; VOICE & SAFETY uses
+   chips + Large knob + LIMITER row. All three land at ~220 px.
+2. **`set_min_height`** — last resort. Creates dead space and reads as
+   broken; use only for data-driven content whose height genuinely varies.
+3. **Two-pass measure-then-render** — render once invisibly to measure, then
+   render again at the shared height. Works but doubles per-frame cost and
+   is awkward to express cleanly in immediate mode.
+4. **External `egui_flex` crate** — provides CSS-flex-style sizing. We
+   deferred this in Phase 2 (see `07-implementation-plan.md`). Worth
+   reconsidering if Option 1 stops scaling.
+
+For visual regression — "did my last change accidentally break card heights?"
+— the right tool is `egui_kittest`, the official egui headless-rendering
+test crate. Scheduled for Phase 7 polish.
+
 ### 1.3 Card height comes from one "anchor" component.
 
 Most cards have one component that defines vertical extent (a fader, a knob,
@@ -68,6 +89,46 @@ and spacing between them.
 
 A card has heading → group caption → controls. More nesting than that means
 rethink the card — either split it, or the wrap is the wrong pattern.
+
+### 1.8 Cards declare an explicit width band.
+
+Every card body sets `ui.set_max_width(w)` and `ui.set_min_width(w)` to the
+same value (or a tight band around the same value) so the card sizes to its
+designed dimensions, not to whatever leftover space the dock pane has. Without
+this, any `vertical_centered` / `horizontal_centered` / `with_layout(...)`
+call inside the card grabs the full available width to center within, making
+the card sprawl and content drift into a void. The current Mixer panel
+declares `CARD_W_CHANNELS = 240`, `CARD_W_MASTER = 180`,
+`CARD_W_VOICE_SAFETY = 220`.
+
+### 1.9 Cards do not expand to fill the row.
+
+If three cards in a horizontal_top row use 600 px combined and the dock pane
+is 900 px wide, the remaining 300 px stays empty on the right. That's correct
+behavior. The alternative — stretching one card to fill — produces uneven
+proportions that hurt readability more than the empty gutter does.
+
+### 1.10 Content inside a card is left-aligned by default.
+
+Use `vertical_centered` / `horizontal_centered` only when the entire card has
+**one centered element** that's smaller than the card width (and you want
+deliberate visual emphasis). Inside a card with multiple groups, every group
+should hug the left edge. The Mixer's GLIDE knob bug was a direct violation
+of this rule.
+
+### 1.11 Card widths in egui — quick reference
+
+| Want | Use |
+|------|-----|
+| "Card is exactly this wide" | `ui.set_max_width(w); ui.set_min_width(w);` or `ui.set_width(w)` |
+| "Card has a sensible content-driven width up to a cap" | `ui.set_max_width(w);` |
+| "Card has a minimum but can grow" | `ui.set_min_width(w);` |
+| "Exact size + custom layout" | `ui.allocate_ui_with_layout(size, layout, …)` |
+
+Default behavior: in `ui.horizontal(...)`, each child sizes to its **widest
+inner child**. Any inner call that requests full available width (`set_min_width(ui.available_width())`,
+`vertical_centered`, `horizontal_centered`, `with_layout(right_to_left, ...)`,
+etc.) makes the child expand to fill the row's leftover space.
 
 ---
 
@@ -197,6 +258,26 @@ SYNC uses `accent_hard_sync`, FM uses `accent_fm`, RING uses `accent_ring`,
 LIM uses `accent_limiter`. Pass them via the toggle's `accent_color: Option<Color32>`
 override. This is how a single active toggle row stays color-coded by
 function instead of monotonously green.
+
+### 5.5 Every visible pixel must come from a theme token.
+
+Switching themes (Midnight ↔ Winamp ↔ Phosphor) is the simplest test of
+whether a component is on-system. Any color that doesn't change between
+themes is a hardcoded literal that escaped the token system. Run the theme
+switcher on every newly-migrated panel and confirm every visible pixel
+moves. Common offenders found this way:
+
+- `Color32::WHITE` / `Color32::GRAY` left in custom painters as "neutral"
+  colors. Replace with `theme.c(&theme.text_primary)` / `text_secondary`.
+- `Color32::from_rgb(180, 180, 180)` "near-grey" placeholder values from
+  pre-token-era code. Replace with the closest semantic token.
+- Hardcoded labels inside legacy widgets (`widgets::knob` originally had
+  three hardcoded greys for center dot, value text, label text — fixed
+  when migrating its 18 caller sites was deferred to Phase 6).
+
+The Phase 5/6 token compliance grep (§7.1) catches most of these, but the
+theme-switch test catches subtler ones inside derived expressions and
+custom painters.
 
 ---
 
