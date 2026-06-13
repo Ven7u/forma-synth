@@ -1,3 +1,4 @@
+use crate::ui::design::{toggle::ToggleSize, KnobSize, SynthUi, Tier};
 use crate::ui::frame::SynthFrame;
 use crate::SynthApp;
 use eframe::egui;
@@ -606,28 +607,30 @@ impl SynthApp {
     }
 
     pub fn ui_filter_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        // Tier 1 frame — Filter cutoff / resonance are the canonical
+        // performance controls per `01-philosophy.md`. Accent border earns
+        // the elevation.
+        SynthFrame::tier1(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // ── Header ───────────────────────────────────────────────────────
+            // ── Header: FILTER toggle + LP24 caption ──────────────────────
+            let mut filter_on = self.filter_enabled;
             ui.horizontal(|ui| {
-                let on = self.filter_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
                 if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("FILTER").font(self.theme.font_heading()).strong().color(col),
-                    ))
+                    .synth_toggle(
+                        &mut filter_on,
+                        "FILTER",
+                        ToggleSize::Standard,
+                        Tier::Primary,
+                        &theme,
+                        None,
+                    )
                     .on_hover_text("Moog-style 4-pole lowpass filter")
                     .clicked()
                 {
-                    self.filter_enabled = !on;
+                    self.filter_enabled = filter_on;
                     if self.filter_enabled {
                         self.engine.set_filter_cutoff(self.filter_cutoff);
                         self.engine.set_filter_resonance(self.filter_q);
@@ -639,46 +642,45 @@ impl SynthApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
                         RichText::new("LP24")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                 });
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
-            // ── Mode buttons ─────────────────────────────────────────────────
-            // Only LP is active; BP/HP/NOTCH are shown but disabled.
+            // ── Mode row: LP active, BP/HP/NOTCH placeholder/disabled ─────
+            // Kept as raw buttons for now — chip_selector would let the user
+            // click into a disabled mode. Phase 7 polish should add a
+            // disabled-chip variant to ChipSelector and migrate this row.
             ui.horizontal(|ui| {
-                let accent = self.theme.c(&self.theme.accent);
-                let disabled = self.theme.c(&self.theme.text_disabled);
-                // LP — always selected
+                let accent = theme.c(&theme.accent);
+                let disabled = theme.c(&theme.text_disabled);
                 ui.add(egui::Button::selectable(
                     true,
-                    RichText::new("LP").font(self.theme.font_body()).strong().color(accent),
+                    RichText::new("LP").font(theme.font_body()).strong().color(accent),
                 ));
                 for label in ["BP", "HP", "NOTCH"] {
                     ui.add_enabled(
                         false,
                         egui::Button::selectable(
                             false,
-                            RichText::new(label).font(self.theme.font_body()).color(disabled),
+                            RichText::new(label).font(theme.font_body()).color(disabled),
                         ),
                     );
                 }
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.filter_enabled, |ui| {
-                // ── Response curve ────────────────────────────────────────────
+                // ── Response curve ────────────────────────────────────────
                 let curve_h = ui.available_width().min(100.0);
                 let curve_size = egui::Vec2::new(ui.available_width(), curve_h);
                 let (rect, response) =
                     ui.allocate_exact_size(curve_size, egui::Sense::click_and_drag());
 
-                // Absolute-position interaction: clicking anywhere in the rect
-                // jumps the node there. Shift slows delta movement for fine tuning.
                 if response.dragged() {
                     let fine = ui.input(|i| i.modifiers.shift);
                     if fine {
@@ -709,7 +711,6 @@ impl SynthApp {
                     self.engine.set_filter_resonance(self.filter_q);
                 }
 
-                // Show mod wheel filter contribution on the curve only when dest==Filter.
                 let mod_offset = if self.mod_wheel_dest == 1 {
                     self.piano_mod_wheel as f32 / 5.0 * self.mod_wheel_depth * self.filter_cutoff * 0.5
                 } else {
@@ -724,30 +725,35 @@ impl SynthApp {
                         effective_cutoff,
                         self.filter_q,
                         response.hovered() || response.dragged(),
-                        &self.theme,
+                        &theme,
                     );
                 }
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // ── Knobs ─────────────────────────────────────────────────────
+                // ── Knobs ─────────────────────────────────────────────────
+                // CUTOFF + RES are Tier 1 (Large + Primary). The remaining
+                // four are Tier 2 sound-design knobs (Standard + Secondary).
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+
+                    // CUTOFF — Tier 1 performance control.
                     ui.vertical(|ui| {
                         let mut display_cutoff = effective_cutoff;
-                        let knob_resp = super::widgets::knob(
-                            ui,
-                            &mut display_cutoff,
-                            80.0..=18000.0,
-                            "CUTOFF",
-                            &self.theme,
-                            true,
-                        )
-                        .on_hover_text("Cutoff frequency. 80 Hz = dark, 18 kHz = fully open.");
+                        let knob_resp = ui
+                            .synth_knob(
+                                &mut display_cutoff,
+                                80.0..=18000.0,
+                                "CUTOFF",
+                                &theme,
+                                true,
+                                KnobSize::Large,
+                                Tier::Primary,
+                            )
+                            .on_hover_text("Cutoff frequency. 80 Hz = dark, 18 kHz = fully open.");
                         if knob_resp.changed() {
-                            // Knob moved: keep mod offset, back-solve base cutoff.
-                            // Approximate back-solve: base ≈ effective / (1 + depth*0.5) when offset
-                            // is additive-relative; for simplicity just subtract the pre-computed offset.
-                            self.filter_cutoff = (display_cutoff - mod_offset).clamp(80.0, 18000.0);
+                            self.filter_cutoff =
+                                (display_cutoff - mod_offset).clamp(80.0, 18000.0);
                             self.engine.set_filter_cutoff(self.filter_cutoff);
                         }
                         if mod_offset > 0.0 {
@@ -758,91 +764,106 @@ impl SynthApp {
                             };
                             ui.label(
                                 RichText::new(format!("▲ {hz_str}"))
-                                    .font(self.theme.font_body())
-                                    .color(Color32::from_rgb(180, 120, 255)),
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_primary)),
                             )
                             .on_hover_text("Effective cutoff with mod wheel offset");
                         }
                     });
 
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.filter_q,
-                        0.0..=0.95,
-                        "RES",
-                        &self.theme,
-                        false,
+                    // RES — Tier 1 performance control.
+                    if ui
+                        .synth_knob(
+                            &mut self.filter_q,
+                            0.0..=0.95,
+                            "RES",
+                            &theme,
+                            false,
+                            KnobSize::Large,
+                            Tier::Primary,
                         )
-                    .on_hover_text("Resonance — 0 = flat, 0.9+ = self-oscillation.")
-                    .changed()
+                        .on_hover_text("Resonance — 0 = flat, 0.9+ = self-oscillation.")
+                        .changed()
                     {
                         self.engine.set_filter_resonance(self.filter_q);
                     }
 
+                    // DRIVE — Tier 2 sound design.
                     let mut drive = self.engine.filter_drive();
-                    if super::widgets::knob(
-                        ui,
-                        &mut drive,
-                        1.0..=10.0,
-                        "DRIVE",
-                        &self.theme,
-                        false,
+                    if ui
+                        .synth_knob(
+                            &mut drive,
+                            1.0..=10.0,
+                            "DRIVE",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
                         )
-                    .on_hover_text(
-                        "Input drive — saturates the signal before the filter. 1 = clean, 10 = heavy.",
-                    )
-                    .changed()
+                        .on_hover_text(
+                            "Input drive — saturates the signal before the filter. 1 = clean, 10 = heavy.",
+                        )
+                        .changed()
                     {
                         self.engine.set_filter_drive(drive);
                     }
 
+                    // KEY tracking — Tier 2.
                     let mut key_track = self.engine.filter_key_track();
-                    if super::widgets::knob(
-                        ui,
-                        &mut key_track,
-                        0.0..=1.0,
-                        "KEY",
-                        &self.theme,
-                        false,
+                    if ui
+                        .synth_knob(
+                            &mut key_track,
+                            0.0..=1.0,
+                            "KEY",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
                         )
-                    .on_hover_text(
-                        "Keyboard tracking — cutoff follows pitch. 0 = off, 1 = full (one octave up doubles the cutoff).",
-                    )
-                    .changed()
+                        .on_hover_text(
+                            "Keyboard tracking — cutoff follows pitch. 0 = off, 1 = full (one octave up doubles the cutoff).",
+                        )
+                        .changed()
                     {
                         self.engine.set_filter_key_track(key_track);
                     }
 
+                    // VEL>AMP — Tier 2.
                     let mut vel_amp = self.engine.vel_amp();
-                    if super::widgets::knob(
-                        ui,
-                        &mut vel_amp,
-                        0.0..=1.0,
-                        "VEL>AMP",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text(
-                        "Velocity → amplitude. 0 = velocity ignored (always full volume), 1 = full sensitivity.",
-                    )
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut vel_amp,
+                            0.0..=1.0,
+                            "VEL>AMP",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text(
+                            "Velocity → amplitude. 0 = velocity ignored (always full volume), 1 = full sensitivity.",
+                        )
+                        .changed()
                     {
                         self.engine.set_vel_amp(vel_amp);
                     }
 
+                    // VEL>FLT — Tier 2.
                     let mut vel_filter = self.engine.vel_filter();
-                    if super::widgets::knob(
-                        ui,
-                        &mut vel_filter,
-                        0.0..=1.0,
-                        "VEL>FLT",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text(
-                        "Velocity → filter cutoff. Hard hits open the filter. 0 = off, 1 = adds up to 8 kHz.",
-                    )
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut vel_filter,
+                            0.0..=1.0,
+                            "VEL>FLT",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text(
+                            "Velocity → filter cutoff. Hard hits open the filter. 0 = off, 1 = adds up to 8 kHz.",
+                        )
+                        .changed()
                     {
                         self.engine.set_vel_filter(vel_filter);
                     }
@@ -1180,7 +1201,7 @@ fn draw_lp_response_curve(
     let border_col = if active {
         accent
     } else {
-        Color32::from_gray(55)
+        theme.c(&theme.border)
     };
 
     // ── Coordinate helpers ────────────────────────────────────────────────
@@ -1193,12 +1214,13 @@ fn draw_lp_response_curve(
     };
 
     // ── Background ────────────────────────────────────────────────────────
+    // Token-derived: accent tinted dark.
     let bg = Color32::from_rgba_premultiplied(accent.r() / 6, accent.g() / 6, accent.b() / 6, 140);
-    painter.rect_filled(rect, egui::CornerRadius::same(5), bg);
+    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), bg);
 
     // ── Grid — log-spaced vertical frequency lines ────────────────────────
-    let grid_col = Color32::from_gray(42);
-    let label_col = Color32::from_gray(72);
+    let grid_col = theme.c(&theme.border);
+    let label_col = theme.c(&theme.text_secondary);
     let small = theme.font_small();
     for (f, label) in [
         (100.0_f32, "100"),
@@ -1212,7 +1234,7 @@ fn draw_lp_response_curve(
         let x = sx(freq_to_t(f));
         painter.line_segment(
             [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
-            egui::Stroke::new(1.0, grid_col),
+            egui::Stroke::new(theme.stroke_ui, grid_col),
         );
         painter.text(
             egui::pos2(x, rect.bottom() - 2.0),
@@ -1226,7 +1248,9 @@ fn draw_lp_response_curve(
     // ── Grid — horizontal dB lines ────────────────────────────────────────
     for db in [-48.0_f32, -24.0, -12.0, 0.0, 18.0] {
         let y = sy(db);
-        let w = if db == 0.0 { 1.0 } else { 0.5 };
+        // 0 dB line is full-weight; minor lines are half. Both are
+        // token-relative — they scale if `stroke_ui` ever changes.
+        let w = if db == 0.0 { theme.stroke_ui } else { theme.stroke_ui * 0.5 };
         painter.line_segment(
             [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
             egui::Stroke::new(w, grid_col),
@@ -1269,10 +1293,10 @@ fn draw_lp_response_curve(
         ));
     }
 
-    // Curve line
+    // Curve line — token-derived: accent at high alpha.
     let line_col = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 210);
     for w in pts.windows(2) {
-        painter.line_segment([w[0], w[1]], egui::Stroke::new(1.5, line_col));
+        painter.line_segment([w[0], w[1]], egui::Stroke::new(theme.stroke_focus, line_col));
     }
 
     // ── Control node — free in (cutoff × Q) space, not on the curve ───────
@@ -1281,21 +1305,21 @@ fn draw_lp_response_curve(
     let node_x = sx(freq_to_t(cutoff));
     let node_y = rect.bottom() - (q_engine / 0.95) * rect.height();
 
-    // Subtle crosshair
+    // Subtle crosshair — token-derived: accent at low alpha.
     let cross = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 45);
     painter.line_segment(
         [
             egui::pos2(node_x, rect.top()),
             egui::pos2(node_x, rect.bottom()),
         ],
-        egui::Stroke::new(1.0, cross),
+        egui::Stroke::new(theme.stroke_ui, cross),
     );
     painter.line_segment(
         [
             egui::pos2(rect.left(), node_y),
             egui::pos2(rect.right(), node_y),
         ],
-        egui::Stroke::new(1.0, cross),
+        egui::Stroke::new(theme.stroke_ui, cross),
     );
 
     // Node dot
@@ -1303,14 +1327,14 @@ fn draw_lp_response_curve(
     painter.circle_stroke(
         egui::pos2(node_x, node_y),
         5.0,
-        egui::Stroke::new(1.5, Color32::WHITE),
+        egui::Stroke::new(theme.stroke_focus, theme.c(&theme.text_primary)),
     );
 
     // Border (drawn last so it's on top of the curve)
     painter.rect_stroke(
         rect,
-        egui::CornerRadius::same(5),
-        egui::Stroke::new(1.0, border_col),
+        egui::CornerRadius::same(theme.rounding_sm as u8),
+        egui::Stroke::new(theme.stroke_ui, border_col),
         egui::StrokeKind::Middle,
     );
 }
