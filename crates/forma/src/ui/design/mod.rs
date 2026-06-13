@@ -12,6 +12,7 @@ pub mod fader;
 pub mod gallery;
 pub mod knob;
 pub mod layout;
+pub mod level_meter;
 pub mod section;
 pub mod step_pad;
 pub mod toggle;

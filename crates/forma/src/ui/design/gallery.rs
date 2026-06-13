@@ -12,6 +12,7 @@ use super::{
     chip::chip_selector as design_chip,
     fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
+    level_meter::{level_meter as design_level_meter, LevelMeterOrientation, LevelMeterSize},
     section::section_header as design_section_header,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
     toggle::{toggle_button as design_toggle, ToggleSize},
@@ -288,6 +289,10 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "Fader — 3 sizes vertical + horizontal sample", theme);
     fader_grid(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "LevelMeter — 3 levels × peak hold", theme);
+    level_meter_row(ui, theme);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "StepPad — 2 sizes × velocity-encoded fill", theme);
@@ -641,6 +646,51 @@ fn fader_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
             theme,
         );
     });
+}
+
+fn level_meter_row(ui: &mut Ui, theme: &SynthTheme) {
+    // Static samples that demonstrate the three color zones plus peak-hold
+    // line behavior.
+    let samples = [
+        ("0.3 (green)", 0.3, 0.55),
+        ("0.8 (warn)", 0.8, 0.92),
+        ("1.0 (clip)", 1.0, 1.0),
+    ];
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_xl;
+        for (label, level, peak) in samples {
+            ui.vertical(|ui| {
+                design_level_meter(
+                    ui,
+                    level,
+                    peak,
+                    LevelMeterOrientation::Vertical,
+                    LevelMeterSize::Standard,
+                    theme,
+                );
+                ui.label(
+                    RichText::new(label)
+                        .font(theme.font_micro())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+            });
+        }
+    });
+
+    ui.add_space(theme.sp_md);
+    ui.label(
+        RichText::new("Horizontal (Small)")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    design_level_meter(
+        ui,
+        0.65,
+        0.85,
+        LevelMeterOrientation::Horizontal,
+        LevelMeterSize::Small,
+        theme,
+    );
 }
 
 fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {

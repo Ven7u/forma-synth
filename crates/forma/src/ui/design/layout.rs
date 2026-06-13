@@ -14,6 +14,7 @@ use super::{
     chip::chip_selector,
     fader::{fader, FaderOrientation, FaderSize},
     knob::knob,
+    level_meter::{level_meter, LevelMeterOrientation, LevelMeterSize},
     section::section_header,
     step_pad::{step_pad, StepPadSize, StepState},
     toggle::{toggle_button, ToggleSize},
@@ -57,6 +58,17 @@ pub trait SynthUi {
         range: std::ops::RangeInclusive<f32>,
         orientation: FaderOrientation,
         size: FaderSize,
+        theme: &SynthTheme,
+    ) -> Response;
+
+    /// Render a level meter — peak / VU bar with three color zones and
+    /// optional peak-hold line.
+    fn synth_level_meter(
+        &mut self,
+        level: f32,
+        peak_hold: f32,
+        orientation: LevelMeterOrientation,
+        size: LevelMeterSize,
         theme: &SynthTheme,
     ) -> Response;
 
@@ -153,6 +165,17 @@ impl SynthUi for Ui {
         theme: &SynthTheme,
     ) -> Response {
         fader(self, value, range, orientation, size, theme)
+    }
+
+    fn synth_level_meter(
+        &mut self,
+        level: f32,
+        peak_hold: f32,
+        orientation: LevelMeterOrientation,
+        size: LevelMeterSize,
+        theme: &SynthTheme,
+    ) -> Response {
+        level_meter(self, level, peak_hold, orientation, size, theme)
     }
 
     fn synth_toggle(
