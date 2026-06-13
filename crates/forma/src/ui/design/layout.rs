@@ -12,6 +12,7 @@ use egui::{Response, Ui};
 
 use super::{
     chip::chip_selector,
+    fader::{fader, FaderOrientation, FaderSize},
     knob::knob,
     section::section_header,
     step_pad::{step_pad, StepPadSize, StepState},
@@ -46,6 +47,16 @@ pub trait SynthUi {
         &mut self,
         state: StepState,
         size: StepPadSize,
+        theme: &SynthTheme,
+    ) -> Response;
+
+    /// Render a linear fader.
+    fn synth_fader(
+        &mut self,
+        value: &mut f32,
+        range: std::ops::RangeInclusive<f32>,
+        orientation: FaderOrientation,
+        size: FaderSize,
         theme: &SynthTheme,
     ) -> Response;
 
@@ -131,6 +142,17 @@ impl SynthUi for Ui {
         theme: &SynthTheme,
     ) -> Response {
         step_pad(self, state, size, theme)
+    }
+
+    fn synth_fader(
+        &mut self,
+        value: &mut f32,
+        range: std::ops::RangeInclusive<f32>,
+        orientation: FaderOrientation,
+        size: FaderSize,
+        theme: &SynthTheme,
+    ) -> Response {
+        fader(self, value, range, orientation, size, theme)
     }
 
     fn synth_toggle(

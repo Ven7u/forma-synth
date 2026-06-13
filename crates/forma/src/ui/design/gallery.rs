@@ -10,6 +10,7 @@ use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
 use super::{
     chip::chip_selector as design_chip,
+    fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
     section::section_header as design_section_header,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
@@ -65,6 +66,9 @@ struct GalleryState {
     example_detune: f32,
     example_pw: f32,
     example_uni: bool,
+    /// 3 sizes of vertical fader sample, plus 1 horizontal.
+    fader_values: [f32; 3],
+    fader_horizontal: f32,
 }
 
 impl Default for GalleryState {
@@ -81,6 +85,8 @@ impl Default for GalleryState {
             example_detune: 12.0,
             example_pw: 0.5,
             example_uni: false,
+            fader_values: [0.8, 0.5, 0.2],
+            fader_horizontal: 0.6,
         }
     }
 }
@@ -278,6 +284,10 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "SectionHeader — title + optional right slot", theme);
     section_header_sample(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Fader — 3 sizes vertical + horizontal sample", theme);
+    fader_grid(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "StepPad — 2 sizes × velocity-encoded fill", theme);
@@ -585,6 +595,52 @@ fn section_header_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GallerySta
             );
         }),
     );
+}
+
+fn fader_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    let sizes = [
+        (FaderSize::Large, "Large (Tier 1)"),
+        (FaderSize::Standard, "Standard (Tier 2)"),
+        (FaderSize::Small, "Small (Tier 3)"),
+    ];
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_lg;
+        for (i, (size, label)) in sizes.iter().enumerate() {
+            ui.vertical(|ui| {
+                design_fader(
+                    ui,
+                    &mut state.fader_values[i],
+                    0.0..=1.0,
+                    FaderOrientation::Vertical,
+                    *size,
+                    theme,
+                );
+                ui.label(
+                    RichText::new(*label)
+                        .font(theme.font_micro())
+                        .color(theme.c(&theme.text_secondary)),
+                );
+            });
+        }
+    });
+
+    ui.add_space(theme.sp_md);
+    ui.label(
+        RichText::new("Horizontal (Standard)")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    ui.scope(|ui| {
+        ui.set_max_width(280.0);
+        design_fader(
+            ui,
+            &mut state.fader_horizontal,
+            0.0..=1.0,
+            FaderOrientation::Horizontal,
+            FaderSize::Standard,
+            theme,
+        );
+    });
 }
 
 fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
