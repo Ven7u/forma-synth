@@ -583,22 +583,20 @@ impl SynthApp {
                         ui.add_space(theme.sp_xxs);
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = theme.sp_xxs;
-                            // Standard-size LevelMeter is 80 px; for the
-                            // master section we want it visually paired with
-                            // a 120 px Large fader, so render two at full
-                            // height by reusing the Standard glyph stacked.
+                            // Large meters (120 px) paired with the Large
+                            // master fader — §2.4 (same-extent pairing).
                             ui.synth_level_meter(
                                 peak_raw_l,
                                 peak_hold,
                                 LevelMeterOrientation::Vertical,
-                                LevelMeterSize::Standard,
+                                LevelMeterSize::Large,
                                 &theme,
                             );
                             ui.synth_level_meter(
                                 peak_raw_r,
                                 peak_hold,
                                 LevelMeterOrientation::Vertical,
-                                LevelMeterSize::Standard,
+                                LevelMeterSize::Large,
                                 &theme,
                             );
                         });

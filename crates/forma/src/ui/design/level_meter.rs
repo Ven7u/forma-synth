@@ -18,7 +18,10 @@ pub enum LevelMeterOrientation {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LevelMeterSize {
-    /// Standard — paired with a Fader. Matches `fader_h_md` (80 px).
+    /// Large — paired with a Large Fader (`fader_h_lg`, 120 px). Used in
+    /// master sections and Tier 1 channel strips.
+    Large,
+    /// Standard — paired with a Standard Fader. Matches `fader_h_md` (80 px).
     Standard,
     /// Compact — meter-bridge style, ~48 px.
     Small,
@@ -27,6 +30,7 @@ pub enum LevelMeterSize {
 impl LevelMeterSize {
     pub fn length(self) -> f32 {
         match self {
+            LevelMeterSize::Large => 120.0,
             LevelMeterSize::Standard => 80.0,
             LevelMeterSize::Small => 48.0,
         }
