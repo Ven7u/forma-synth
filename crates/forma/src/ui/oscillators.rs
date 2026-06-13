@@ -422,9 +422,10 @@ impl SynthApp {
     }
 
     pub fn ui_mixer_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
+        let limiter_accent = theme.c(&theme.accent_limiter);
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             let total_h = CARD_H;
             const FADER_COL_W: f32 = 20.0;
             const SLIDER_W: f32 = 8.0;
@@ -437,7 +438,7 @@ impl SynthApp {
             // and meters and cause overflow on small screens).
             let sp = ui.spacing().item_spacing.x;
             let controls_w = FADER_COL_W * 4.0 + sp * 3.0;
-            let meter_w = METER_TOTAL_W_CONST + sp_xs * 2.0; // +frame inner margins
+            let meter_w = METER_TOTAL_W_CONST + theme.sp_xs * 2.0; // +frame inner margins
             ui.set_max_width(controls_w + sp + meter_w);
 
             ui.horizontal(|ui| {
@@ -447,24 +448,28 @@ impl SynthApp {
                     ui.set_max_width(max_w);
                     ui.label(
                         RichText::new("MIX")
-                            .font(self.theme.font_heading())
+                            .font(theme.font_heading())
                             .italics()
-                            .color(self.theme.c(&self.theme.text_primary)),
+                            .color(theme.c(&theme.text_primary)),
                     );
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
 
-                    // Vertical faders for OSC 1/2/3 + Noise
+                    // Per-channel volume faders for OSC 1/2/3 + Noise.
+                    // egui::Slider until the design-system Fader component
+                    // lands (04-components.md §Fader, Phase 6+).
                     ui.horizontal(|ui| {
                         for i in 0..3 {
                             ui.vertical(|ui| {
                                 ui.set_width(FADER_COL_W);
-                                ui.label(RichText::new(format!("O{}", i + 1)).font(self.theme.font_body()).color(
-                                    if self.osc_enabled[i] {
-                                        self.theme.c(&self.theme.text_primary)
-                                    } else {
-                                        self.theme.c(&self.theme.text_disabled)
-                                    },
-                                ));
+                                ui.label(
+                                    RichText::new(format!("O{}", i + 1))
+                                        .font(theme.font_body())
+                                        .color(if self.osc_enabled[i] {
+                                            theme.c(&theme.text_primary)
+                                        } else {
+                                            theme.c(&theme.text_disabled)
+                                        }),
+                                );
                                 if ui
                                     .add_sized(
                                         [SLIDER_W, 80.0],
@@ -485,8 +490,8 @@ impl SynthApp {
                             ui.set_width(FADER_COL_W);
                             ui.label(
                                 RichText::new("N")
-                                    .font(self.theme.font_body())
-                                    .color(self.theme.c(&self.theme.text_secondary)),
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
                             );
                             let mut noise_vol = self.engine.noise_vol();
                             if ui
@@ -504,104 +509,98 @@ impl SynthApp {
                         });
                     });
 
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
                     ui.separator();
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
 
                     ui.horizontal(|ui| {
+                        // MAST — Master volume is Tier 1 per the philosophy
+                        // doc ("performance controls"). Standard size to fit
+                        // the existing mixer column width; Tier::Primary gives
+                        // it the full accent arc.
                         let mut master = self.engine.master_volume();
-                        if super::widgets::knob(
-                            ui,
-                            &mut master,
-                            0.0..=1.0,
-                            "MAST",
-                            &self.theme,
-                            false,
-                        )
-                        .on_hover_text("Master output volume — applied after all FX")
-                        .changed()
+                        if ui
+                            .synth_knob(
+                                &mut master,
+                                0.0..=1.0,
+                                "MAST",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Primary,
+                            )
+                            .on_hover_text("Master output volume — applied after all FX")
+                            .changed()
                         {
                             self.engine.set_master_volume(master);
                         }
+                        // GLIDE — Tier 2 sound design.
                         let mut glide = self.engine.glide_time();
-                        if super::widgets::knob(
-                            ui,
-                            &mut glide,
-                            0.0..=0.5,
-                            "GLIDE",
-                            &self.theme,
-                            false,
-                        )
-                        .on_hover_text("Pitch slide time between notes (seconds)")
-                        .changed()
+                        if ui
+                            .synth_knob(
+                                &mut glide,
+                                0.0..=0.5,
+                                "GLIDE",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Secondary,
+                            )
+                            .on_hover_text("Pitch slide time between notes (seconds)")
+                            .changed()
                         {
                             self.engine.set_glide_time(glide);
                         }
 
-                        // Voice mode selector
-                        let mode = self.engine.mono_mode();
+                        // VOICE — chip selector for POLY / MONO / LEGATO.
                         ui.vertical(|ui| {
                             ui.label(
-                                egui::RichText::new("VOICE")
+                                RichText::new("VOICE")
                                     .weak()
-                                    .font(self.theme.font_body())
-                                    .color(self.theme.c(&self.theme.text_secondary)),
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
                             );
-                            ui.horizontal(|ui| {
-                                for (label, val, tip) in [
-                                    ("POLY", 0u8, "Polyphonic — multiple simultaneous notes"),
-                                    ("MONO", 1u8, "Mono — single voice, retrigger on each note"),
-                                    (
-                                        "LEGATO",
-                                        2u8,
-                                        "Legato — single voice, glide without retrigger",
-                                    ),
-                                ] {
-                                    let active = mode == val;
-                                    let col = if active {
-                                        self.theme.c(&self.theme.accent)
-                                    } else {
-                                        self.theme.c(&self.theme.text_secondary)
-                                    };
-                                    if ui
-                                        .selectable_label(
-                                            active,
-                                            egui::RichText::new(label).font(self.theme.font_body()).color(col),
-                                        )
-                                        .on_hover_text(tip)
-                                        .clicked()
-                                    {
-                                        self.engine.set_mono_mode(val);
-                                    }
-                                }
-                            });
+                            let mut mode = self.engine.mono_mode();
+                            let prev = mode;
+                            ui.chip_selector(
+                                &mut mode,
+                                &[
+                                    (0u8, "POLY"),
+                                    (1u8, "MONO"),
+                                    (2u8, "LEG"),
+                                ],
+                                &theme,
+                                None,
+                            )
+                            .on_hover_text(
+                                "POLY: multiple voices · MONO: single voice retriggered · LEG: single voice with glide",
+                            );
+                            if mode != prev {
+                                self.engine.set_mono_mode(mode);
+                            }
                         });
                     });
 
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
 
                     ui.horizontal(|ui| {
-                        let lim_on = self.limiter_enabled;
-                        let lim_col = if lim_on {
-                            self.theme.c(&self.theme.accent_limiter)
-                        } else {
-                            self.theme.c(&self.theme.text_disabled)
-                        };
+                        let mut lim_on = self.limiter_enabled;
                         if ui
-                            .add_sized(
-                                [30.0, 22.0],
-                                egui::Button::selectable(
-                                    lim_on,
-                                    RichText::new("LIM").font(self.theme.font_body()).color(lim_col),
-                                ),
+                            .synth_toggle(
+                                &mut lim_on,
+                                "LIM",
+                                ToggleSize::Standard,
+                                Tier::Secondary,
+                                &theme,
+                                Some(limiter_accent),
                             )
                             .on_hover_text("Limiter — prevents output clipping")
                             .clicked()
                         {
-                            self.limiter_enabled = !lim_on;
+                            self.limiter_enabled = lim_on;
                             self.engine.set_limiter_enabled(self.limiter_enabled);
                         }
-                        ui.add_enabled_ui(lim_on, |ui| {
+                        ui.add_enabled_ui(self.limiter_enabled, |ui| {
                             let mut thr = self.engine.limiter_threshold();
                             if ui
                                 .add(
@@ -612,7 +611,7 @@ impl SynthApp {
                                 )
                                 .on_hover_text("Threshold — lower = more compression")
                                 .changed()
-                                && lim_on
+                                && self.limiter_enabled
                             {
                                 self.engine.set_limiter_threshold(thr);
                             }
@@ -638,7 +637,7 @@ impl SynthApp {
                 }
 
                 egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(sp_xs as i8, 0))
+                    .inner_margin(egui::Margin::symmetric(theme.sp_xs as i8, 0))
                     .show(ui, |ui| {
                         let (resp, painter) = ui.allocate_painter(
                             Vec2::new(METER_TOTAL_W_CONST, total_h),
@@ -648,8 +647,8 @@ impl SynthApp {
 
                         painter.rect_filled(
                             mr,
-                            CornerRadius::same(2),
-                            self.theme.c(&self.theme.meter_bg),
+                            CornerRadius::same(theme.rounding_xs as u8),
+                            theme.c(&theme.meter_bg),
                         );
 
                         for (ci, &peak_raw) in [peak_raw_l, peak_raw_r].iter().enumerate() {
@@ -662,18 +661,20 @@ impl SynthApp {
                             let bar_h = ch_rect.height() * level;
                             if bar_h > 0.5 {
                                 let color = if peak_raw < 0.7 {
-                                    self.theme.c(&self.theme.meter_green)
+                                    theme.c(&theme.meter_green)
                                 } else if peak_raw < 1.0 {
+                                    // Token-derived: interpolation between
+                                    // theme.meter_green and theme.meter_clip.
                                     let t = (peak_raw - 0.7) / 0.3;
-                                    let g = self.theme.meter_green;
-                                    let c = self.theme.meter_clip;
+                                    let g = theme.meter_green;
+                                    let c = theme.meter_clip;
                                     Color32::from_rgb(
                                         (g[0] as f32 + (c[0] as f32 - g[0] as f32) * t) as u8,
                                         (g[1] as f32 + (c[1] as f32 - g[1] as f32) * t) as u8,
                                         (g[2] as f32 + (c[2] as f32 - g[2] as f32) * t) as u8,
                                     )
                                 } else {
-                                    self.theme.c(&self.theme.meter_clip)
+                                    theme.c(&theme.meter_clip)
                                 };
                                 let bar_rect = Rect::from_min_size(
                                     Pos2::new(ch_rect.left(), ch_rect.bottom() - bar_h),
@@ -685,24 +686,24 @@ impl SynthApp {
                             let hold_frac = self.peak_hold.clamp(0.0, 1.0);
                             let hold_y = ch_rect.bottom() - ch_rect.height() * hold_frac;
                             let hold_color = if self.peak_hold >= 1.0 {
-                                self.theme.c(&self.theme.meter_clip)
+                                theme.c(&theme.meter_clip)
                             } else {
-                                Color32::WHITE
+                                theme.c(&theme.text_primary)
                             };
                             painter.line_segment(
                                 [
                                     Pos2::new(ch_rect.left(), hold_y),
                                     Pos2::new(ch_rect.right(), hold_y),
                                 ],
-                                Stroke::new(1.5, hold_color),
+                                Stroke::new(theme.stroke_focus, hold_color),
                             );
 
                             painter.text(
                                 Pos2::new(ch_rect.center_top().x, mr.bottom() - 2.0),
                                 egui::Align2::CENTER_BOTTOM,
                                 if ci == 0 { "L" } else { "R" },
-                                self.theme.font_micro(),
-                                Color32::from_rgba_premultiplied(200, 200, 200, 120),
+                                theme.font_micro(),
+                                theme.c(&theme.text_secondary),
                             );
                         }
                     }); // Frame::new inner_margin
