@@ -33,86 +33,87 @@ pub fn lfo_synced_rate(bpm: f32, division: usize) -> f32 {
 
 impl SynthApp {
     pub fn ui_lfo_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.lfo_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("LFO 1").font(self.theme.font_heading()).strong().color(col),
-                    ))
-                    .on_hover_text(
-                        "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
-                    )
-                    .clicked()
-                {
-                    self.lfo_enabled = !on;
-                    self.engine.set_lfo_depth(if self.lfo_enabled {
-                        self.lfo_depth
-                    } else {
-                        0.0
-                    });
-                }
-            });
 
-            ui.add_space(sp_xs);
+            // Header — LFO 1 enable toggle.
+            let mut lfo_on = self.lfo_enabled;
+            if ui
+                .synth_toggle(
+                    &mut lfo_on,
+                    "LFO 1",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text(
+                    "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
+                )
+                .clicked()
+            {
+                self.lfo_enabled = lfo_on;
+                self.engine.set_lfo_depth(if self.lfo_enabled {
+                    self.lfo_depth
+                } else {
+                    0.0
+                });
+            }
+
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.lfo_enabled, |ui| {
-                // Rate + Depth knobs
+                // Rate + Depth knobs + SYNC toggle.
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
                     let sync_on = self.lfo_sync_active();
                     if !sync_on
-                        && super::widgets::knob(
-                            ui,
-                            &mut self.lfo_rate,
-                            0.1..=20.0,
-                            "RATE",
-                            &self.theme,
-                            false,
-                        )
-                        .on_hover_text(
-                            "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
-                        )
-                        .changed()
+                        && ui
+                            .synth_knob(
+                                &mut self.lfo_rate,
+                                0.1..=20.0,
+                                "RATE",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Secondary,
+                            )
+                            .on_hover_text(
+                                "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
+                            )
+                            .changed()
                     {
                         self.engine.set_lfo_rate(self.lfo_rate);
                     }
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("Modulation depth. 0 = off, 1 = full.")
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("Modulation depth. 0 = off, 1 = full.")
+                        .changed()
                     {
                         self.engine.set_lfo_depth(self.lfo_depth);
                     }
 
-                    // Sync toggle
                     ui.add_enabled_ui(!self.global_sync, |ui| {
-                        let sync_on = self.lfo_sync_active();
-                        let sync_col = if sync_on {
-                            self.theme.c(&self.theme.accent)
-                        } else {
-                            self.theme.c(&self.theme.text_disabled)
-                        };
+                        let mut sync_on = self.lfo_sync_active();
                         if ui
-                            .add(egui::Button::selectable(
-                                sync_on,
-                                RichText::new("SYNC").font(self.theme.font_body()).color(sync_col),
-                            ))
+                            .synth_toggle(
+                                &mut sync_on,
+                                "SYNC",
+                                ToggleSize::Standard,
+                                Tier::Secondary,
+                                &theme,
+                                None,
+                            )
                             .on_hover_text("Lock LFO rate to a note division of the Global BPM")
                             .clicked()
                         {
@@ -127,9 +128,11 @@ impl SynthApp {
                     });
                 });
 
-                // Division selector (when synced)
+                // Division selector when synced — kept as wrapped
+                // selectable_label row because chip_selector doesn't
+                // currently support `horizontal_wrapped` overflow.
                 if self.lfo_sync_active() {
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
                     ui.horizontal_wrapped(|ui| {
                         for (i, &(label, _)) in LFO_SYNC_DIVISIONS.iter().enumerate() {
                             let active = self.lfo_division == i;
@@ -138,9 +141,9 @@ impl SynthApp {
                                 .selectable_label(
                                     active,
                                     RichText::new(label).small().color(if active {
-                                        self.theme.c(&self.theme.accent)
+                                        theme.c(&theme.accent)
                                     } else {
-                                        self.theme.c(&self.theme.text_secondary)
+                                        theme.c(&theme.text_secondary)
                                     }),
                                 )
                                 .on_hover_text(format!(
@@ -157,57 +160,55 @@ impl SynthApp {
                     });
                 }
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // Shape
+                // SHAPE — chip selector for Sin / Tri / Saw.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    let shape_tips = [
-                        "Sine — smooth, natural modulation.",
-                        "Triangle — linear ramp up and down.",
-                        "Saw — ramps up then resets.",
-                    ];
-                    for (s, label) in [(0usize, "Sin"), (1, "Tri"), (2, "Saw")] {
-                        if ui
-                            .selectable_label(self.lfo_shape == s, label)
-                            .on_hover_text(shape_tips[s])
-                            .clicked()
-                        {
-                            self.lfo_shape = s;
-                            self.engine.set_lfo_shape(s as u8);
-                        }
+                    let mut shape = self.lfo_shape;
+                    let prev = shape;
+                    ui.chip_selector(
+                        &mut shape,
+                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text(
+                        "Sine: smooth · Triangle: linear ramp · Saw: ramp + reset",
+                    );
+                    if shape != prev {
+                        self.lfo_shape = shape;
+                        self.engine.set_lfo_shape(shape as u8);
                     }
                 });
 
-                // Destination
+                // Destination — chip selector for Pitch / Filter / Amp.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    let dest_tips = [
-                        "Pitch — vibrato.",
-                        "Filter — wobble / wah.",
-                        "Amp — tremolo.",
-                    ];
-                    for (d, label) in [(0usize, "Pitch"), (1, "Filter"), (2, "Amp")] {
-                        if ui
-                            .selectable_label(self.lfo_dest == d, label)
-                            .on_hover_text(dest_tips[d])
-                            .clicked()
-                        {
-                            self.lfo_dest = d;
-                            self.engine.set_lfo_dest(d as u8);
-                        }
+                    let mut dest = self.lfo_dest;
+                    let prev = dest;
+                    ui.chip_selector(
+                        &mut dest,
+                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text("Pitch: vibrato · Filter: wobble/wah · Amp: tremolo");
+                    if dest != prev {
+                        self.lfo_dest = dest;
+                        self.engine.set_lfo_dest(dest as u8);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
                 ui.separator();
                 self.ui_lfo_gate_row(ui, LfoGate::L1);
             });
@@ -215,98 +216,115 @@ impl SynthApp {
     }
 
     pub fn ui_lfo2_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.lfo2_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("LFO 2").font(self.theme.font_heading()).strong().color(col),
-                    ))
-                    .on_hover_text("Second LFO — runs independently of LFO 1")
-                    .clicked()
-                {
-                    self.lfo2_enabled = !on;
-                    self.engine.set_lfo2_depth(if self.lfo2_enabled {
-                        self.lfo2_depth
-                    } else {
-                        0.0
-                    });
-                }
-            });
 
-            ui.add_space(sp_xs);
+            // Header — LFO 2 enable toggle.
+            let mut lfo2_on = self.lfo2_enabled;
+            if ui
+                .synth_toggle(
+                    &mut lfo2_on,
+                    "LFO 2",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text("Second LFO — runs independently of LFO 1")
+                .clicked()
+            {
+                self.lfo2_enabled = lfo2_on;
+                self.engine.set_lfo2_depth(if self.lfo2_enabled {
+                    self.lfo2_depth
+                } else {
+                    0.0
+                });
+            }
+
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.lfo2_enabled, |ui| {
                 ui.horizontal(|ui| {
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo2_rate,
-                        0.01..=20.0,
-                        "RATE",
-                        &self.theme,
-                        true,
-                    )
-                    .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
-                    .changed()
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo2_rate,
+                            0.01..=20.0,
+                            "RATE",
+                            &theme,
+                            true,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
+                        .changed()
                     {
                         self.engine.set_lfo2_rate(self.lfo2_rate);
                     }
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo2_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("LFO 2 modulation depth")
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo2_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("LFO 2 modulation depth")
+                        .changed()
                     {
                         self.engine.set_lfo2_depth(self.lfo2_depth);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
+                // SHAPE — chip selector.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    for (s, label) in [(0usize, "Sin"), (1, "Tri"), (2, "Saw")] {
-                        if ui.selectable_label(self.lfo2_shape == s, label).clicked() {
-                            self.lfo2_shape = s;
-                            self.engine.set_lfo2_shape(s as u8);
-                        }
+                    let mut shape = self.lfo2_shape;
+                    let prev = shape;
+                    ui.chip_selector(
+                        &mut shape,
+                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                        &theme,
+                        None,
+                    );
+                    if shape != prev {
+                        self.lfo2_shape = shape;
+                        self.engine.set_lfo2_shape(shape as u8);
                     }
                 });
 
+                // Destination — chip selector.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    for (d, label) in [(0usize, "Pitch"), (1, "Filter"), (2, "Amp")] {
-                        if ui.selectable_label(self.lfo2_dest == d, label).clicked() {
-                            self.lfo2_dest = d;
-                            self.engine.set_lfo2_dest(d as u8);
-                        }
+                    let mut dest = self.lfo2_dest;
+                    let prev = dest;
+                    ui.chip_selector(
+                        &mut dest,
+                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                        &theme,
+                        None,
+                    );
+                    if dest != prev {
+                        self.lfo2_dest = dest;
+                        self.engine.set_lfo2_dest(dest as u8);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
                 ui.separator();
                 self.ui_lfo_gate_row(ui, LfoGate::L2);
             });
@@ -483,18 +501,19 @@ impl SynthApp {
             LfoGate::L2 => self.lfo2_gate_division,
         };
 
-        // Header row: RETRIG enable + division dropdown
+        let theme = self.theme.clone();
+
+        // Header row: RETRIG toggle + division dropdown.
         ui.horizontal(|ui| {
-            let col = if enabled {
-                self.theme.c(&self.theme.accent)
-            } else {
-                self.theme.c(&self.theme.text_disabled)
-            };
             if ui
-                .add(egui::Button::selectable(
-                    enabled,
-                    RichText::new("RETRIG").font(self.theme.font_body()).strong().color(col),
-                ))
+                .synth_toggle(
+                    &mut enabled,
+                    "RETRIG",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
                 .on_hover_text(
                     "Resets the LFO's phase to 0 on each \"on\" step (tempo-synced).\n\
                      \n\
@@ -507,7 +526,7 @@ impl SynthApp {
                 )
                 .clicked()
             {
-                enabled = !enabled;
+                // synth_toggle has already flipped `enabled` via its &mut.
             }
 
             let div = forma_common::ClockDivision::from_u8(division as u8);
@@ -531,7 +550,11 @@ impl SynthApp {
                 });
         });
 
-        // 16-cell step row.
+        // 16-cell step row. Custom painter rather than StepPad component
+        // because the active-length alpha treatment (steps beyond the
+        // pattern length render at 35% opacity to signal "ignored") doesn't
+        // map cleanly to StepPad's binary state model. All visual values
+        // are token-derived.
         let mut pattern_changed = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {
@@ -539,9 +562,9 @@ impl SynthApp {
                 let spacing = ui.spacing().item_spacing.x;
                 let step_w = ((total_w - spacing * 15.0) / 16.0).max(10.0);
                 let cell_h = 18.0;
-                let active_col = self.theme.c(&self.theme.accent);
-                let inactive_col = self.theme.c(&self.theme.bg_sunken);
-                let edge = self.theme.c(&self.theme.text_disabled);
+                let active_col = theme.c(&theme.accent);
+                let inactive_col = theme.c(&theme.bg_sunken);
+                let edge = theme.c(&theme.text_disabled);
                 for i in 0..16u8 {
                     let on_step = (pattern >> i) & 1 != 0;
                     let in_active_len = i < length;
@@ -549,14 +572,16 @@ impl SynthApp {
                         .allocate_exact_size(egui::Vec2::new(step_w, cell_h), egui::Sense::click());
                     let painter = ui.painter_at(rect);
                     let fill = if on_step { active_col } else { inactive_col };
+                    // Token-derived: alpha encodes whether the step falls
+                    // inside the current pattern length.
                     let alpha = if in_active_len { 255 } else { 90 };
                     let fill =
                         egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), alpha);
-                    painter.rect_filled(rect, egui::CornerRadius::same(2), fill);
+                    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
                     painter.rect_stroke(
                         rect,
-                        egui::CornerRadius::same(2),
-                        Stroke::new(1.0, edge),
+                        egui::CornerRadius::same(theme.rounding_xs as u8),
+                        Stroke::new(theme.stroke_ui, edge),
                         egui::StrokeKind::Middle,
                     );
                     if resp.clicked() {
