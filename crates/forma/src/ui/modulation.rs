@@ -336,57 +336,57 @@ impl SynthApp {
     /// `ui_lfo2_panel`: a `SynthFrame::section` with header, knob row, division row,
     /// and a 16-cell step row below.
     pub fn ui_pulse_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.pulse_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("PULSE").font(self.theme.font_heading()).strong().color(col),
-                    ))
-                    .on_hover_text(
-                        "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
-                    )
-                    .clicked()
-                {
-                    self.pulse_enabled = !on;
-                    self.engine.set_gate_aenv_enabled(self.pulse_enabled);
-                }
-            });
+            // Header — PULSE enable toggle.
+            let mut pulse_on = self.pulse_enabled;
+            if ui
+                .synth_toggle(
+                    &mut pulse_on,
+                    "PULSE",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text(
+                    "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
+                )
+                .clicked()
+            {
+                self.pulse_enabled = pulse_on;
+                self.engine.set_gate_aenv_enabled(self.pulse_enabled);
+            }
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.pulse_enabled, |ui| {
-                // Depth knob + length stepper
+                // Depth knob + length stepper.
                 ui.horizontal(|ui| {
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.pulse_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("How hard each step ducks the master output")
-                    .changed()
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    if ui
+                        .synth_knob(
+                            &mut self.pulse_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("How hard each step ducks the master output")
+                        .changed()
                     {
                         self.engine.set_gate_aenv_depth(self.pulse_depth);
                     }
 
                     ui.label(
                         RichText::new("LEN")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     let mut len = self.pulse_length as i32;
                     if ui
@@ -399,9 +399,9 @@ impl SynthApp {
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // Division selector — same idiom as LFO sync. Always tempo-synced.
+                // Division selector — kept as wrapped selectable_label row.
                 ui.horizontal_wrapped(|ui| {
                     for div in forma_common::ClockDivision::ALL {
                         let div_u8 = div.to_u8();
@@ -412,9 +412,9 @@ impl SynthApp {
                             .selectable_label(
                                 active,
                                 RichText::new(label).small().color(if active {
-                                    self.theme.c(&self.theme.accent)
+                                    theme.c(&theme.accent)
                                 } else {
-                                    self.theme.c(&self.theme.text_secondary)
+                                    theme.c(&theme.text_secondary)
                                 }),
                             )
                             .on_hover_text(format!(
@@ -430,22 +430,23 @@ impl SynthApp {
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // 16-cell step row.
+                // 16-cell step row. Same length-aware alpha treatment as
+                // `ui_lfo_gate_row` — see that comment.
                 ui.label(
                     RichText::new("STEPS")
-                        .font(self.theme.font_body())
-                        .color(self.theme.c(&self.theme.text_secondary)),
+                        .font(theme.font_body())
+                        .color(theme.c(&theme.text_secondary)),
                 );
                 ui.horizontal(|ui| {
                     let total_w = ui.available_width();
                     let spacing = ui.spacing().item_spacing.x;
                     let step_w = ((total_w - spacing * 15.0) / 16.0).max(14.0);
                     let cell_h = 26.0;
-                    let active_col = self.theme.c(&self.theme.accent);
-                    let inactive_col = self.theme.c(&self.theme.bg_sunken);
-                    let edge = self.theme.c(&self.theme.text_disabled);
+                    let active_col = theme.c(&theme.accent);
+                    let inactive_col = theme.c(&theme.bg_sunken);
+                    let edge = theme.c(&theme.text_disabled);
                     for i in 0..16u8 {
                         let on_step = (self.pulse_pattern >> i) & 1 != 0;
                         let in_active_len = i < self.pulse_length;
@@ -455,6 +456,7 @@ impl SynthApp {
                         );
                         let painter = ui.painter_at(rect);
                         let fill = if on_step { active_col } else { inactive_col };
+                        // Token-derived: alpha encodes pattern-length state.
                         let alpha = if in_active_len { 255 } else { 90 };
                         let fill = egui::Color32::from_rgba_unmultiplied(
                             fill.r(),
@@ -462,11 +464,11 @@ impl SynthApp {
                             fill.b(),
                             alpha,
                         );
-                        painter.rect_filled(rect, egui::CornerRadius::same(3), fill);
+                        painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
                         painter.rect_stroke(
                             rect,
-                            egui::CornerRadius::same(3),
-                            Stroke::new(1.0, edge),
+                            egui::CornerRadius::same(theme.rounding_xs as u8),
+                            Stroke::new(theme.stroke_ui, edge),
                             egui::StrokeKind::Middle,
                         );
                         if resp.clicked() {
@@ -898,43 +900,39 @@ impl SynthApp {
     }
 
     pub fn ui_mod_matrix_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
+        let theme = self.theme.clone();
         const SOURCES: &[&str] = &["Off", "LFO 1", "LFO 2", "Mod Wheel", "Aftertouch"];
         const DESTS: &[&str] = &["Off", "Filter", "Amp", "Pitch"];
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.label(
                 RichText::new("MOD MATRIX")
-                    .font(self.theme.font_heading())
-                    .strong()
-                    .color(self.theme.c(&self.theme.accent)),
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
             );
-            ui.add_space(self.theme.sp_xs);
+            ui.add_space(theme.sp_xs);
 
             egui::Grid::new("mod_matrix_grid")
                 .num_columns(4)
-                .spacing([8.0, 4.0])
+                .spacing([theme.sp_sm, theme.sp_xs])
                 .show(ui, |ui| {
-                    // Header
                     for label in ["#", "SOURCE", "→ DEST", "DEPTH"] {
                         ui.label(
                             RichText::new(label)
-                                .font(self.theme.font_body())
-                                .color(self.theme.c(&self.theme.text_secondary)),
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_secondary)),
                         );
                     }
                     ui.end_row();
 
                     for slot in 0..4 {
-                        // Row number
                         ui.label(
                             RichText::new(format!("{}", slot + 1))
-                                .font(self.theme.font_body())
-                                .color(self.theme.c(&self.theme.text_disabled)),
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_disabled)),
                         );
 
-                        // Source combo
                         egui::ComboBox::from_id_salt(format!("mat_src_{slot}"))
                             .selected_text(SOURCES[self.mat_src[slot].min(4)])
                             .width(90.0)
@@ -950,7 +948,6 @@ impl SynthApp {
                                 }
                             });
 
-                        // Dest combo
                         egui::ComboBox::from_id_salt(format!("mat_dst_{slot}"))
                             .selected_text(DESTS[self.mat_dst[slot].min(3)])
                             .width(70.0)
@@ -966,7 +963,6 @@ impl SynthApp {
                                 }
                             });
 
-                        // Depth drag
                         let mut d = self.mat_depth[slot];
                         let active = self.mat_src[slot] != 0 && self.mat_dst[slot] != 0;
                         let resp = ui.add_enabled(
@@ -988,34 +984,39 @@ impl SynthApp {
     }
 
     pub fn ui_mod_wheel_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
-        let sp_xs = self.theme.sp_xs;
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        let theme = self.theme.clone();
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            ui.label(
+                RichText::new("MOD WHEEL")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
+            ui.add_space(theme.sp_xs);
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("MOD WHEEL")
-                        .font(self.theme.font_heading())
-                        .strong()
-                        .color(self.theme.c(&self.theme.accent)),
-                );
-            });
-            ui.add_space(sp_xs);
-            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
                 let mut depth = self.mod_wheel_depth;
-                if super::widgets::knob(ui, &mut depth, 0.0..=1.0, "DEPTH", &self.theme, false)
+                if ui
+                    .synth_knob(
+                        &mut depth,
+                        0.0..=1.0,
+                        "DEPTH",
+                        &theme,
+                        false,
+                        KnobSize::Standard,
+                        Tier::Secondary,
+                    )
                     .on_hover_text("How much the mod wheel affects the selected destination.")
                     .changed()
                 {
                     self.mod_wheel_depth = depth;
                     self.engine.set_mod_wheel_depth(depth);
                 }
-                ui.add_space(sp_xs);
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     for (d, label, tip) in [
                         (0usize, "Off", "Mod wheel has no effect."),
@@ -1042,22 +1043,28 @@ impl SynthApp {
     }
 
     pub fn ui_aftertouch_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
-        let sp_xs = self.theme.sp_xs;
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        let theme = self.theme.clone();
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            ui.label(
+                RichText::new("AFTERTOUCH")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
+            ui.add_space(theme.sp_xs);
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("AFTERTOUCH")
-                        .font(self.theme.font_heading())
-                        .strong()
-                        .color(self.theme.c(&self.theme.accent)),
-                );
-            });
-            ui.add_space(sp_xs);
-            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
                 let mut depth = self.aftertouch_depth;
-                if super::widgets::knob(ui, &mut depth, 0.0..=1.0, "DEPTH", &self.theme, false)
+                if ui
+                    .synth_knob(
+                        &mut depth,
+                        0.0..=1.0,
+                        "DEPTH",
+                        &theme,
+                        false,
+                        KnobSize::Standard,
+                        Tier::Secondary,
+                    )
                     .on_hover_text(
                         "How much channel pressure (aftertouch) affects the selected destination.",
                     )
@@ -1066,12 +1073,11 @@ impl SynthApp {
                     self.aftertouch_depth = depth;
                     self.engine.set_aftertouch_depth(depth);
                 }
-                ui.add_space(sp_xs);
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .font(self.theme.font_body())
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     for (d, label, tip) in [
                         (0usize, "Off", "Aftertouch has no effect."),
@@ -1377,7 +1383,7 @@ pub fn draw_adsr_visualizer(
     );
     let rect = resp.rect;
 
-    painter.rect_filled(rect, egui::CornerRadius::same(3), theme.c(&theme.bg_adsr));
+    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.bg_adsr));
 
     let a = adsr[0];
     let d = adsr[1];
@@ -1418,7 +1424,7 @@ pub fn draw_adsr_visualizer(
     ));
 
     let pts = [p0, p1, p2, p3, p4];
-    let stroke = Stroke::new(1.5, theme.c(&theme.adsr_outline));
+    let stroke = Stroke::new(theme.stroke_focus, theme.c(&theme.adsr_outline));
     for w in pts.windows(2) {
         painter.line_segment([w[0], w[1]], stroke);
     }
