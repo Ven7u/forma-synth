@@ -14,6 +14,7 @@ use super::{
     knob::knob as design_knob,
     layout::fader_column as design_fader_column,
     level_meter::{level_meter as design_level_meter, LevelMeterOrientation, LevelMeterSize},
+    mini_bar::{MiniBar, MiniBarOrientation},
     section::section_header as design_section_header,
     slider::Slider as DesignSlider,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
@@ -76,6 +77,11 @@ struct GalleryState {
     column_values: [f32; 4],
     /// 4 Slider demos: linear / suffix / logarithmic / formatter.
     slider_values: [f32; 4],
+    /// MiniBar samples — velocity, probability, pitch index.
+    mini_bar_velocity: f32,
+    mini_bar_probability: f32,
+    mini_bar_pitch: f32,
+    mini_bar_pitch_accum: f32,
 }
 
 impl Default for GalleryState {
@@ -96,6 +102,10 @@ impl Default for GalleryState {
             fader_horizontal: 0.6,
             column_values: [0.75, 0.55, 0.3, 0.4],
             slider_values: [0.5, 440.0, 2000.0, 0.4],
+            mini_bar_velocity: 95.0,
+            mini_bar_probability: 70.0,
+            mini_bar_pitch: 60.0,
+            mini_bar_pitch_accum: 0.0,
         }
     }
 }
@@ -301,6 +311,10 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "Slider — inline parameter row", theme);
     slider_samples(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "MiniBar — sequencer-style value bars", theme);
+    mini_bar_samples(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "LevelMeter — 3 levels × peak hold", theme);
@@ -723,6 +737,67 @@ fn slider_samples(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
             .decimals(2)
             .show(ui, theme);
     });
+}
+
+fn mini_bar_samples(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.label(
+        RichText::new("Velocity — solid fill, centered value text, absolute drag")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    let vel_label = format!("{}", state.mini_bar_velocity as u8);
+    MiniBar::new(
+        &mut state.mini_bar_velocity,
+        0.0..=127.0,
+        MiniBarOrientation::Horizontal,
+        Vec2::new(180.0, 14.0),
+    )
+    .fill(theme.c(&theme.seq_velocity_bar))
+    .label(vel_label, theme.font_micro(), theme.c(&theme.text_primary))
+    .show(ui, theme);
+
+    ui.add_space(theme.sp_sm);
+    ui.label(
+        RichText::new("Probability — 3-zone color (low / mid / high), 50% and 100% thresholds")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    MiniBar::new(
+        &mut state.mini_bar_probability,
+        0.0..=100.0,
+        MiniBarOrientation::Horizontal,
+        Vec2::new(180.0, 10.0),
+    )
+    .zoned(
+        50.0,
+        100.0,
+        theme.c(&theme.seq_prob_low),
+        theme.c(&theme.seq_prob_mid),
+        theme.c(&theme.seq_prob_high),
+    )
+    .show(ui, theme);
+
+    ui.add_space(theme.sp_sm);
+    ui.label(
+        RichText::new("Pitch — vertical, delta drag with caller accumulator, note-name label")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    let pitch_label = crate::ui::midi_note_name(state.mini_bar_pitch as u8);
+    MiniBar::new(
+        &mut state.mini_bar_pitch,
+        48.0..=84.0,
+        MiniBarOrientation::Vertical,
+        Vec2::new(48.0, 64.0),
+    )
+    .fill(theme.c(&theme.seq_note_bar_on))
+    .label(
+        pitch_label,
+        theme.font_value(),
+        theme.c(&theme.text_primary),
+    )
+    .drag_delta(&mut state.mini_bar_pitch_accum, 0.3)
+    .show(ui, theme);
 }
 
 fn level_meter_row(ui: &mut Ui, theme: &SynthTheme) {

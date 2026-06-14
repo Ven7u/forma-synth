@@ -78,6 +78,21 @@ pub struct SynthTheme {
     pub seq_kb_major: [u8; 3],
     pub seq_kb_minor: [u8; 3],
     pub seq_kb_dim: [u8; 3],
+    /// Velocity-bar fill color in the note sequencer step grid.
+    #[serde(default)]
+    pub seq_velocity_bar: [u8; 3],
+    /// Probability-bar low zone (< 50%).
+    #[serde(default)]
+    pub seq_prob_low: [u8; 3],
+    /// Probability-bar mid zone (50% – 99%).
+    #[serde(default)]
+    pub seq_prob_mid: [u8; 3],
+    /// Probability-bar high zone (100%).
+    #[serde(default)]
+    pub seq_prob_high: [u8; 3],
+    /// Step-entry record cursor border.
+    #[serde(default)]
+    pub seq_rec_cursor: [u8; 3],
 
     // ── Keyboard ────────────────────────────────────────────────────────────
     pub key_white_pressed: [u8; 3],
@@ -438,6 +453,11 @@ pub fn midnight() -> SynthTheme {
         seq_kb_major: [30, 80, 55],
         seq_kb_minor: [40, 55, 100],
         seq_kb_dim: [80, 35, 35],
+        seq_velocity_bar: [80, 140, 200],
+        seq_prob_low: [180, 70, 50],
+        seq_prob_mid: [180, 140, 40],
+        seq_prob_high: [60, 160, 80],
+        seq_rec_cursor: [220, 50, 50],
 
         key_white_pressed: [100, 180, 255],
         key_black_pressed: [60, 120, 200],
@@ -541,6 +561,11 @@ pub fn winamp_classic() -> SynthTheme {
         seq_kb_major: [20, 70, 20],
         seq_kb_minor: [40, 50, 80],
         seq_kb_dim: [80, 40, 30],
+        seq_velocity_bar: [60, 200, 100],
+        seq_prob_low: [220, 80, 40],
+        seq_prob_mid: [220, 180, 30],
+        seq_prob_high: [40, 220, 60],
+        seq_rec_cursor: [255, 80, 60],
 
         key_white_pressed: [0, 220, 0],
         key_black_pressed: [0, 160, 0],
@@ -648,6 +673,11 @@ pub fn phosphor() -> SynthTheme {
         seq_kb_major: [10, 60, 30],
         seq_kb_minor: [20, 40, 60],
         seq_kb_dim: [50, 30, 20],
+        seq_velocity_bar: [120, 255, 180],
+        seq_prob_low: [220, 100, 80],
+        seq_prob_mid: [220, 200, 80],
+        seq_prob_high: [100, 255, 120],
+        seq_rec_cursor: [255, 120, 100],
 
         key_white_pressed: [40, 255, 140],
         key_black_pressed: [20, 180, 90],

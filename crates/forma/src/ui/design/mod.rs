@@ -13,6 +13,7 @@ pub mod gallery;
 pub mod knob;
 pub mod layout;
 pub mod level_meter;
+pub mod mini_bar;
 pub mod section;
 pub mod slider;
 pub mod step_pad;
