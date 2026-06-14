@@ -1,6 +1,7 @@
 use crate::sequencer::{
     chord_name, chord_quality, ScaleType, SeqClockDiv, SeqMode, DEGREE_LABELS, NOTE_NAMES,
 };
+use crate::ui::design::layout::{note_seq_step, NoteSeqStepState};
 use crate::SynthApp;
 use eframe::egui;
 use egui::{Color32, CornerRadius, Sense, Stroke, StrokeKind, Vec2};
@@ -534,164 +535,66 @@ impl SynthApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = step_gap;
             for i in 0..length {
-                ui.vertical(|ui| {
-                    ui.set_width(step_w);
-                    let (is_on, note) = {
-                        let ns = this.seq.note_seq.lock().unwrap();
-                        (ns.steps[i], ns.notes[i])
-                    };
-                    let is_current = seq_playing && seq_current_step == i;
-                    // Step-entry cursor: highlight when stopped + recording.
-                    let is_rec_cursor = recording && !seq_playing && rec_step == i;
-                    let note_f = note as f32;
+                // Snapshot the step's mutable fields out of the lock so the
+                // design-system pattern can drive them without holding the
+                // mutex across painter calls. Writes go back in one short
+                // critical section after the pattern returns.
+                let (mut is_on, mut note, mut drag_accum, mut velocity, mut probability) = {
+                    let ns = this.seq.note_seq.lock().unwrap();
+                    (
+                        ns.steps[i],
+                        ns.notes[i],
+                        ns.drag_accum[i],
+                        ns.velocities[i],
+                        ns.probabilities[i],
+                    )
+                };
+                let is_current = seq_playing && seq_current_step == i;
+                let is_rec_cursor = recording && !seq_playing && rec_step == i;
+                let note_label = super::midi_note_name(note).to_string();
 
-                    // Pitch bar
-                    let (bar_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, bar_area_h), Sense::click_and_drag());
-                    let r = bar_resp.rect;
-                    painter.rect_filled(
-                        r,
-                        CornerRadius::same(4),
-                        this.theme.c(&this.theme.bg_seq_bar),
-                    );
-                    let t = (note_f - midi_min) / (midi_max - midi_min);
-                    let bar_h = (t * (bar_area_h - 4.0)).max(4.0);
-                    let bar_rect = egui::Rect::from_min_size(
-                        egui::pos2(r.min.x + 2.0, r.max.y - bar_h - 2.0),
-                        Vec2::new(step_w - 4.0, bar_h),
-                    );
-                    let bar_color = if is_current {
-                        this.theme.c(&this.theme.seq_current)
-                    } else if is_on {
-                        this.theme.c(&this.theme.seq_note_bar_on)
-                    } else {
-                        this.theme.c(&this.theme.seq_note_bar_off)
-                    };
-                    painter.rect_filled(bar_rect, CornerRadius::same(3), bar_color);
-                    // Red border on rec cursor step.
-                    if is_rec_cursor {
-                        painter.rect_stroke(
-                            r,
-                            CornerRadius::same(4),
-                            Stroke::new(2.0, egui::Color32::from_rgb(220, 50, 50)),
-                            StrokeKind::Middle,
-                        );
-                    }
-                    painter.text(
-                        r.center(),
-                        egui::Align2::CENTER_CENTER,
-                        super::midi_note_name(note),
-                        this.theme.font_value(),
-                        if is_on { Color32::WHITE } else { Color32::GRAY },
-                    );
+                let events = note_seq_step(
+                    ui,
+                    NoteSeqStepState {
+                        is_on: &mut is_on,
+                        note: &mut note,
+                        drag_accum: &mut drag_accum,
+                        velocity: &mut velocity,
+                        probability: &mut probability,
+                        midi_min,
+                        midi_max,
+                        is_current,
+                        is_rec_cursor,
+                    },
+                    &note_label,
+                    step_w,
+                    bar_area_h,
+                    &this.theme,
+                );
 
-                    if bar_resp.dragged() {
-                        let mut ns = this.seq.note_seq.lock().unwrap();
-                        ns.drag_accum[i] -= bar_resp.drag_delta().y * 0.3;
-                        let steps = ns.drag_accum[i] as i32;
-                        if steps != 0 {
-                            ns.drag_accum[i] -= steps as f32;
-                            let pos = SEQ_CHROMATIC
-                                .iter()
-                                .position(|&n| n == ns.notes[i])
-                                .unwrap_or(0) as i32;
-                            let new_pos =
-                                (pos + steps).clamp(0, SEQ_CHROMATIC.len() as i32 - 1) as usize;
-                            ns.notes[i] = SEQ_CHROMATIC[new_pos];
-                        }
-                    }
-                    // (Scroll-wheel pitch editing removed: it conflicted with
-                    // ScrollArea scrolling and dock-panel scrolling, where
-                    // trackpad swipes accidentally changed step notes.
-                    // Drag remains the primary pitch-edit gesture.)
-                    if bar_resp.drag_stopped() {
-                        this.seq.note_seq.lock().unwrap().drag_accum[i] = 0.0;
-                    }
+                if events.pad_clicked {
+                    is_on = !is_on;
+                }
 
-                    // Step button
-                    let fill = if is_current {
-                        this.theme.c(&this.theme.seq_current)
-                    } else if is_on {
-                        this.theme.c(&this.theme.seq_step_on)
-                    } else {
-                        this.theme.c(&this.theme.seq_step_off)
-                    };
-                    let (r, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
-                    painter.rect_filled(r.rect, CornerRadius::same(5), fill);
-                    painter.rect_stroke(
-                        r.rect,
-                        CornerRadius::same(5),
-                        Stroke::new(
-                            1.0,
-                            if is_current {
-                                Color32::WHITE
-                            } else {
-                                Color32::GRAY
-                            },
-                        ),
-                        StrokeKind::Middle,
-                    );
-                    if r.clicked() {
-                        let mut ns = this.seq.note_seq.lock().unwrap();
-                        ns.steps[i] = !ns.steps[i];
-                    }
+                // Snap `note` to the nearest legal chromatic index so the
+                // pitch bar's continuous range still produces the same
+                // discrete pitches the engine expects.
+                let nearest = SEQ_CHROMATIC
+                    .iter()
+                    .min_by_key(|&&c| ((c as i32) - (note as i32)).abs())
+                    .copied()
+                    .unwrap_or(note);
+                note = nearest;
 
-                    // Velocity bar — click/drag sets 0-127 by x position.
-                    let vel_h = 14.0;
-                    let vel = this.seq.note_seq.lock().unwrap().velocities[i];
-                    let (vel_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, vel_h), Sense::click_and_drag());
-                    let vr = vel_resp.rect;
-                    painter.rect_filled(vr, CornerRadius::same(2), Color32::from_rgb(30, 30, 40));
-                    let fill_w = vel as f32 / 127.0 * vr.width();
-                    painter.rect_filled(
-                        egui::Rect::from_min_size(vr.min, Vec2::new(fill_w, vel_h)),
-                        CornerRadius::same(2),
-                        Color32::from_rgb(80, 140, 200),
-                    );
-                    painter.text(
-                        vr.center(),
-                        egui::Align2::CENTER_CENTER,
-                        format!("{vel}"),
-                        this.theme.font_micro(),
-                        Color32::from_rgb(180, 180, 180),
-                    );
-                    if vel_resp.dragged() || vel_resp.clicked() {
-                        if let Some(pos) = vel_resp.interact_pointer_pos() {
-                            let t = ((pos.x - vr.min.x) / vr.width()).clamp(0.0, 1.0);
-                            this.seq.note_seq.lock().unwrap().velocities[i] =
-                                (t * 127.0).round() as u8;
-                        }
-                    }
-
-                    // Probability bar — click/drag sets 0-100 by x position.
-                    let prob_h = 10.0;
-                    let prob = this.seq.note_seq.lock().unwrap().probabilities[i];
-                    let (prob_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, prob_h), Sense::click_and_drag());
-                    let pr = prob_resp.rect;
-                    painter.rect_filled(pr, CornerRadius::same(2), Color32::from_rgb(30, 30, 40));
-                    let pfill_w = prob as f32 / 100.0 * pr.width();
-                    let prob_color = if prob >= 100 {
-                        Color32::from_rgb(60, 160, 80)
-                    } else if prob >= 50 {
-                        Color32::from_rgb(180, 140, 40)
-                    } else {
-                        Color32::from_rgb(180, 70, 50)
-                    };
-                    painter.rect_filled(
-                        egui::Rect::from_min_size(pr.min, Vec2::new(pfill_w, prob_h)),
-                        CornerRadius::same(2),
-                        prob_color,
-                    );
-                    if prob_resp.dragged() || prob_resp.clicked() {
-                        if let Some(pos) = prob_resp.interact_pointer_pos() {
-                            let t = ((pos.x - pr.min.x) / pr.width()).clamp(0.0, 1.0);
-                            this.seq.note_seq.lock().unwrap().probabilities[i] =
-                                (t * 100.0).round() as u8;
-                        }
-                    }
-                });
+                // Write back any deltas in a single lock acquisition.
+                if events.pad_clicked || events.changed || drag_accum != 0.0 {
+                    let mut ns = this.seq.note_seq.lock().unwrap();
+                    ns.steps[i] = is_on;
+                    ns.notes[i] = note;
+                    ns.drag_accum[i] = drag_accum;
+                    ns.velocities[i] = velocity;
+                    ns.probabilities[i] = probability;
+                }
             }
         });
         };

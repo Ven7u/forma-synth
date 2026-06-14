@@ -8,13 +8,14 @@
 //! (`synth_toggle`, `chip_row`, `section_header`, ...) land in Phase 5+
 //! when the first migrated panel exercises them.
 
-use egui::{Response, Ui};
+use egui::{CornerRadius, Response, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use super::{
     chip::chip_selector,
     fader::{fader, FaderOrientation, FaderSize},
     knob::knob,
     level_meter::{level_meter, LevelMeterOrientation, LevelMeterSize},
+    mini_bar::{MiniBar, MiniBarOrientation},
     section::section_header,
     step_pad::{step_pad, StepPadSize, StepState},
     toggle::{toggle_button, ToggleSize},
@@ -385,4 +386,184 @@ pub fn fader_column(
         });
     });
     response.expect("fader_column always renders the fader")
+}
+
+/// State + bindings for one column in the note sequencer. Aggregates
+/// all the per-step fields so the `note_seq_step` pattern's signature
+/// stays manageable.
+pub struct NoteSeqStepState<'a> {
+    /// On/off flag for this step.
+    pub is_on: &'a mut bool,
+    /// MIDI note (0–127). The pattern's pitch bar drives this via the
+    /// caller-owned `drag_accum`.
+    pub note: &'a mut u8,
+    /// Pitch-bar drag accumulator — persisted between frames in the
+    /// caller's state, reset to 0 on drag-stop by MiniBar.
+    pub drag_accum: &'a mut f32,
+    /// 0–127 step velocity.
+    pub velocity: &'a mut u8,
+    /// 0–100 step probability.
+    pub probability: &'a mut u8,
+    /// Pitch range to map the bar into (typically the SEQ_CHROMATIC bounds).
+    pub midi_min: f32,
+    pub midi_max: f32,
+    /// True when the playhead is currently on this step (highlights it).
+    pub is_current: bool,
+    /// True when the step-entry record cursor is on this step
+    /// (draws the `seq_rec_cursor` border).
+    pub is_rec_cursor: bool,
+}
+
+/// What the user did on this step this frame.
+#[derive(Default)]
+pub struct NoteSeqStepEvents {
+    /// User clicked the on/off pad — caller should toggle `is_on` in
+    /// shared state.
+    pub pad_clicked: bool,
+    /// True if any of the four bars caused a value to change this frame
+    /// (caller checks `*state.note`, `*state.velocity`, `*state.probability`
+    /// for the new values).
+    pub changed: bool,
+}
+
+/// NoteSeqStep pattern — composes the four widgets that make up one
+/// column of the note sequencer:
+///   ┌─────┐   ← pitch MiniBar (vertical, drag-delta, shows note name)
+///   │ E3  │
+///   └─────┘
+///   ┌─────┐   ← on/off StepPad (custom rendered because of the
+///   │     │     length-aware alpha + rec-cursor border)
+///   └─────┘
+///   ┌─────┐   ← velocity MiniBar (horizontal, absolute drag, value text)
+///   └─────┘
+///   ┌───┐     ← probability MiniBar (horizontal, absolute drag,
+///   └───┘       3-zone color)
+///
+/// Returns the events; the caller is responsible for writing them
+/// back into the shared sequencer state (under lock).
+///
+/// `note_label` is rendered into the pitch bar. The caller derives it
+/// from `*state.note` (typically via `crate::ui::midi_note_name`) before
+/// calling to keep borrow rules simple.
+pub fn note_seq_step(
+    ui: &mut Ui,
+    state: NoteSeqStepState<'_>,
+    note_label: &str,
+    step_w: f32,
+    bar_area_h: f32,
+    theme: &SynthTheme,
+) -> NoteSeqStepEvents {
+    let mut events = NoteSeqStepEvents::default();
+    let prev_note = *state.note;
+    let prev_vel = *state.velocity;
+    let prev_prob = *state.probability;
+
+    ui.vertical(|ui| {
+        ui.set_width(step_w);
+
+        // ── Pitch bar ────────────────────────────────────────────────
+        // Color picks up the playhead / on / off semantic from theme.
+        let pitch_color = if state.is_current {
+            theme.c(&theme.seq_current)
+        } else if *state.is_on {
+            theme.c(&theme.seq_note_bar_on)
+        } else {
+            theme.c(&theme.seq_note_bar_off)
+        };
+        let label_color = if *state.is_on {
+            theme.c(&theme.text_primary)
+        } else {
+            theme.c(&theme.text_secondary)
+        };
+
+        let mut pitch_f = *state.note as f32;
+        let pitch_resp = MiniBar::new(
+            &mut pitch_f,
+            state.midi_min..=state.midi_max,
+            MiniBarOrientation::Vertical,
+            Vec2::new(step_w, bar_area_h),
+        )
+        .fill(pitch_color)
+        .bg(theme.c(&theme.bg_seq_bar))
+        .label(note_label, theme.font_value(), label_color)
+        .drag_delta(state.drag_accum, 0.3)
+        .show(ui, theme);
+        *state.note = pitch_f.round().clamp(0.0, 127.0) as u8;
+
+        // Rec-cursor border drawn over the pitch bar's rect.
+        if state.is_rec_cursor {
+            ui.painter().rect_stroke(
+                pitch_resp.rect,
+                CornerRadius::same(theme.rounding_sm as u8),
+                Stroke::new(theme.stroke_active, theme.c(&theme.seq_rec_cursor)),
+                StrokeKind::Middle,
+            );
+        }
+
+        // ── On/off step pad ──────────────────────────────────────────
+        let pad_fill = if state.is_current {
+            theme.c(&theme.seq_current)
+        } else if *state.is_on {
+            theme.c(&theme.seq_step_on)
+        } else {
+            theme.c(&theme.seq_step_off)
+        };
+        let pad_border = if state.is_current {
+            theme.c(&theme.text_primary)
+        } else {
+            theme.c(&theme.border)
+        };
+        let (pad_resp, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
+        painter.rect_filled(
+            pad_resp.rect,
+            CornerRadius::same(theme.rounding_sm as u8),
+            pad_fill,
+        );
+        painter.rect_stroke(
+            pad_resp.rect,
+            CornerRadius::same(theme.rounding_sm as u8),
+            Stroke::new(theme.stroke_ui, pad_border),
+            StrokeKind::Middle,
+        );
+        if pad_resp.clicked() {
+            events.pad_clicked = true;
+        }
+
+        // ── Velocity bar ─────────────────────────────────────────────
+        let vel_label = format!("{}", *state.velocity);
+        let mut vel_f = *state.velocity as f32;
+        MiniBar::new(
+            &mut vel_f,
+            0.0..=127.0,
+            MiniBarOrientation::Horizontal,
+            Vec2::new(step_w, 14.0),
+        )
+        .fill(theme.c(&theme.seq_velocity_bar))
+        .label(vel_label, theme.font_micro(), theme.c(&theme.text_primary))
+        .show(ui, theme);
+        *state.velocity = vel_f.round().clamp(0.0, 127.0) as u8;
+
+        // ── Probability bar ──────────────────────────────────────────
+        let mut prob_f = *state.probability as f32;
+        MiniBar::new(
+            &mut prob_f,
+            0.0..=100.0,
+            MiniBarOrientation::Horizontal,
+            Vec2::new(step_w, 10.0),
+        )
+        .zoned(
+            50.0,
+            100.0,
+            theme.c(&theme.seq_prob_low),
+            theme.c(&theme.seq_prob_mid),
+            theme.c(&theme.seq_prob_high),
+        )
+        .show(ui, theme);
+        *state.probability = prob_f.round().clamp(0.0, 100.0) as u8;
+    });
+
+    events.changed = *state.note != prev_note
+        || *state.velocity != prev_vel
+        || *state.probability != prev_prob;
+    events
 }
