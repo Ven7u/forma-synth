@@ -15,6 +15,7 @@ use super::{
     layout::fader_column as design_fader_column,
     level_meter::{level_meter as design_level_meter, LevelMeterOrientation, LevelMeterSize},
     section::section_header as design_section_header,
+    slider::Slider as DesignSlider,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
     toggle::{toggle_button as design_toggle, ToggleSize},
     KnobSize, SynthUi, Tier,
@@ -73,6 +74,8 @@ struct GalleryState {
     fader_horizontal: f32,
     /// FaderColumn pattern demo — 4 channel volumes.
     column_values: [f32; 4],
+    /// 4 Slider demos: linear / suffix / logarithmic / formatter.
+    slider_values: [f32; 4],
 }
 
 impl Default for GalleryState {
@@ -92,6 +95,7 @@ impl Default for GalleryState {
             fader_values: [0.8, 0.5, 0.2],
             fader_horizontal: 0.6,
             column_values: [0.75, 0.55, 0.3, 0.4],
+            slider_values: [0.5, 440.0, 2000.0, 0.4],
         }
     }
 }
@@ -293,6 +297,10 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "Fader — 3 sizes vertical + horizontal sample", theme);
     fader_grid(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Slider — inline parameter row", theme);
+    slider_samples(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "LevelMeter — 3 levels × peak hold", theme);
@@ -690,6 +698,30 @@ fn fader_column_row(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
             FaderSize::Standard,
             theme,
         );
+    });
+}
+
+fn slider_samples(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.scope(|ui| {
+        ui.set_max_width(360.0);
+        DesignSlider::new(&mut state.slider_values[0], 0.0..=1.0, "Mix").show(ui, theme);
+        DesignSlider::new(&mut state.slider_values[1], 80.0..=18_000.0, "Freq")
+            .suffix(" Hz")
+            .logarithmic(true)
+            .decimals(0)
+            .show(ui, theme);
+        DesignSlider::new(&mut state.slider_values[2], 10.0..=2_000.0, "Time")
+            .formatter(|v| {
+                if v >= 1000.0 {
+                    format!("{:.2} s", v / 1000.0)
+                } else {
+                    format!("{:.0} ms", v)
+                }
+            })
+            .show(ui, theme);
+        DesignSlider::new(&mut state.slider_values[3], 0.0..=1.0, "Drive")
+            .decimals(2)
+            .show(ui, theme);
     });
 }
 
