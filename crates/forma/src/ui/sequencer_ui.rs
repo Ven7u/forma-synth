@@ -2,6 +2,7 @@ use crate::sequencer::{
     chord_name, chord_quality, ScaleType, SeqClockDiv, SeqMode, DEGREE_LABELS, NOTE_NAMES,
 };
 use crate::ui::design::layout::{note_seq_step, NoteSeqStepState};
+use crate::ui::design::mini_bar::{MiniBar, MiniBarOrientation};
 use crate::SynthApp;
 use eframe::egui;
 use egui::{Color32, CornerRadius, Sense, Stroke, StrokeKind, Vec2};
@@ -652,7 +653,7 @@ impl SynthApp {
                     let r = bar_resp.rect;
                     painter.rect_filled(
                         r,
-                        CornerRadius::same(4),
+                        CornerRadius::same(this.theme.rounding_sm as u8),
                         this.theme.c(&this.theme.bg_seq_bar),
                     );
                     let t = degree as f32 / 6.0;
@@ -673,47 +674,49 @@ impl SynthApp {
                     } else {
                         this.theme.c(&this.theme.seq_chord_major)
                     };
-                    painter.rect_filled(bar_rect, CornerRadius::same(3), bar_color);
+                    painter.rect_filled(bar_rect, CornerRadius::same(this.theme.rounding_xs as u8), bar_color);
                     // Rec cursor border.
                     if is_rec_cursor {
                         painter.rect_stroke(
                             r,
-                            CornerRadius::same(4),
-                            Stroke::new(2.0, egui::Color32::from_rgb(220, 50, 50)),
+                            CornerRadius::same(this.theme.rounding_sm as u8),
+                            Stroke::new(this.theme.stroke_active, this.theme.c(&this.theme.seq_rec_cursor)),
                             StrokeKind::Middle,
                         );
                     }
 
                     let cname = chord_name(root, scale, degree);
+                    let primary = this.theme.c(&this.theme.text_primary);
+                    let secondary = this.theme.c(&this.theme.text_secondary);
+                    let disabled = this.theme.c(&this.theme.text_disabled);
                     painter.text(
                         egui::pos2(r.center().x, r.min.y + 10.0),
                         egui::Align2::CENTER_CENTER,
                         &cname,
                         this.theme.font_value(),
-                        if is_on { Color32::WHITE } else { Color32::GRAY },
+                        if is_on { primary } else { secondary },
                     );
                     painter.text(
                         egui::pos2(r.center().x, r.min.y + 22.0),
                         egui::Align2::CENTER_CENTER,
                         DEGREE_LABELS[degree],
                         this.theme.font_micro(),
-                        if is_on {
-                            Color32::from_rgb(180, 180, 180)
-                        } else {
-                            Color32::from_rgb(80, 80, 80)
-                        },
+                        if is_on { secondary } else { disabled },
                     );
-                    // Chord type label (bottom of bar).
+                    // Chord type label (bottom of bar). Uses the accent
+                    // family to differentiate from the chord-name and
+                    // degree labels stacked above.
+                    let chord_type_color = if is_on {
+                        this.theme.c(&this.theme.accent_dim)
+                    } else {
+                        disabled
+                    };
                     painter.text(
                         egui::pos2(r.center().x, r.max.y - 8.0),
                         egui::Align2::CENTER_CENTER,
                         chord_type.label(),
                         this.theme.font_micro(),
-                        if is_on {
-                            Color32::from_rgb(160, 200, 160)
-                        } else {
-                            Color32::from_rgb(70, 90, 70)
-                        },
+                        chord_type_color,
                     );
 
                     // Left drag: change degree.
@@ -747,6 +750,7 @@ impl SynthApp {
                         this.seq.chord_seq.lock().unwrap().chord_types[i] = next;
                     }
 
+                    // ── Step pad (on/off) ────────────────────────────────
                     let fill = if is_current {
                         this.theme.c(&this.theme.seq_current)
                     } else if is_on {
@@ -754,94 +758,79 @@ impl SynthApp {
                     } else {
                         this.theme.c(&this.theme.seq_step_off)
                     };
-                    let (r, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
-                    painter.rect_filled(r.rect, CornerRadius::same(5), fill);
+                    let pad_border = if is_current {
+                        this.theme.c(&this.theme.text_primary)
+                    } else {
+                        this.theme.c(&this.theme.border)
+                    };
+                    let (pad_resp, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
+                    painter.rect_filled(pad_resp.rect, CornerRadius::same(this.theme.rounding_sm as u8), fill);
                     painter.rect_stroke(
-                        r.rect,
-                        CornerRadius::same(5),
-                        Stroke::new(
-                            1.0,
-                            if is_current {
-                                Color32::WHITE
-                            } else {
-                                Color32::GRAY
-                            },
-                        ),
+                        pad_resp.rect,
+                        CornerRadius::same(this.theme.rounding_sm as u8),
+                        Stroke::new(this.theme.stroke_ui, pad_border),
                         StrokeKind::Middle,
                     );
-                    if r.clicked() {
+                    if pad_resp.clicked() {
                         let mut cs = this.seq.chord_seq.lock().unwrap();
                         cs.steps[i] = !cs.steps[i];
                     }
 
-                    // Velocity bar.
-                    let vel_h = 14.0;
-                    let vel = this.seq.chord_seq.lock().unwrap().velocities[i];
-                    let (vel_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, vel_h), Sense::click_and_drag());
-                    let vr = vel_resp.rect;
-                    painter.rect_filled(vr, CornerRadius::same(2), Color32::from_rgb(30, 30, 40));
-                    let fill_w = vel as f32 / 127.0 * vr.width();
-                    painter.rect_filled(
-                        egui::Rect::from_min_size(vr.min, Vec2::new(fill_w, vel_h)),
-                        CornerRadius::same(2),
-                        Color32::from_rgb(80, 140, 200),
-                    );
-                    painter.text(
-                        vr.center(),
-                        egui::Align2::CENTER_CENTER,
-                        format!("{vel}"),
-                        this.theme.font_micro(),
-                        Color32::from_rgb(180, 180, 180),
-                    );
-                    if vel_resp.dragged() || vel_resp.clicked() {
-                        if let Some(pos) = vel_resp.interact_pointer_pos() {
-                            let t = ((pos.x - vr.min.x) / vr.width()).clamp(0.0, 1.0);
-                            this.seq.chord_seq.lock().unwrap().velocities[i] =
-                                (t * 127.0).round() as u8;
-                        }
+                    // ── Velocity MiniBar ─────────────────────────────────
+                    let mut velocity = this.seq.chord_seq.lock().unwrap().velocities[i];
+                    let mut vel_f = velocity as f32;
+                    let vel_label = format!("{velocity}");
+                    MiniBar::new(
+                        &mut vel_f,
+                        0.0..=127.0,
+                        MiniBarOrientation::Horizontal,
+                        Vec2::new(step_w, 14.0),
+                    )
+                    .fill(this.theme.c(&this.theme.seq_velocity_bar))
+                    .label(vel_label, this.theme.font_micro(), this.theme.c(&this.theme.text_primary))
+                    .show(ui, &this.theme);
+                    let new_vel = vel_f.round().clamp(0.0, 127.0) as u8;
+                    if new_vel != velocity {
+                        this.seq.chord_seq.lock().unwrap().velocities[i] = new_vel;
+                        velocity = new_vel;
+                    }
+                    let _ = velocity;
+
+                    // ── Probability MiniBar ──────────────────────────────
+                    let probability = this.seq.chord_seq.lock().unwrap().probabilities[i];
+                    let mut prob_f = probability as f32;
+                    MiniBar::new(
+                        &mut prob_f,
+                        0.0..=100.0,
+                        MiniBarOrientation::Horizontal,
+                        Vec2::new(step_w, 10.0),
+                    )
+                    .zoned(
+                        50.0,
+                        100.0,
+                        this.theme.c(&this.theme.seq_prob_low),
+                        this.theme.c(&this.theme.seq_prob_mid),
+                        this.theme.c(&this.theme.seq_prob_high),
+                    )
+                    .show(ui, &this.theme);
+                    let new_prob = prob_f.round().clamp(0.0, 100.0) as u8;
+                    if new_prob != probability {
+                        this.seq.chord_seq.lock().unwrap().probabilities[i] = new_prob;
                     }
 
-                    // Probability bar.
-                    let prob_h = 10.0;
-                    let prob = this.seq.chord_seq.lock().unwrap().probabilities[i];
-                    let (prob_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, prob_h), Sense::click_and_drag());
-                    let pr = prob_resp.rect;
-                    painter.rect_filled(pr, CornerRadius::same(2), Color32::from_rgb(30, 30, 40));
-                    let pfill_w = prob as f32 / 100.0 * pr.width();
-                    let prob_color = if prob >= 100 {
-                        Color32::from_rgb(60, 160, 80)
-                    } else if prob >= 50 {
-                        Color32::from_rgb(180, 140, 40)
-                    } else {
-                        Color32::from_rgb(180, 70, 50)
-                    };
-                    painter.rect_filled(
-                        egui::Rect::from_min_size(pr.min, Vec2::new(pfill_w, prob_h)),
-                        CornerRadius::same(2),
-                        prob_color,
-                    );
-                    if prob_resp.dragged() || prob_resp.clicked() {
-                        if let Some(pos) = prob_resp.interact_pointer_pos() {
-                            let t = ((pos.x - pr.min.x) / pr.width()).clamp(0.0, 1.0);
-                            this.seq.chord_seq.lock().unwrap().probabilities[i] =
-                                (t * 100.0).round() as u8;
-                        }
-                    }
-
-                    // Octave offset row: −2 to +2, click left/right half to dec/inc.
+                    // ── Octave offset row ────────────────────────────────
+                    // Click left half = -1, right half = +1.
                     let oct_h = 14.0;
                     let (oct_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, oct_h), Sense::click());
                     let or_ = oct_resp.rect;
-                    let oct_t = (oct_off + 2) as f32 / 4.0; // map −2..+2 → 0..1
-                    painter.rect_filled(or_, CornerRadius::same(2), Color32::from_rgb(30, 30, 40));
+                    let oct_t = (oct_off + 2) as f32 / 4.0;
+                    painter.rect_filled(or_, CornerRadius::same(this.theme.rounding_xs as u8), this.theme.c(&this.theme.bg_sunken));
                     let oct_fill_w = oct_t * or_.width();
                     painter.rect_filled(
                         egui::Rect::from_min_size(or_.min, Vec2::new(oct_fill_w, oct_h)),
-                        CornerRadius::same(2),
-                        Color32::from_rgb(120, 80, 180),
+                        CornerRadius::same(this.theme.rounding_xs as u8),
+                        this.theme.c(&this.theme.seq_octave_bar),
                     );
                     let oct_label = match oct_off {
                         0 => "oct".to_string(),
@@ -853,7 +842,7 @@ impl SynthApp {
                         egui::Align2::CENTER_CENTER,
                         oct_label,
                         this.theme.font_micro(),
-                        Color32::from_rgb(200, 180, 220),
+                        this.theme.c(&this.theme.text_primary),
                     );
                     if oct_resp.clicked() {
                         if let Some(pos) = oct_resp.interact_pointer_pos() {
@@ -867,27 +856,26 @@ impl SynthApp {
                         }
                     }
 
-                    // Voicing row: click left = prev inversion, right = next inversion.
+                    // ── Voicing row ──────────────────────────────────────
+                    // Click left = prev inversion, right = next inversion.
+                    // Voice-lead-active variant uses chord_major (green hue)
+                    // for the label; non-VL uses the velocity-bar color so
+                    // the row reads as a velocity sibling.
                     let voicing_h = 12.0;
                     let voicing = this.seq.chord_seq.lock().unwrap().voicings[i];
                     let voice_lead = this.seq.chord_seq.lock().unwrap().voice_lead;
                     let (v_resp, painter) =
                         ui.allocate_painter(Vec2::new(step_w, voicing_h), Sense::click());
-                    let vr = v_resp.rect;
-                    let vbg = if voice_lead {
-                        Color32::from_rgb(20, 40, 30)
-                    } else {
-                        Color32::from_rgb(20, 35, 50)
-                    };
-                    painter.rect_filled(vr, CornerRadius::same(2), vbg);
+                    let v_rect = v_resp.rect;
+                    painter.rect_filled(v_rect, CornerRadius::same(this.theme.rounding_xs as u8), this.theme.c(&this.theme.bg_sunken));
                     let vcolor = if voice_lead {
-                        Color32::from_rgb(80, 140, 100)
+                        this.theme.c(&this.theme.seq_chord_major)
                     } else {
-                        Color32::from_rgb(80, 140, 200)
+                        this.theme.c(&this.theme.seq_velocity_bar)
                     };
                     let vlabel = if voice_lead { "VL" } else { voicing.short() };
                     painter.text(
-                        vr.center(),
+                        v_rect.center(),
                         egui::Align2::CENTER_CENTER,
                         vlabel,
                         this.theme.font_micro(),
@@ -895,7 +883,7 @@ impl SynthApp {
                     );
                     if v_resp.clicked() && !voice_lead {
                         if let Some(pos) = v_resp.interact_pointer_pos() {
-                            let next = if pos.x > vr.center().x {
+                            let next = if pos.x > v_rect.center().x {
                                 voicing.next()
                             } else {
                                 voicing.prev()

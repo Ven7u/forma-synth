@@ -93,6 +93,9 @@ pub struct SynthTheme {
     /// Step-entry record cursor border.
     #[serde(default)]
     pub seq_rec_cursor: [u8; 3],
+    /// Chord-sequencer octave-offset bar fill.
+    #[serde(default)]
+    pub seq_octave_bar: [u8; 3],
 
     // ── Keyboard ────────────────────────────────────────────────────────────
     pub key_white_pressed: [u8; 3],
@@ -458,6 +461,7 @@ pub fn midnight() -> SynthTheme {
         seq_prob_mid: [180, 140, 40],
         seq_prob_high: [60, 160, 80],
         seq_rec_cursor: [220, 50, 50],
+        seq_octave_bar: [120, 80, 180],
 
         key_white_pressed: [100, 180, 255],
         key_black_pressed: [60, 120, 200],
@@ -566,6 +570,7 @@ pub fn winamp_classic() -> SynthTheme {
         seq_prob_mid: [220, 180, 30],
         seq_prob_high: [40, 220, 60],
         seq_rec_cursor: [255, 80, 60],
+        seq_octave_bar: [180, 140, 60],
 
         key_white_pressed: [0, 220, 0],
         key_black_pressed: [0, 160, 0],
@@ -678,6 +683,7 @@ pub fn phosphor() -> SynthTheme {
         seq_prob_mid: [220, 200, 80],
         seq_prob_high: [100, 255, 120],
         seq_rec_cursor: [255, 120, 100],
+        seq_octave_bar: [200, 230, 100],
 
         key_white_pressed: [40, 255, 140],
         key_black_pressed: [20, 180, 90],
