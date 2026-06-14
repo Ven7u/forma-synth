@@ -48,11 +48,11 @@ impl SynthApp {
                             } else {
                                 Color32::from_gray(50)
                             };
-                            ui.label(egui::RichText::new("●").size(8.0).color(dot_col));
+                            ui.label(egui::RichText::new("●").font(self.theme.font_small()).color(dot_col));
                             let name_col = if focused { accent } else { text_sec };
                             let label =
                                 egui::RichText::new(format!("T{}  {}", t + 1, self.track_names[t]))
-                                    .size(10.0)
+                                    .font(self.theme.font_body())
                                     .color(name_col);
                             if ui
                                 .add(egui::Label::new(label).sense(Sense::click()))
@@ -98,7 +98,7 @@ impl SynthApp {
                         // Patch name
                         ui.label(
                             egui::RichText::new(&self.track_patches[t].name)
-                                .size(9.0)
+                                .font(self.theme.font_body())
                                 .color(text_dis),
                         );
 
@@ -112,7 +112,7 @@ impl SynthApp {
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        egui::RichText::new("M").size(9.0).color(m_col),
+                                        egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
                                     )
                                     .frame(muted)
                                     .min_size(Vec2::new(18.0, 14.0)),
@@ -127,7 +127,7 @@ impl SynthApp {
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        egui::RichText::new("S").size(9.0).color(s_col),
+                                        egui::RichText::new("S").font(self.theme.font_body()).color(s_col),
                                     )
                                     .frame(solo)
                                     .min_size(Vec2::new(18.0, 14.0)),
@@ -167,12 +167,12 @@ impl SynthApp {
                         } else {
                             Color32::from_gray(50)
                         };
-                        ui.label(egui::RichText::new("●").size(8.0).color(dot_col));
+                        ui.label(egui::RichText::new("●").font(self.theme.font_small()).color(dot_col));
                         let col = if drums_focused { accent } else { text_sec };
                         if ui
                             .add(
                                 egui::Label::new(
-                                    egui::RichText::new("DRUMS").size(10.0).color(col),
+                                    egui::RichText::new("DRUMS").font(self.theme.font_body()).color(col),
                                 )
                                 .sense(Sense::click()),
                             )
@@ -186,7 +186,7 @@ impl SynthApp {
                         ui.allocate_exact_size(Vec2::new(52.0, 4.0), Sense::hover());
                     ui.painter_at(meter_rect)
                         .rect_filled(meter_rect, 1.0, Color32::from_gray(22));
-                    ui.label(egui::RichText::new("Phase 5").size(9.0).color(text_dis));
+                    ui.label(egui::RichText::new("Phase 5").font(self.theme.font_body()).color(text_dis));
                     let drum_muted = !self.drums.enabled;
                     let m_col = if drum_muted {
                         Color32::from_rgb(220, 80, 60)
@@ -195,7 +195,7 @@ impl SynthApp {
                     };
                     if ui
                         .add(
-                            egui::Button::new(egui::RichText::new("M").size(9.0).color(m_col))
+                            egui::Button::new(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
                                 .frame(drum_muted)
                                 .min_size(Vec2::new(18.0, 14.0)),
                         )
@@ -214,13 +214,13 @@ impl SynthApp {
             ui.vertical(|ui| {
                 ui.label(
                     egui::RichText::new(format!("♩ {} BPM", self.global_bpm))
-                        .size(10.0)
+                        .font(self.theme.font_body())
                         .color(accent),
                 );
                 let mix_col = if self.show_mixer { accent } else { text_dis };
                 if ui
                     .add(
-                        egui::Label::new(egui::RichText::new("MIX▸").size(10.0).color(mix_col))
+                        egui::Label::new(egui::RichText::new("MIX▸").font(self.theme.font_body()).color(mix_col))
                             .sense(egui::Sense::click()),
                     )
                     .on_hover_text("Toggle mixer panel")

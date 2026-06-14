@@ -6,6 +6,7 @@ use egui_dock::{DockState, NodeIndex, TabViewer};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tab {
     Oscillators,
+    Mixer,
     Modulation,
     Filter,
     Sequencer,
@@ -20,6 +21,7 @@ impl Tab {
     pub fn title(self) -> &'static str {
         match self {
             Tab::Oscillators => "Oscillators",
+            Tab::Mixer => "Mixer",
             Tab::Modulation => "Modulation",
             Tab::Filter => "Filter & Envelopes",
             Tab::Sequencer => "Sequencer",
@@ -33,6 +35,7 @@ impl Tab {
 
     pub const ALL: &[Tab] = &[
         Tab::Oscillators,
+        Tab::Mixer,
         Tab::Modulation,
         Tab::Filter,
         Tab::Sequencer,
@@ -57,8 +60,9 @@ impl Tab {
 /// └─────────────────────────────────────────────────┘
 /// ```
 pub fn default_dock_state() -> DockState<Tab> {
-    // Start with Oscillators as root.
-    let mut state = DockState::new(vec![Tab::Oscillators]);
+    // Oscillators + Mixer share the root node as sibling tabs. Click between
+    // them; both get the same full width of the upper-left dock column.
+    let mut state = DockState::new(vec![Tab::Oscillators, Tab::Mixer]);
     let surface = state.main_surface_mut();
 
     // 1. Split bottom from root: Sequencer + ArpWalker tabbed — bottom 32%.
@@ -71,8 +75,8 @@ pub fn default_dock_state() -> DockState<Tab> {
     // 2. In top area, split right: Oscilloscope — right takes 40%.
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
-    // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators.
-    let [_osc, _mod] = surface.split_below(top_left, 0.55, vec![Tab::Modulation, Tab::Filter]);
+    // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators/Mixer.
+    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
 
     // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
@@ -165,12 +169,14 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Tab) {
         match tab {
             Tab::Oscillators => {
-                ui.columns(4, |cols| {
+                ui.columns(3, |cols| {
                     self.app.ui_osc_panel(&mut cols[0], 0);
                     self.app.ui_osc_panel(&mut cols[1], 1);
                     self.app.ui_osc_panel(&mut cols[2], 2);
-                    self.app.ui_mixer_panel(&mut cols[3]);
                 });
+            }
+            Tab::Mixer => {
+                self.app.ui_mixer_panel(ui);
             }
             Tab::Modulation => {
                 ui.vertical(|ui| {

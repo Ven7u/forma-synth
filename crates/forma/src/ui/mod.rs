@@ -1,4 +1,5 @@
 pub mod arp_walker;
+pub mod design;
 pub mod dock;
 pub mod drum_machine_ui;
 pub mod eq_ui;

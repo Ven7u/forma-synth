@@ -201,7 +201,7 @@ impl SynthApp {
                         ui.label(
                             egui::RichText::new(format!("g:{:.0} {}", gate, stage))
                                 .monospace()
-                                .size(9.0)
+                                .font(self.theme.font_body())
                                 .color(label_color),
                         );
                     });
@@ -220,7 +220,7 @@ impl SynthApp {
 
         // ── CPU-drawn modes: Spectrum and Envelope ────────────────────────────
         if self.viz_mode == VizMode::Spectrum {
-            draw_spectrum(&cpu_painter, row, &buf, self.engine.sample_rate());
+            draw_spectrum(&cpu_painter, row, &buf, self.engine.sample_rate(), &self.theme);
             return;
         }
         if self.viz_mode == VizMode::Envelope {
@@ -229,7 +229,7 @@ impl SynthApp {
             let s = self.engine.amp_sustain();
             let r = self.engine.amp_release();
             let cursors = self.engine.amp_cursors();
-            draw_envelope(&cpu_painter, row, a, d, s, r, &cursors);
+            draw_envelope(&cpu_painter, row, a, d, s, r, &cursors, &self.theme);
             return;
         }
 
@@ -374,8 +374,8 @@ impl SynthApp {
 
         // Axis labels drawn on top of the GPU render.
         match self.viz_mode {
-            VizMode::Spectrogram => draw_sgr_labels(&cpu_painter, row),
-            VizMode::SpectrogramV => draw_sgrv_labels(&cpu_painter, row),
+            VizMode::Spectrogram => draw_sgr_labels(&cpu_painter, row, &self.theme),
+            VizMode::SpectrogramV => draw_sgrv_labels(&cpu_painter, row, &self.theme),
             _ => {}
         }
     }
@@ -425,7 +425,7 @@ fn compute_sgr_bins(buf: &[f32], sample_rate: u32) -> Vec<f32> {
 
 /// Draw frequency axis labels on top of the GPU-rendered spectrogram.
 /// Padding values must match the shader's pad_l/pad_b/pad_t/pad_r constants.
-fn draw_sgr_labels(painter: &egui::Painter, rect: Rect) {
+fn draw_sgr_labels(painter: &egui::Painter, rect: Rect, theme: &super::theme::SynthTheme) {
     let pad_l = 38.0f32;
     let pad_b = 18.0f32;
     let pad_t = 6.0f32;
@@ -458,7 +458,7 @@ fn draw_sgr_labels(painter: &egui::Painter, rect: Rect) {
             Pos2::new(rect.left() + 2.0, y),
             egui::Align2::LEFT_CENTER,
             label,
-            egui::FontId::monospace(8.0),
+            theme.font_micro(),
             PHOSPHOR_MID,
         );
     }
@@ -467,7 +467,7 @@ fn draw_sgr_labels(painter: &egui::Painter, rect: Rect) {
         Pos2::new(draw_rect.center_bottom().x, rect.bottom() - 2.0),
         egui::Align2::CENTER_BOTTOM,
         "time →",
-        egui::FontId::monospace(8.0),
+        theme.font_micro(),
         PHOSPHOR_DIM,
     );
 
@@ -476,13 +476,13 @@ fn draw_sgr_labels(painter: &egui::Painter, rect: Rect) {
         Pos2::new(rect.left() + 2.0, draw_rect.center().y),
         egui::Align2::LEFT_CENTER,
         "kHz",
-        egui::FontId::monospace(8.0),
+        theme.font_micro(),
         PHOSPHOR_DIM,
     );
 }
 
 /// Axis labels for SGRV mode: frequency on X (bottom), time on Y (left = "now" at top).
-fn draw_sgrv_labels(painter: &egui::Painter, rect: Rect) {
+fn draw_sgrv_labels(painter: &egui::Painter, rect: Rect, theme: &super::theme::SynthTheme) {
     let pad_l = 38.0f32;
     let pad_b = 18.0f32;
     let pad_t = 6.0f32;
@@ -517,7 +517,7 @@ fn draw_sgrv_labels(painter: &egui::Painter, rect: Rect) {
             Pos2::new(x, rect.bottom() - 2.0),
             egui::Align2::CENTER_BOTTOM,
             label,
-            egui::FontId::monospace(8.0),
+            theme.font_micro(),
             PHOSPHOR_MID,
         );
     }
@@ -537,7 +537,7 @@ fn draw_sgrv_labels(painter: &egui::Painter, rect: Rect) {
                 Pos2::new(rect.left() + 2.0, y),
                 egui::Align2::LEFT_CENTER,
                 label,
-                egui::FontId::monospace(8.0),
+                theme.font_micro(),
                 PHOSPHOR_DIM,
             );
         }
@@ -548,20 +548,26 @@ fn draw_sgrv_labels(painter: &egui::Painter, rect: Rect) {
         Pos2::new(draw_rect.center_bottom().x, rect.bottom() - 2.0),
         egui::Align2::CENTER_BOTTOM,
         "Hz",
-        egui::FontId::monospace(8.0),
+        theme.font_micro(),
         PHOSPHOR_DIM,
     );
     painter.text(
         Pos2::new(rect.left() + 2.0, draw_rect.center().y),
         egui::Align2::LEFT_CENTER,
         "t↑",
-        egui::FontId::monospace(8.0),
+        theme.font_micro(),
         PHOSPHOR_DIM,
     );
 }
 
 /// 80 log-spaced bins 20 Hz → 20 kHz, Hann windowed, dB-scaled.
-fn draw_spectrum(painter: &egui::Painter, rect: Rect, buf: &[f32], sample_rate: u32) {
+fn draw_spectrum(
+    painter: &egui::Painter,
+    rect: Rect,
+    buf: &[f32],
+    sample_rate: u32,
+    theme: &super::theme::SynthTheme,
+) {
     use std::f32::consts::PI;
 
     painter.rect_filled(rect, CornerRadius::same(4), PHOSPHOR_BG);
@@ -622,7 +628,7 @@ fn draw_spectrum(painter: &egui::Painter, rect: Rect, buf: &[f32], sample_rate: 
             Pos2::new(rect.left() + 2.0, y),
             egui::Align2::LEFT_CENTER,
             format!("{db_mark:.0}"),
-            egui::FontId::monospace(8.0),
+            theme.font_micro(),
             PHOSPHOR_MID,
         );
     }
@@ -650,7 +656,7 @@ fn draw_spectrum(painter: &egui::Painter, rect: Rect, buf: &[f32], sample_rate: 
             Pos2::new(x, y_bot + 2.0),
             egui::Align2::CENTER_TOP,
             label,
-            egui::FontId::monospace(8.0),
+            theme.font_micro(),
             PHOSPHOR_DIM,
         );
     }
@@ -718,6 +724,7 @@ fn draw_envelope(
     sustain: f32,
     release: f32,
     cursors: &[f32],
+    theme: &super::theme::SynthTheme,
 ) {
     use std::f32::consts::PI;
     painter.rect_filled(rect, CornerRadius::same(4), PHOSPHOR_BG);
@@ -763,7 +770,7 @@ fn draw_envelope(
             Pos2::new(x0 - 3.0, y),
             egui::Align2::RIGHT_CENTER,
             label,
-            egui::FontId::monospace(8.0),
+            theme.font_micro(),
             PHOSPHOR_DIM,
         );
     }
@@ -778,7 +785,7 @@ fn draw_envelope(
             Pos2::new(x, y_bot + 5.0),
             egui::Align2::CENTER_TOP,
             label,
-            egui::FontId::monospace(9.0),
+            theme.font_value(),
             PHOSPHOR_MID,
         );
     }
@@ -1029,7 +1036,7 @@ pub fn draw_peak_meter(
         Pos2::new(rect.left() + 4.0, rect.center().y),
         egui::Align2::LEFT_CENTER,
         text,
-        egui::FontId::proportional(10.0),
+        theme.font_body(),
         Color32::WHITE,
     );
 }

@@ -47,11 +47,22 @@ fn main() -> eframe::Result {
         }
     };
 
+    // Load persisted layout once up front so window geometry can be applied
+    // to NativeOptions before the viewport is built.
+    let saved_layout = ui::layout::load_layout();
+    let preferred_size = saved_layout.window_size.unwrap_or([1400.0, 860.0]);
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size(preferred_size)
+        .with_min_inner_size([720.0, 480.0])
+        .with_title("Forma")
+        .with_icon(icon);
+    if let Some(pos) = saved_layout.window_pos {
+        viewport = viewport.with_position(pos);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1400.0, 860.0])
-            .with_title("Forma")
-            .with_icon(icon),
+        viewport,
         ..Default::default()
     };
 
@@ -70,7 +81,7 @@ fn main() -> eframe::Result {
                     .callback_resources
                     .insert(resources);
             }
-            Ok(Box::new(SynthApp::new(audio, recorder_sink)))
+            Ok(Box::new(SynthApp::new(audio, recorder_sink, saved_layout)))
         }),
     )
 }
@@ -260,6 +271,19 @@ pub(crate) struct SynthApp {
     // Limiter — threshold lives in engine; only the UI toggle is mirrored.
     pub(crate) limiter_enabled: bool,
     pub(crate) window_focused: bool,
+
+    // Design-system gallery (debug window — Ctrl/Cmd+Shift+G).
+    pub(crate) show_design_gallery: bool,
+
+    // ── UI scaling / window geometry persistence ─────────────────────────────
+    pub(crate) zoom_factor: f32,
+    /// True until the first `ui()` tick — used for one-shot monitor clamp.
+    first_frame: bool,
+    /// Last value passed to `set_pixels_per_point` (avoid redundant calls).
+    last_applied_ppp: f32,
+    /// Cached each frame so `on_exit` (which has no `ctx`) can persist it.
+    last_window_size: Option<[f32; 2]>,
+    last_window_pos: Option<[f32; 2]>,
 
     // Global tempo / sync
     pub(crate) global_bpm: u32, // master tempo — source of truth when components are synced
@@ -482,14 +506,17 @@ pub(crate) struct SynthApp {
 }
 
 impl SynthApp {
-    fn new(audio: AudioEngine, recorder_sink: Arc<Mutex<Option<recorder::Recorder>>>) -> Self {
+    fn new(
+        audio: AudioEngine,
+        recorder_sink: Arc<Mutex<Option<recorder::Recorder>>>,
+        saved: ui::layout::LayoutState,
+    ) -> Self {
         let mut midi = MidiEngine::new();
         midi.list_ports();
 
         // Auto-connect: try the saved port name first, then fall back to the
         // first available device so the keyboard just works on launch.
         {
-            let saved = ui::layout::load_layout();
             let target_idx = if let Some(ref saved_name) = saved.midi_port_name {
                 // Prefer exact match on saved name.
                 midi.port_names
@@ -559,7 +586,6 @@ impl SynthApp {
         ];
 
         // Restore persisted layout (theme + panel visibility).
-        let saved = ui::layout::load_layout();
         let theme = ui::theme::builtin_themes()
             .into_iter()
             .find(|t| t.name == saved.theme_name)
@@ -663,6 +689,12 @@ impl SynthApp {
             peak_hold_timer: 0.0,
             limiter_enabled: true,
             window_focused: true,
+            show_design_gallery: false,
+            zoom_factor: saved.zoom_factor.clamp(0.7, 1.4),
+            first_frame: true,
+            last_applied_ppp: 0.0,
+            last_window_size: saved.window_size,
+            last_window_pos: saved.window_pos,
             global_bpm: 120,
             global_sync: false,
             arp_sync: true,
@@ -1601,6 +1633,9 @@ impl SynthApp {
                 .midi
                 .connected_port
                 .and_then(|i| self.midi.port_names.get(i).cloned()),
+            window_size: self.last_window_size,
+            window_pos: self.last_window_pos,
+            zoom_factor: self.zoom_factor,
         }
     }
 
@@ -1631,6 +1666,80 @@ impl eframe::App for SynthApp {
     fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = _ui.ctx().clone();
         let ctx = &ctx;
+
+        // ── Window geometry + zoom ────────────────────────────────────────
+        // Cache window geometry every frame so on_exit (which has no ctx)
+        // can persist it.
+        ctx.input(|i| {
+            let vp = i.viewport();
+            if let Some(r) = vp.inner_rect {
+                self.last_window_size = Some([r.width(), r.height()]);
+            }
+            if let Some(r) = vp.outer_rect {
+                self.last_window_pos = Some([r.min.x, r.min.y]);
+            }
+        });
+
+        // First-frame monitor clamp: shrink to 90% of monitor if larger.
+        if self.first_frame {
+            self.first_frame = false;
+            if let Some(mon) = ctx.input(|i| i.viewport().monitor_size) {
+                let max_w = mon.x * 0.9;
+                let max_h = mon.y * 0.9;
+                let cur = self.last_window_size.unwrap_or([1400.0, 860.0]);
+                if cur[0] > max_w || cur[1] > max_h {
+                    let clamped = egui::vec2(cur[0].min(max_w), cur[1].min(max_h));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(clamped));
+                }
+            }
+        }
+
+        // Cmd/Ctrl +/-/0 zoom shortcuts. egui::Modifiers::COMMAND maps to ⌘
+        // on macOS, Ctrl elsewhere.
+        let zoom_action = ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            let plus = KeyboardShortcut::new(Modifiers::COMMAND, Key::Plus);
+            let equ = KeyboardShortcut::new(Modifiers::COMMAND, Key::Equals);
+            let minus = KeyboardShortcut::new(Modifiers::COMMAND, Key::Minus);
+            let zero = KeyboardShortcut::new(Modifiers::COMMAND, Key::Num0);
+            if i.consume_shortcut(&zero) {
+                return 2; // reset
+            }
+            if i.consume_shortcut(&plus) || i.consume_shortcut(&equ) {
+                return 1; // zoom in
+            }
+            if i.consume_shortcut(&minus) {
+                return -1; // zoom out
+            }
+            0
+        });
+        match zoom_action {
+            1 => self.zoom_factor = (self.zoom_factor + 0.05).min(1.4),
+            -1 => self.zoom_factor = (self.zoom_factor - 0.05).max(0.7),
+            2 => self.zoom_factor = 0.9,
+            _ => {}
+        }
+
+        // Ctrl/Cmd+Shift+G toggles the design-system gallery window.
+        if ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            i.consume_shortcut(&KeyboardShortcut::new(
+                Modifiers::COMMAND | Modifiers::SHIFT,
+                Key::G,
+            ))
+        }) {
+            self.show_design_gallery = !self.show_design_gallery;
+        }
+
+        // Apply pixels_per_point. NOTE: if text appears doubled on HiDPI,
+        // the native_ppp multiplier double-applies — drop it and re-test.
+        let native_ppp = ctx.native_pixels_per_point().unwrap_or(1.0);
+        let target_ppp = self.zoom_factor * native_ppp;
+        if (self.last_applied_ppp - target_ppp).abs() > 0.001 {
+            ctx.set_pixels_per_point(target_ppp);
+            self.last_applied_ppp = target_ppp;
+        }
+
         // Apply theme to egui Visuals + Style every frame — cheap struct copies.
         self.theme.apply_to_egui(ctx);
 
@@ -1672,6 +1781,7 @@ impl eframe::App for SynthApp {
         self.ui_scope_fullscreen(ctx);
         self.ui_scene_browser(ctx);
         self.ui_midi_learn_window(ctx);
+        ui::design::gallery::show(ctx, &mut self.show_design_gallery, &self.theme);
 
         // ── Zone 1: global bar (top, always visible) ──────────────────────────
         egui::TopBottomPanel::top("global_bar")

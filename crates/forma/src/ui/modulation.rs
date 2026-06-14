@@ -1,3 +1,4 @@
+use crate::ui::design::{toggle::ToggleSize, KnobSize, SynthUi, Tier};
 use crate::ui::frame::SynthFrame;
 use crate::SynthApp;
 use eframe::egui;
@@ -32,86 +33,87 @@ pub fn lfo_synced_rate(bpm: f32, division: usize) -> f32 {
 
 impl SynthApp {
     pub fn ui_lfo_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.lfo_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("LFO 1").size(12.0).strong().color(col),
-                    ))
-                    .on_hover_text(
-                        "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
-                    )
-                    .clicked()
-                {
-                    self.lfo_enabled = !on;
-                    self.engine.set_lfo_depth(if self.lfo_enabled {
-                        self.lfo_depth
-                    } else {
-                        0.0
-                    });
-                }
-            });
 
-            ui.add_space(sp_xs);
+            // Header — LFO 1 enable toggle.
+            let mut lfo_on = self.lfo_enabled;
+            if ui
+                .synth_toggle(
+                    &mut lfo_on,
+                    "LFO 1",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text(
+                    "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
+                )
+                .clicked()
+            {
+                self.lfo_enabled = lfo_on;
+                self.engine.set_lfo_depth(if self.lfo_enabled {
+                    self.lfo_depth
+                } else {
+                    0.0
+                });
+            }
+
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.lfo_enabled, |ui| {
-                // Rate + Depth knobs
+                // Rate + Depth knobs + SYNC toggle.
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
                     let sync_on = self.lfo_sync_active();
                     if !sync_on
-                        && super::widgets::knob(
-                            ui,
-                            &mut self.lfo_rate,
-                            0.1..=20.0,
-                            "RATE",
-                            &self.theme,
-                            false,
-                        )
-                        .on_hover_text(
-                            "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
-                        )
-                        .changed()
+                        && ui
+                            .synth_knob(
+                                &mut self.lfo_rate,
+                                0.1..=20.0,
+                                "RATE",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Secondary,
+                            )
+                            .on_hover_text(
+                                "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
+                            )
+                            .changed()
                     {
                         self.engine.set_lfo_rate(self.lfo_rate);
                     }
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("Modulation depth. 0 = off, 1 = full.")
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("Modulation depth. 0 = off, 1 = full.")
+                        .changed()
                     {
                         self.engine.set_lfo_depth(self.lfo_depth);
                     }
 
-                    // Sync toggle
                     ui.add_enabled_ui(!self.global_sync, |ui| {
-                        let sync_on = self.lfo_sync_active();
-                        let sync_col = if sync_on {
-                            self.theme.c(&self.theme.accent)
-                        } else {
-                            self.theme.c(&self.theme.text_disabled)
-                        };
+                        let mut sync_on = self.lfo_sync_active();
                         if ui
-                            .add(egui::Button::selectable(
-                                sync_on,
-                                RichText::new("SYNC").size(10.0).color(sync_col),
-                            ))
+                            .synth_toggle(
+                                &mut sync_on,
+                                "SYNC",
+                                ToggleSize::Standard,
+                                Tier::Secondary,
+                                &theme,
+                                None,
+                            )
                             .on_hover_text("Lock LFO rate to a note division of the Global BPM")
                             .clicked()
                         {
@@ -126,9 +128,11 @@ impl SynthApp {
                     });
                 });
 
-                // Division selector (when synced)
+                // Division selector when synced — kept as wrapped
+                // selectable_label row because chip_selector doesn't
+                // currently support `horizontal_wrapped` overflow.
                 if self.lfo_sync_active() {
-                    ui.add_space(sp_xs);
+                    ui.add_space(theme.sp_xs);
                     ui.horizontal_wrapped(|ui| {
                         for (i, &(label, _)) in LFO_SYNC_DIVISIONS.iter().enumerate() {
                             let active = self.lfo_division == i;
@@ -137,9 +141,9 @@ impl SynthApp {
                                 .selectable_label(
                                     active,
                                     RichText::new(label).small().color(if active {
-                                        self.theme.c(&self.theme.accent)
+                                        theme.c(&theme.accent)
                                     } else {
-                                        self.theme.c(&self.theme.text_secondary)
+                                        theme.c(&theme.text_secondary)
                                     }),
                                 )
                                 .on_hover_text(format!(
@@ -156,57 +160,55 @@ impl SynthApp {
                     });
                 }
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // Shape
+                // SHAPE — chip selector for Sin / Tri / Saw.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    let shape_tips = [
-                        "Sine — smooth, natural modulation.",
-                        "Triangle — linear ramp up and down.",
-                        "Saw — ramps up then resets.",
-                    ];
-                    for (s, label) in [(0usize, "Sin"), (1, "Tri"), (2, "Saw")] {
-                        if ui
-                            .selectable_label(self.lfo_shape == s, label)
-                            .on_hover_text(shape_tips[s])
-                            .clicked()
-                        {
-                            self.lfo_shape = s;
-                            self.engine.set_lfo_shape(s as u8);
-                        }
+                    let mut shape = self.lfo_shape;
+                    let prev = shape;
+                    ui.chip_selector(
+                        &mut shape,
+                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text(
+                        "Sine: smooth · Triangle: linear ramp · Saw: ramp + reset",
+                    );
+                    if shape != prev {
+                        self.lfo_shape = shape;
+                        self.engine.set_lfo_shape(shape as u8);
                     }
                 });
 
-                // Destination
+                // Destination — chip selector for Pitch / Filter / Amp.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    let dest_tips = [
-                        "Pitch — vibrato.",
-                        "Filter — wobble / wah.",
-                        "Amp — tremolo.",
-                    ];
-                    for (d, label) in [(0usize, "Pitch"), (1, "Filter"), (2, "Amp")] {
-                        if ui
-                            .selectable_label(self.lfo_dest == d, label)
-                            .on_hover_text(dest_tips[d])
-                            .clicked()
-                        {
-                            self.lfo_dest = d;
-                            self.engine.set_lfo_dest(d as u8);
-                        }
+                    let mut dest = self.lfo_dest;
+                    let prev = dest;
+                    ui.chip_selector(
+                        &mut dest,
+                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text("Pitch: vibrato · Filter: wobble/wah · Amp: tremolo");
+                    if dest != prev {
+                        self.lfo_dest = dest;
+                        self.engine.set_lfo_dest(dest as u8);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
                 ui.separator();
                 self.ui_lfo_gate_row(ui, LfoGate::L1);
             });
@@ -214,98 +216,115 @@ impl SynthApp {
     }
 
     pub fn ui_lfo2_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.lfo2_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("LFO 2").size(12.0).strong().color(col),
-                    ))
-                    .on_hover_text("Second LFO — runs independently of LFO 1")
-                    .clicked()
-                {
-                    self.lfo2_enabled = !on;
-                    self.engine.set_lfo2_depth(if self.lfo2_enabled {
-                        self.lfo2_depth
-                    } else {
-                        0.0
-                    });
-                }
-            });
 
-            ui.add_space(sp_xs);
+            // Header — LFO 2 enable toggle.
+            let mut lfo2_on = self.lfo2_enabled;
+            if ui
+                .synth_toggle(
+                    &mut lfo2_on,
+                    "LFO 2",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text("Second LFO — runs independently of LFO 1")
+                .clicked()
+            {
+                self.lfo2_enabled = lfo2_on;
+                self.engine.set_lfo2_depth(if self.lfo2_enabled {
+                    self.lfo2_depth
+                } else {
+                    0.0
+                });
+            }
+
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.lfo2_enabled, |ui| {
                 ui.horizontal(|ui| {
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo2_rate,
-                        0.01..=20.0,
-                        "RATE",
-                        &self.theme,
-                        true,
-                    )
-                    .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
-                    .changed()
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo2_rate,
+                            0.01..=20.0,
+                            "RATE",
+                            &theme,
+                            true,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
+                        .changed()
                     {
                         self.engine.set_lfo2_rate(self.lfo2_rate);
                     }
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.lfo2_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("LFO 2 modulation depth")
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut self.lfo2_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("LFO 2 modulation depth")
+                        .changed()
                     {
                         self.engine.set_lfo2_depth(self.lfo2_depth);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
+                // SHAPE — chip selector.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("SHAPE")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    for (s, label) in [(0usize, "Sin"), (1, "Tri"), (2, "Saw")] {
-                        if ui.selectable_label(self.lfo2_shape == s, label).clicked() {
-                            self.lfo2_shape = s;
-                            self.engine.set_lfo2_shape(s as u8);
-                        }
+                    let mut shape = self.lfo2_shape;
+                    let prev = shape;
+                    ui.chip_selector(
+                        &mut shape,
+                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                        &theme,
+                        None,
+                    );
+                    if shape != prev {
+                        self.lfo2_shape = shape;
+                        self.engine.set_lfo2_shape(shape as u8);
                     }
                 });
 
+                // Destination — chip selector.
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
-                    for (d, label) in [(0usize, "Pitch"), (1, "Filter"), (2, "Amp")] {
-                        if ui.selectable_label(self.lfo2_dest == d, label).clicked() {
-                            self.lfo2_dest = d;
-                            self.engine.set_lfo2_dest(d as u8);
-                        }
+                    let mut dest = self.lfo2_dest;
+                    let prev = dest;
+                    ui.chip_selector(
+                        &mut dest,
+                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                        &theme,
+                        None,
+                    );
+                    if dest != prev {
+                        self.lfo2_dest = dest;
+                        self.engine.set_lfo2_dest(dest as u8);
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
                 ui.separator();
                 self.ui_lfo_gate_row(ui, LfoGate::L2);
             });
@@ -317,57 +336,57 @@ impl SynthApp {
     /// `ui_lfo2_panel`: a `SynthFrame::section` with header, knob row, division row,
     /// and a 16-cell step row below.
     pub fn ui_pulse_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header
-            ui.horizontal(|ui| {
-                let on = self.pulse_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
-                if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("PULSE").size(12.0).strong().color(col),
-                    ))
-                    .on_hover_text(
-                        "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
-                    )
-                    .clicked()
-                {
-                    self.pulse_enabled = !on;
-                    self.engine.set_gate_aenv_enabled(self.pulse_enabled);
-                }
-            });
+            // Header — PULSE enable toggle.
+            let mut pulse_on = self.pulse_enabled;
+            if ui
+                .synth_toggle(
+                    &mut pulse_on,
+                    "PULSE",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
+                .on_hover_text(
+                    "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
+                )
+                .clicked()
+            {
+                self.pulse_enabled = pulse_on;
+                self.engine.set_gate_aenv_enabled(self.pulse_enabled);
+            }
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.pulse_enabled, |ui| {
-                // Depth knob + length stepper
+                // Depth knob + length stepper.
                 ui.horizontal(|ui| {
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.pulse_depth,
-                        0.0..=1.0,
-                        "DEPTH",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text("How hard each step ducks the master output")
-                    .changed()
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    if ui
+                        .synth_knob(
+                            &mut self.pulse_depth,
+                            0.0..=1.0,
+                            "DEPTH",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text("How hard each step ducks the master output")
+                        .changed()
                     {
                         self.engine.set_gate_aenv_depth(self.pulse_depth);
                     }
 
                     ui.label(
                         RichText::new("LEN")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     let mut len = self.pulse_length as i32;
                     if ui
@@ -380,9 +399,9 @@ impl SynthApp {
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // Division selector — same idiom as LFO sync. Always tempo-synced.
+                // Division selector — kept as wrapped selectable_label row.
                 ui.horizontal_wrapped(|ui| {
                     for div in forma_common::ClockDivision::ALL {
                         let div_u8 = div.to_u8();
@@ -393,9 +412,9 @@ impl SynthApp {
                             .selectable_label(
                                 active,
                                 RichText::new(label).small().color(if active {
-                                    self.theme.c(&self.theme.accent)
+                                    theme.c(&theme.accent)
                                 } else {
-                                    self.theme.c(&self.theme.text_secondary)
+                                    theme.c(&theme.text_secondary)
                                 }),
                             )
                             .on_hover_text(format!(
@@ -411,22 +430,23 @@ impl SynthApp {
                     }
                 });
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // 16-cell step row.
+                // 16-cell step row. Same length-aware alpha treatment as
+                // `ui_lfo_gate_row` — see that comment.
                 ui.label(
                     RichText::new("STEPS")
-                        .size(10.0)
-                        .color(self.theme.c(&self.theme.text_secondary)),
+                        .font(theme.font_body())
+                        .color(theme.c(&theme.text_secondary)),
                 );
                 ui.horizontal(|ui| {
                     let total_w = ui.available_width();
                     let spacing = ui.spacing().item_spacing.x;
                     let step_w = ((total_w - spacing * 15.0) / 16.0).max(14.0);
                     let cell_h = 26.0;
-                    let active_col = self.theme.c(&self.theme.accent);
-                    let inactive_col = self.theme.c(&self.theme.bg_sunken);
-                    let edge = self.theme.c(&self.theme.text_disabled);
+                    let active_col = theme.c(&theme.accent);
+                    let inactive_col = theme.c(&theme.bg_sunken);
+                    let edge = theme.c(&theme.text_disabled);
                     for i in 0..16u8 {
                         let on_step = (self.pulse_pattern >> i) & 1 != 0;
                         let in_active_len = i < self.pulse_length;
@@ -436,6 +456,7 @@ impl SynthApp {
                         );
                         let painter = ui.painter_at(rect);
                         let fill = if on_step { active_col } else { inactive_col };
+                        // Token-derived: alpha encodes pattern-length state.
                         let alpha = if in_active_len { 255 } else { 90 };
                         let fill = egui::Color32::from_rgba_unmultiplied(
                             fill.r(),
@@ -443,11 +464,11 @@ impl SynthApp {
                             fill.b(),
                             alpha,
                         );
-                        painter.rect_filled(rect, egui::CornerRadius::same(3), fill);
+                        painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
                         painter.rect_stroke(
                             rect,
-                            egui::CornerRadius::same(3),
-                            Stroke::new(1.0, edge),
+                            egui::CornerRadius::same(theme.rounding_xs as u8),
+                            Stroke::new(theme.stroke_ui, edge),
                             egui::StrokeKind::Middle,
                         );
                         if resp.clicked() {
@@ -482,18 +503,19 @@ impl SynthApp {
             LfoGate::L2 => self.lfo2_gate_division,
         };
 
-        // Header row: RETRIG enable + division dropdown
+        let theme = self.theme.clone();
+
+        // Header row: RETRIG toggle + division dropdown.
         ui.horizontal(|ui| {
-            let col = if enabled {
-                self.theme.c(&self.theme.accent)
-            } else {
-                self.theme.c(&self.theme.text_disabled)
-            };
             if ui
-                .add(egui::Button::selectable(
-                    enabled,
-                    RichText::new("RETRIG").size(10.0).strong().color(col),
-                ))
+                .synth_toggle(
+                    &mut enabled,
+                    "RETRIG",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &theme,
+                    None,
+                )
                 .on_hover_text(
                     "Resets the LFO's phase to 0 on each \"on\" step (tempo-synced).\n\
                      \n\
@@ -506,7 +528,7 @@ impl SynthApp {
                 )
                 .clicked()
             {
-                enabled = !enabled;
+                // synth_toggle has already flipped `enabled` via its &mut.
             }
 
             let div = forma_common::ClockDivision::from_u8(division as u8);
@@ -530,7 +552,11 @@ impl SynthApp {
                 });
         });
 
-        // 16-cell step row.
+        // 16-cell step row. Custom painter rather than StepPad component
+        // because the active-length alpha treatment (steps beyond the
+        // pattern length render at 35% opacity to signal "ignored") doesn't
+        // map cleanly to StepPad's binary state model. All visual values
+        // are token-derived.
         let mut pattern_changed = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {
@@ -538,9 +564,9 @@ impl SynthApp {
                 let spacing = ui.spacing().item_spacing.x;
                 let step_w = ((total_w - spacing * 15.0) / 16.0).max(10.0);
                 let cell_h = 18.0;
-                let active_col = self.theme.c(&self.theme.accent);
-                let inactive_col = self.theme.c(&self.theme.bg_sunken);
-                let edge = self.theme.c(&self.theme.text_disabled);
+                let active_col = theme.c(&theme.accent);
+                let inactive_col = theme.c(&theme.bg_sunken);
+                let edge = theme.c(&theme.text_disabled);
                 for i in 0..16u8 {
                     let on_step = (pattern >> i) & 1 != 0;
                     let in_active_len = i < length;
@@ -548,14 +574,16 @@ impl SynthApp {
                         .allocate_exact_size(egui::Vec2::new(step_w, cell_h), egui::Sense::click());
                     let painter = ui.painter_at(rect);
                     let fill = if on_step { active_col } else { inactive_col };
+                    // Token-derived: alpha encodes whether the step falls
+                    // inside the current pattern length.
                     let alpha = if in_active_len { 255 } else { 90 };
                     let fill =
                         egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), alpha);
-                    painter.rect_filled(rect, egui::CornerRadius::same(2), fill);
+                    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
                     painter.rect_stroke(
                         rect,
-                        egui::CornerRadius::same(2),
-                        Stroke::new(1.0, edge),
+                        egui::CornerRadius::same(theme.rounding_xs as u8),
+                        Stroke::new(theme.stroke_ui, edge),
                         egui::StrokeKind::Middle,
                     );
                     if resp.clicked() {
@@ -606,28 +634,30 @@ impl SynthApp {
     }
 
     pub fn ui_filter_panel(&mut self, ui: &mut egui::Ui) {
-        let sp_xs = self.theme.sp_xs;
+        let theme = self.theme.clone();
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        // Tier 1 frame — Filter cutoff / resonance are the canonical
+        // performance controls per `01-philosophy.md`. Accent border earns
+        // the elevation.
+        SynthFrame::tier1(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // ── Header ───────────────────────────────────────────────────────
+            // ── Header: FILTER toggle + LP24 caption ──────────────────────
+            let mut filter_on = self.filter_enabled;
             ui.horizontal(|ui| {
-                let on = self.filter_enabled;
-                let col = if on {
-                    self.theme.c(&self.theme.accent)
-                } else {
-                    self.theme.c(&self.theme.text_disabled)
-                };
                 if ui
-                    .add(egui::Button::selectable(
-                        on,
-                        RichText::new("FILTER").size(12.0).strong().color(col),
-                    ))
+                    .synth_toggle(
+                        &mut filter_on,
+                        "FILTER",
+                        ToggleSize::Standard,
+                        Tier::Primary,
+                        &theme,
+                        None,
+                    )
                     .on_hover_text("Moog-style 4-pole lowpass filter")
                     .clicked()
                 {
-                    self.filter_enabled = !on;
+                    self.filter_enabled = filter_on;
                     if self.filter_enabled {
                         self.engine.set_filter_cutoff(self.filter_cutoff);
                         self.engine.set_filter_resonance(self.filter_q);
@@ -639,46 +669,45 @@ impl SynthApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
                         RichText::new("LP24")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                 });
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
-            // ── Mode buttons ─────────────────────────────────────────────────
-            // Only LP is active; BP/HP/NOTCH are shown but disabled.
+            // ── Mode row: LP active, BP/HP/NOTCH placeholder/disabled ─────
+            // Kept as raw buttons for now — chip_selector would let the user
+            // click into a disabled mode. Phase 7 polish should add a
+            // disabled-chip variant to ChipSelector and migrate this row.
             ui.horizontal(|ui| {
-                let accent = self.theme.c(&self.theme.accent);
-                let disabled = self.theme.c(&self.theme.text_disabled);
-                // LP — always selected
+                let accent = theme.c(&theme.accent);
+                let disabled = theme.c(&theme.text_disabled);
                 ui.add(egui::Button::selectable(
                     true,
-                    RichText::new("LP").size(10.0).strong().color(accent),
+                    RichText::new("LP").font(theme.font_body()).strong().color(accent),
                 ));
                 for label in ["BP", "HP", "NOTCH"] {
                     ui.add_enabled(
                         false,
                         egui::Button::selectable(
                             false,
-                            RichText::new(label).size(10.0).color(disabled),
+                            RichText::new(label).font(theme.font_body()).color(disabled),
                         ),
                     );
                 }
             });
 
-            ui.add_space(sp_xs);
+            ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.filter_enabled, |ui| {
-                // ── Response curve ────────────────────────────────────────────
+                // ── Response curve ────────────────────────────────────────
                 let curve_h = ui.available_width().min(100.0);
                 let curve_size = egui::Vec2::new(ui.available_width(), curve_h);
                 let (rect, response) =
                     ui.allocate_exact_size(curve_size, egui::Sense::click_and_drag());
 
-                // Absolute-position interaction: clicking anywhere in the rect
-                // jumps the node there. Shift slows delta movement for fine tuning.
                 if response.dragged() {
                     let fine = ui.input(|i| i.modifiers.shift);
                     if fine {
@@ -709,7 +738,6 @@ impl SynthApp {
                     self.engine.set_filter_resonance(self.filter_q);
                 }
 
-                // Show mod wheel filter contribution on the curve only when dest==Filter.
                 let mod_offset = if self.mod_wheel_dest == 1 {
                     self.piano_mod_wheel as f32 / 5.0 * self.mod_wheel_depth * self.filter_cutoff * 0.5
                 } else {
@@ -724,30 +752,35 @@ impl SynthApp {
                         effective_cutoff,
                         self.filter_q,
                         response.hovered() || response.dragged(),
-                        &self.theme,
+                        &theme,
                     );
                 }
 
-                ui.add_space(sp_xs);
+                ui.add_space(theme.sp_xs);
 
-                // ── Knobs ─────────────────────────────────────────────────────
+                // ── Knobs ─────────────────────────────────────────────────
+                // CUTOFF + RES are Tier 1 (Large + Primary). The remaining
+                // four are Tier 2 sound-design knobs (Standard + Secondary).
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+
+                    // CUTOFF — Tier 1 performance control.
                     ui.vertical(|ui| {
                         let mut display_cutoff = effective_cutoff;
-                        let knob_resp = super::widgets::knob(
-                            ui,
-                            &mut display_cutoff,
-                            80.0..=18000.0,
-                            "CUTOFF",
-                            &self.theme,
-                            true,
-                        )
-                        .on_hover_text("Cutoff frequency. 80 Hz = dark, 18 kHz = fully open.");
+                        let knob_resp = ui
+                            .synth_knob(
+                                &mut display_cutoff,
+                                80.0..=18000.0,
+                                "CUTOFF",
+                                &theme,
+                                true,
+                                KnobSize::Large,
+                                Tier::Primary,
+                            )
+                            .on_hover_text("Cutoff frequency. 80 Hz = dark, 18 kHz = fully open.");
                         if knob_resp.changed() {
-                            // Knob moved: keep mod offset, back-solve base cutoff.
-                            // Approximate back-solve: base ≈ effective / (1 + depth*0.5) when offset
-                            // is additive-relative; for simplicity just subtract the pre-computed offset.
-                            self.filter_cutoff = (display_cutoff - mod_offset).clamp(80.0, 18000.0);
+                            self.filter_cutoff =
+                                (display_cutoff - mod_offset).clamp(80.0, 18000.0);
                             self.engine.set_filter_cutoff(self.filter_cutoff);
                         }
                         if mod_offset > 0.0 {
@@ -758,91 +791,106 @@ impl SynthApp {
                             };
                             ui.label(
                                 RichText::new(format!("▲ {hz_str}"))
-                                    .size(9.0)
-                                    .color(Color32::from_rgb(180, 120, 255)),
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_primary)),
                             )
                             .on_hover_text("Effective cutoff with mod wheel offset");
                         }
                     });
 
-                    if super::widgets::knob(
-                        ui,
-                        &mut self.filter_q,
-                        0.0..=0.95,
-                        "RES",
-                        &self.theme,
-                        false,
+                    // RES — Tier 1 performance control.
+                    if ui
+                        .synth_knob(
+                            &mut self.filter_q,
+                            0.0..=0.95,
+                            "RES",
+                            &theme,
+                            false,
+                            KnobSize::Large,
+                            Tier::Primary,
                         )
-                    .on_hover_text("Resonance — 0 = flat, 0.9+ = self-oscillation.")
-                    .changed()
+                        .on_hover_text("Resonance — 0 = flat, 0.9+ = self-oscillation.")
+                        .changed()
                     {
                         self.engine.set_filter_resonance(self.filter_q);
                     }
 
+                    // DRIVE — Tier 2 sound design.
                     let mut drive = self.engine.filter_drive();
-                    if super::widgets::knob(
-                        ui,
-                        &mut drive,
-                        1.0..=10.0,
-                        "DRIVE",
-                        &self.theme,
-                        false,
+                    if ui
+                        .synth_knob(
+                            &mut drive,
+                            1.0..=10.0,
+                            "DRIVE",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
                         )
-                    .on_hover_text(
-                        "Input drive — saturates the signal before the filter. 1 = clean, 10 = heavy.",
-                    )
-                    .changed()
+                        .on_hover_text(
+                            "Input drive — saturates the signal before the filter. 1 = clean, 10 = heavy.",
+                        )
+                        .changed()
                     {
                         self.engine.set_filter_drive(drive);
                     }
 
+                    // KEY tracking — Tier 2.
                     let mut key_track = self.engine.filter_key_track();
-                    if super::widgets::knob(
-                        ui,
-                        &mut key_track,
-                        0.0..=1.0,
-                        "KEY",
-                        &self.theme,
-                        false,
+                    if ui
+                        .synth_knob(
+                            &mut key_track,
+                            0.0..=1.0,
+                            "KEY",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
                         )
-                    .on_hover_text(
-                        "Keyboard tracking — cutoff follows pitch. 0 = off, 1 = full (one octave up doubles the cutoff).",
-                    )
-                    .changed()
+                        .on_hover_text(
+                            "Keyboard tracking — cutoff follows pitch. 0 = off, 1 = full (one octave up doubles the cutoff).",
+                        )
+                        .changed()
                     {
                         self.engine.set_filter_key_track(key_track);
                     }
 
+                    // VEL>AMP — Tier 2.
                     let mut vel_amp = self.engine.vel_amp();
-                    if super::widgets::knob(
-                        ui,
-                        &mut vel_amp,
-                        0.0..=1.0,
-                        "VEL>AMP",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text(
-                        "Velocity → amplitude. 0 = velocity ignored (always full volume), 1 = full sensitivity.",
-                    )
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut vel_amp,
+                            0.0..=1.0,
+                            "VEL>AMP",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text(
+                            "Velocity → amplitude. 0 = velocity ignored (always full volume), 1 = full sensitivity.",
+                        )
+                        .changed()
                     {
                         self.engine.set_vel_amp(vel_amp);
                     }
 
+                    // VEL>FLT — Tier 2.
                     let mut vel_filter = self.engine.vel_filter();
-                    if super::widgets::knob(
-                        ui,
-                        &mut vel_filter,
-                        0.0..=1.0,
-                        "VEL>FLT",
-                        &self.theme,
-                        false,
-                    )
-                    .on_hover_text(
-                        "Velocity → filter cutoff. Hard hits open the filter. 0 = off, 1 = adds up to 8 kHz.",
-                    )
-                    .changed()
+                    if ui
+                        .synth_knob(
+                            &mut vel_filter,
+                            0.0..=1.0,
+                            "VEL>FLT",
+                            &theme,
+                            false,
+                            KnobSize::Standard,
+                            Tier::Secondary,
+                        )
+                        .on_hover_text(
+                            "Velocity → filter cutoff. Hard hits open the filter. 0 = off, 1 = adds up to 8 kHz.",
+                        )
+                        .changed()
                     {
                         self.engine.set_vel_filter(vel_filter);
                     }
@@ -852,43 +900,39 @@ impl SynthApp {
     }
 
     pub fn ui_mod_matrix_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
+        let theme = self.theme.clone();
         const SOURCES: &[&str] = &["Off", "LFO 1", "LFO 2", "Mod Wheel", "Aftertouch"];
         const DESTS: &[&str] = &["Off", "Filter", "Amp", "Pitch"];
 
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.label(
                 RichText::new("MOD MATRIX")
-                    .size(12.0)
-                    .strong()
-                    .color(self.theme.c(&self.theme.accent)),
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
             );
-            ui.add_space(self.theme.sp_xs);
+            ui.add_space(theme.sp_xs);
 
             egui::Grid::new("mod_matrix_grid")
                 .num_columns(4)
-                .spacing([8.0, 4.0])
+                .spacing([theme.sp_sm, theme.sp_xs])
                 .show(ui, |ui| {
-                    // Header
                     for label in ["#", "SOURCE", "→ DEST", "DEPTH"] {
                         ui.label(
                             RichText::new(label)
-                                .size(9.0)
-                                .color(self.theme.c(&self.theme.text_secondary)),
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_secondary)),
                         );
                     }
                     ui.end_row();
 
                     for slot in 0..4 {
-                        // Row number
                         ui.label(
                             RichText::new(format!("{}", slot + 1))
-                                .size(10.0)
-                                .color(self.theme.c(&self.theme.text_disabled)),
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_disabled)),
                         );
 
-                        // Source combo
                         egui::ComboBox::from_id_salt(format!("mat_src_{slot}"))
                             .selected_text(SOURCES[self.mat_src[slot].min(4)])
                             .width(90.0)
@@ -904,7 +948,6 @@ impl SynthApp {
                                 }
                             });
 
-                        // Dest combo
                         egui::ComboBox::from_id_salt(format!("mat_dst_{slot}"))
                             .selected_text(DESTS[self.mat_dst[slot].min(3)])
                             .width(70.0)
@@ -920,7 +963,6 @@ impl SynthApp {
                                 }
                             });
 
-                        // Depth drag
                         let mut d = self.mat_depth[slot];
                         let active = self.mat_src[slot] != 0 && self.mat_dst[slot] != 0;
                         let resp = ui.add_enabled(
@@ -942,34 +984,39 @@ impl SynthApp {
     }
 
     pub fn ui_mod_wheel_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
-        let sp_xs = self.theme.sp_xs;
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        let theme = self.theme.clone();
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            ui.label(
+                RichText::new("MOD WHEEL")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
+            ui.add_space(theme.sp_xs);
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("MOD WHEEL")
-                        .size(12.0)
-                        .strong()
-                        .color(self.theme.c(&self.theme.accent)),
-                );
-            });
-            ui.add_space(sp_xs);
-            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
                 let mut depth = self.mod_wheel_depth;
-                if super::widgets::knob(ui, &mut depth, 0.0..=1.0, "DEPTH", &self.theme, false)
+                if ui
+                    .synth_knob(
+                        &mut depth,
+                        0.0..=1.0,
+                        "DEPTH",
+                        &theme,
+                        false,
+                        KnobSize::Standard,
+                        Tier::Secondary,
+                    )
                     .on_hover_text("How much the mod wheel affects the selected destination.")
                     .changed()
                 {
                     self.mod_wheel_depth = depth;
                     self.engine.set_mod_wheel_depth(depth);
                 }
-                ui.add_space(sp_xs);
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     for (d, label, tip) in [
                         (0usize, "Off", "Mod wheel has no effect."),
@@ -996,22 +1043,28 @@ impl SynthApp {
     }
 
     pub fn ui_aftertouch_panel(&mut self, ui: &mut egui::Ui) {
-        use crate::ui::frame::SynthFrame;
-        let sp_xs = self.theme.sp_xs;
-        SynthFrame::section(&self.theme).show(ui, |ui| {
+        let theme = self.theme.clone();
+        SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            ui.label(
+                RichText::new("AFTERTOUCH")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
+            ui.add_space(theme.sp_xs);
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("AFTERTOUCH")
-                        .size(12.0)
-                        .strong()
-                        .color(self.theme.c(&self.theme.accent)),
-                );
-            });
-            ui.add_space(sp_xs);
-            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
                 let mut depth = self.aftertouch_depth;
-                if super::widgets::knob(ui, &mut depth, 0.0..=1.0, "DEPTH", &self.theme, false)
+                if ui
+                    .synth_knob(
+                        &mut depth,
+                        0.0..=1.0,
+                        "DEPTH",
+                        &theme,
+                        false,
+                        KnobSize::Standard,
+                        Tier::Secondary,
+                    )
                     .on_hover_text(
                         "How much channel pressure (aftertouch) affects the selected destination.",
                     )
@@ -1020,12 +1073,11 @@ impl SynthApp {
                     self.aftertouch_depth = depth;
                     self.engine.set_aftertouch_depth(depth);
                 }
-                ui.add_space(sp_xs);
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("→")
-                            .size(10.0)
-                            .color(self.theme.c(&self.theme.text_secondary)),
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
                     );
                     for (d, label, tip) in [
                         (0usize, "Off", "Aftertouch has no effect."),
@@ -1061,7 +1113,7 @@ impl SynthApp {
             // Header
             ui.label(
                 RichText::new(title)
-                    .size(12.0)
+                    .font(self.theme.font_heading())
                     .strong()
                     .color(self.theme.c(&self.theme.text_primary)),
             );
@@ -1102,7 +1154,7 @@ impl SynthApp {
                         // Label above slider
                         ui.label(
                             RichText::new(labels[i])
-                                .size(10.0)
+                                .font(self.theme.font_body())
                                 .color(self.theme.c(&self.theme.text_secondary)),
                         );
                         let log = i != 2;
@@ -1180,7 +1232,7 @@ fn draw_lp_response_curve(
     let border_col = if active {
         accent
     } else {
-        Color32::from_gray(55)
+        theme.c(&theme.border)
     };
 
     // ── Coordinate helpers ────────────────────────────────────────────────
@@ -1193,13 +1245,14 @@ fn draw_lp_response_curve(
     };
 
     // ── Background ────────────────────────────────────────────────────────
+    // Token-derived: accent tinted dark.
     let bg = Color32::from_rgba_premultiplied(accent.r() / 6, accent.g() / 6, accent.b() / 6, 140);
-    painter.rect_filled(rect, egui::CornerRadius::same(5), bg);
+    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), bg);
 
     // ── Grid — log-spaced vertical frequency lines ────────────────────────
-    let grid_col = Color32::from_gray(42);
-    let label_col = Color32::from_gray(72);
-    let small = egui::FontId::proportional(8.0);
+    let grid_col = theme.c(&theme.border);
+    let label_col = theme.c(&theme.text_secondary);
+    let small = theme.font_small();
     for (f, label) in [
         (100.0_f32, "100"),
         (200.0, "200"),
@@ -1212,7 +1265,7 @@ fn draw_lp_response_curve(
         let x = sx(freq_to_t(f));
         painter.line_segment(
             [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
-            egui::Stroke::new(1.0, grid_col),
+            egui::Stroke::new(theme.stroke_ui, grid_col),
         );
         painter.text(
             egui::pos2(x, rect.bottom() - 2.0),
@@ -1226,7 +1279,9 @@ fn draw_lp_response_curve(
     // ── Grid — horizontal dB lines ────────────────────────────────────────
     for db in [-48.0_f32, -24.0, -12.0, 0.0, 18.0] {
         let y = sy(db);
-        let w = if db == 0.0 { 1.0 } else { 0.5 };
+        // 0 dB line is full-weight; minor lines are half. Both are
+        // token-relative — they scale if `stroke_ui` ever changes.
+        let w = if db == 0.0 { theme.stroke_ui } else { theme.stroke_ui * 0.5 };
         painter.line_segment(
             [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
             egui::Stroke::new(w, grid_col),
@@ -1269,10 +1324,10 @@ fn draw_lp_response_curve(
         ));
     }
 
-    // Curve line
+    // Curve line — token-derived: accent at high alpha.
     let line_col = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 210);
     for w in pts.windows(2) {
-        painter.line_segment([w[0], w[1]], egui::Stroke::new(1.5, line_col));
+        painter.line_segment([w[0], w[1]], egui::Stroke::new(theme.stroke_focus, line_col));
     }
 
     // ── Control node — free in (cutoff × Q) space, not on the curve ───────
@@ -1281,21 +1336,21 @@ fn draw_lp_response_curve(
     let node_x = sx(freq_to_t(cutoff));
     let node_y = rect.bottom() - (q_engine / 0.95) * rect.height();
 
-    // Subtle crosshair
+    // Subtle crosshair — token-derived: accent at low alpha.
     let cross = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 45);
     painter.line_segment(
         [
             egui::pos2(node_x, rect.top()),
             egui::pos2(node_x, rect.bottom()),
         ],
-        egui::Stroke::new(1.0, cross),
+        egui::Stroke::new(theme.stroke_ui, cross),
     );
     painter.line_segment(
         [
             egui::pos2(rect.left(), node_y),
             egui::pos2(rect.right(), node_y),
         ],
-        egui::Stroke::new(1.0, cross),
+        egui::Stroke::new(theme.stroke_ui, cross),
     );
 
     // Node dot
@@ -1303,14 +1358,14 @@ fn draw_lp_response_curve(
     painter.circle_stroke(
         egui::pos2(node_x, node_y),
         5.0,
-        egui::Stroke::new(1.5, Color32::WHITE),
+        egui::Stroke::new(theme.stroke_focus, theme.c(&theme.text_primary)),
     );
 
     // Border (drawn last so it's on top of the curve)
     painter.rect_stroke(
         rect,
-        egui::CornerRadius::same(5),
-        egui::Stroke::new(1.0, border_col),
+        egui::CornerRadius::same(theme.rounding_sm as u8),
+        egui::Stroke::new(theme.stroke_ui, border_col),
         egui::StrokeKind::Middle,
     );
 }
@@ -1328,7 +1383,7 @@ pub fn draw_adsr_visualizer(
     );
     let rect = resp.rect;
 
-    painter.rect_filled(rect, egui::CornerRadius::same(3), theme.c(&theme.bg_adsr));
+    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.bg_adsr));
 
     let a = adsr[0];
     let d = adsr[1];
@@ -1369,13 +1424,13 @@ pub fn draw_adsr_visualizer(
     ));
 
     let pts = [p0, p1, p2, p3, p4];
-    let stroke = Stroke::new(1.5, theme.c(&theme.adsr_outline));
+    let stroke = Stroke::new(theme.stroke_focus, theme.c(&theme.adsr_outline));
     for w in pts.windows(2) {
         painter.line_segment([w[0], w[1]], stroke);
     }
 
     let label_color = theme.ca(&theme.adsr_label);
-    let small = egui::FontId::proportional(9.0);
+    let small = theme.font_body();
     for (label, x) in [
         ("A", tx(a * 0.5)),
         ("D", tx(a + d * 0.5)),

@@ -142,7 +142,7 @@ impl SynthApp {
         ui.add_space(2.0);
 
         // Factory layouts
-        ui.label(egui::RichText::new("Factory").size(10.0).color(text_dis));
+        ui.label(egui::RichText::new("Factory").font(self.theme.font_body()).color(text_dis));
         use crate::ui::layout::builtin_presets;
         for preset in builtin_presets() {
             ui.horizontal(|ui| {
@@ -159,7 +159,7 @@ impl SynthApp {
         let saved = crate::layout_store::list_user_layouts();
         if !saved.is_empty() {
             ui.add_space(2.0);
-            ui.label(egui::RichText::new("Saved").size(10.0).color(text_dis));
+            ui.label(egui::RichText::new("Saved").font(self.theme.font_body()).color(text_dis));
             for name in saved {
                 ui.horizontal(|ui| {
                     let btn = egui::Button::new(egui::RichText::new(&name).small().color(accent));
@@ -173,7 +173,7 @@ impl SynthApp {
                         }
                     }
                     let del =
-                        egui::Button::new(egui::RichText::new("✕").size(10.0).color(text_dis));
+                        egui::Button::new(egui::RichText::new("✕").font(self.theme.font_body()).color(text_dis));
                     if ui
                         .add(del)
                         .on_hover_text(format!("Delete layout \"{name}\""))
@@ -209,6 +209,7 @@ impl SynthApp {
         ui.add_space(2.0);
 
         let monitor_h = (ui.available_height() - 4.0).clamp(60.0, 200.0);
+        // Data-driven: MIDI event log grows continuously while connected.
         egui::ScrollArea::vertical()
             .max_height(monitor_h)
             .show(ui, |ui| {
@@ -226,7 +227,7 @@ impl SynthApp {
                     } else {
                         text_sec
                     };
-                    ui.label(egui::RichText::new(msg).monospace().size(10.0).color(col));
+                    ui.label(egui::RichText::new(msg).monospace().font(self.theme.font_body()).color(col));
                 }
             });
     }

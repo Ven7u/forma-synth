@@ -373,7 +373,7 @@ impl SynthApp {
                         [28.0, 14.0],
                         egui::Label::new(
                             egui::RichText::new(format!("{}", step + 1))
-                                .size(9.0)
+                                .font(self.theme.font_body())
                                 .color(col),
                         ),
                     );
@@ -406,7 +406,7 @@ impl SynthApp {
                         .add_sized(
                             [64.0, 26.0],
                             egui::Button::new(
-                                egui::RichText::new(ch_name).size(10.0).color(name_col),
+                                egui::RichText::new(ch_name).font(self.theme.font_body()).color(name_col),
                             )
                             .frame(expanded),
                         )
@@ -494,7 +494,7 @@ impl SynthApp {
                         text_dis
                     };
                     if ui
-                        .button(egui::RichText::new("M").size(9.0).color(m_col))
+                        .button(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
                         .on_hover_text("Mute this lane")
                         .clicked()
                     {
@@ -508,7 +508,7 @@ impl SynthApp {
                     } else {
                         text_dis
                     };
-                    let s_btn = egui::Button::new(egui::RichText::new("S").size(9.0).color(s_col))
+                    let s_btn = egui::Button::new(egui::RichText::new("S").font(self.theme.font_body()).color(s_col))
                         .fill(if soloed {
                             Color32::from_rgba_premultiplied(255, 200, 50, 40)
                         } else {
@@ -524,7 +524,7 @@ impl SynthApp {
 
                     // Reverse button
                     if ui
-                        .button(egui::RichText::new("⇄").size(9.0).color(text_dis))
+                        .button(egui::RichText::new("⇄").font(self.theme.font_body()).color(text_dis))
                         .on_hover_text("Reverse this lane's pattern")
                         .clicked()
                     {
@@ -535,7 +535,7 @@ impl SynthApp {
 
                     // Randomize button
                     if ui
-                        .button(egui::RichText::new("?").size(9.0).color(text_dis))
+                        .button(egui::RichText::new("?").font(self.theme.font_body()).color(text_dis))
                         .on_hover_text("Randomize this lane's steps (50% density)")
                         .clicked()
                     {
@@ -556,7 +556,7 @@ impl SynthApp {
                     // Euclidean toggle button
                     let euclid_on = self.drums.euclid_on[ch];
                     let e_col = if euclid_on { accent } else { text_dis };
-                    let e_btn = egui::Button::new(egui::RichText::new("E").size(9.0).color(e_col))
+                    let e_btn = egui::Button::new(egui::RichText::new("E").font(self.theme.font_body()).color(e_col))
                         .fill(if euclid_on {
                             accent.gamma_multiply(0.2)
                         } else {
@@ -587,7 +587,7 @@ impl SynthApp {
                             ui.horizontal(|ui| {
                                 ui.label(
                                     egui::RichText::new(format!("{} — Voice Editor", ch_name))
-                                        .size(10.0)
+                                        .font(self.theme.font_body())
                                         .color(accent),
                                 );
                                 ui.with_layout(
@@ -610,7 +610,7 @@ impl SynthApp {
                                     ui.vertical(|ui| {
                                         ui.label(
                                             egui::RichText::new("Freq (Hz)")
-                                                .size(9.0)
+                                                .font(self.theme.font_body())
                                                 .color(text_sec),
                                         );
                                         ui.add(
@@ -627,7 +627,7 @@ impl SynthApp {
                                     ui.vertical(|ui| {
                                         ui.label(
                                             egui::RichText::new("Sweep (Hz)")
-                                                .size(9.0)
+                                                .font(self.theme.font_body())
                                                 .color(text_sec),
                                         );
                                         ui.add(
@@ -644,7 +644,7 @@ impl SynthApp {
                                     ui.vertical(|ui| {
                                         ui.label(
                                             egui::RichText::new("Decay (s)")
-                                                .size(9.0)
+                                                .font(self.theme.font_body())
                                                 .color(text_sec),
                                         );
                                         ui.add(
@@ -660,7 +660,7 @@ impl SynthApp {
                                     ui.set_min_width(70.0);
                                     ui.vertical(|ui| {
                                         ui.label(
-                                            egui::RichText::new("Noise").size(9.0).color(text_sec),
+                                            egui::RichText::new("Noise").font(self.theme.font_body()).color(text_sec),
                                         );
                                         ui.add(
                                             egui::DragValue::new(&mut self.drums.noise_mix[ch])
@@ -675,7 +675,7 @@ impl SynthApp {
                                     ui.set_min_width(70.0);
                                     ui.vertical(|ui| {
                                         ui.label(
-                                            egui::RichText::new("Volume").size(9.0).color(text_sec),
+                                            egui::RichText::new("Volume").font(self.theme.font_body()).color(text_sec),
                                         );
                                         ui.add(
                                             egui::DragValue::new(
@@ -699,7 +699,7 @@ impl SynthApp {
                                 };
                                 let e_col = if euclid_on { accent } else { text_dis };
                                 let e_btn = egui::Button::new(
-                                    egui::RichText::new(e_label).size(9.0).color(e_col),
+                                    egui::RichText::new(e_label).font(self.theme.font_body()).color(e_col),
                                 )
                                 .fill(if euclid_on {
                                     accent.gamma_multiply(0.2)
@@ -718,7 +718,7 @@ impl SynthApp {
                                         ui.vertical(|ui| {
                                             ui.label(
                                                 egui::RichText::new("Hits")
-                                                    .size(9.0)
+                                                    .font(self.theme.font_body())
                                                     .color(text_sec),
                                             );
                                             let mut hits = self.drums.euclid_hits[ch] as u32;
@@ -739,7 +739,7 @@ impl SynthApp {
                                         ui.vertical(|ui| {
                                             ui.label(
                                                 egui::RichText::new("Steps")
-                                                    .size(9.0)
+                                                    .font(self.theme.font_body())
                                                     .color(text_sec),
                                             );
                                             let mut steps = self.drums.euclid_steps[ch] as u32;
@@ -762,7 +762,7 @@ impl SynthApp {
                                         ui.vertical(|ui| {
                                             ui.label(
                                                 egui::RichText::new("Offset")
-                                                    .size(9.0)
+                                                    .font(self.theme.font_body())
                                                     .color(text_sec),
                                             );
                                             let mut offset = self.drums.euclid_offset[ch] as u32;
@@ -796,7 +796,7 @@ impl SynthApp {
                         "♩ {} BPM  ·  16 steps  ·  Pattern {}",
                         self.global_bpm, PATTERN_NAMES[self.drums.active_pattern]
                     ))
-                    .size(10.0)
+                    .font(self.theme.font_body())
                     .color(text_dis),
                 );
             });
@@ -882,6 +882,7 @@ impl SynthApp {
                 // ── Kit list ──────────────────────────────────────────────
                 let row_h = 22.0;
                 let avail = ui.available_height();
+                // Data-driven: drum kit library grows with user content.
                 egui::ScrollArea::vertical()
                     .max_height(avail)
                     .show(ui, |ui| {

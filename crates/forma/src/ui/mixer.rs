@@ -16,12 +16,12 @@ impl SynthApp {
 
         // Header
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("MIXER").size(11.0).color(accent));
+            ui.label(egui::RichText::new("MIXER").font(self.theme.font_heading()).color(accent));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let close_col = text_dis;
                 if ui
                     .add(
-                        egui::Label::new(egui::RichText::new("✕").size(11.0).color(close_col))
+                        egui::Label::new(egui::RichText::new("✕").font(self.theme.font_heading()).color(close_col))
                             .sense(Sense::click()),
                     )
                     .clicked()
@@ -58,12 +58,12 @@ impl SynthApp {
                     let name_col = if focused { accent } else { text_sec };
                     ui.label(
                         egui::RichText::new(format!("T{}", t + 1))
-                            .size(9.0)
+                            .font(self.theme.font_body())
                             .color(name_col),
                     );
                     ui.label(
                         egui::RichText::new(&self.track_names[t])
-                            .size(8.0)
+                            .font(self.theme.font_small())
                             .color(text_dis),
                     );
 
@@ -122,7 +122,7 @@ impl SynthApp {
                     // Volume readout
                     ui.label(
                         egui::RichText::new(format!("{:.0}%", vol * 100.0))
-                            .size(8.0)
+                            .font(self.theme.font_small())
                             .color(text_dis),
                     );
 
@@ -146,7 +146,7 @@ impl SynthApp {
                     } else {
                         format!("R{:.0}", pan * 100.0)
                     };
-                    ui.label(egui::RichText::new(pan_label).size(8.0).color(text_dis));
+                    ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
 
                     ui.add_space(4.0);
 
@@ -159,7 +159,7 @@ impl SynthApp {
                         };
                         if ui
                             .add(
-                                egui::Button::new(egui::RichText::new("M").size(9.0).color(m_col))
+                                egui::Button::new(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
                                     .frame(muted)
                                     .min_size(Vec2::new(20.0, 14.0)),
                             )
@@ -171,7 +171,7 @@ impl SynthApp {
                         let s_col = if solo { accent } else { text_dis };
                         if ui
                             .add(
-                                egui::Button::new(egui::RichText::new("S").size(9.0).color(s_col))
+                                egui::Button::new(egui::RichText::new("S").font(self.theme.font_body()).color(s_col))
                                     .frame(solo)
                                     .min_size(Vec2::new(20.0, 14.0)),
                             )
@@ -217,8 +217,8 @@ impl SynthApp {
                 } else {
                     text_sec
                 };
-                ui.label(egui::RichText::new("DRUMS").size(9.0).color(drums_col));
-                ui.label(egui::RichText::new("step seq").size(8.0).color(text_dis));
+                ui.label(egui::RichText::new("DRUMS").font(self.theme.font_body()).color(drums_col));
+                ui.label(egui::RichText::new("step seq").font(self.theme.font_small()).color(text_dis));
 
                 ui.add_space(4.0);
 
@@ -273,7 +273,7 @@ impl SynthApp {
 
                 ui.label(
                     egui::RichText::new(format!("{:.0}%", dvol * 100.0))
-                        .size(8.0)
+                        .font(self.theme.font_small())
                         .color(text_dis),
                 );
                 ui.add_space(2.0);
@@ -293,7 +293,7 @@ impl SynthApp {
                 } else {
                     format!("R{:.0}", dpan * 100.0)
                 };
-                ui.label(egui::RichText::new(pan_label).size(8.0).color(text_dis));
+                ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
                 ui.add_space(4.0);
 
                 let m_col = if drum_muted {
@@ -303,7 +303,7 @@ impl SynthApp {
                 };
                 if ui
                     .add(
-                        egui::Button::new(egui::RichText::new("M").size(9.0).color(m_col))
+                        egui::Button::new(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
                             .frame(drum_muted)
                             .min_size(Vec2::new(20.0, 14.0)),
                     )
