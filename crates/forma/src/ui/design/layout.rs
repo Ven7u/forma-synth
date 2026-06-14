@@ -292,7 +292,9 @@ pub fn fx_module<R>(
     let mut body_out: Option<R> = None;
 
     ui.group(|ui| {
-        ui.set_min_width(120.0);
+        // Fill the available width so a vertical stack of fx_modules reads
+        // as a uniform column of cards.
+        ui.set_min_width(ui.available_width());
         ui.vertical(|ui| {
             let resp = toggle_button(
                 ui,

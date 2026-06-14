@@ -135,11 +135,12 @@ impl<'a> Slider<'a> {
             Pos2::new(track_left, row_rect.top()),
             Vec2::new(track_w, row_h),
         );
-        let response = ui.interact(
-            hit_rect,
-            ui.id().with(("synth_slider", self.label)),
-            Sense::click_and_drag(),
-        );
+        // Use an auto-generated ID (egui's built-in widget idiom) instead of
+        // hashing `ui.id()` with the label, which collides when the same
+        // label (e.g. "Mix") appears multiple times in one parent layout.
+        let id = ui.next_auto_id();
+        ui.skip_ahead_auto_ids(1);
+        let response = ui.interact(hit_rect, id, Sense::click_and_drag());
 
         let log_t = |v: f32| -> f32 {
             if self.logarithmic && *self.range.start() > 0.0 {
