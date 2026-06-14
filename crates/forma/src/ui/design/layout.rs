@@ -266,6 +266,59 @@ impl SynthUi for Ui {
     }
 }
 
+/// FxModule pattern — per `05-patterns.md` §FxModule. A single effect
+/// box in the FX chain. Renders:
+/// - A fixed-min-width vertical container (caller can override via
+///   `min_width`; defaults to 120 px).
+/// - A header row with the effect name as a `synth_toggle` using the
+///   FX-domain accent color as the active fill.
+/// - The caller-provided `content` closure for the effect's parameter
+///   widgets (sliders, chip selectors, etc.).
+/// - When `*enabled` is false, the body is dimmed via `add_enabled_ui`.
+///
+/// Returns the header toggle's Response so the caller can detect the
+/// click transition and run effect-specific side effects (e.g. resetting
+/// tails on delay/reverb engage). The content closure's return value is
+/// also propagated.
+pub fn fx_module<R>(
+    ui: &mut Ui,
+    name: &str,
+    color: egui::Color32,
+    enabled: &mut bool,
+    theme: &SynthTheme,
+    content: impl FnOnce(&mut Ui) -> R,
+) -> (Response, R) {
+    let mut header_resp: Option<Response> = None;
+    let mut body_out: Option<R> = None;
+
+    ui.group(|ui| {
+        ui.set_min_width(120.0);
+        ui.vertical(|ui| {
+            let resp = toggle_button(
+                ui,
+                enabled,
+                name,
+                ToggleSize::Standard,
+                Tier::Secondary,
+                theme,
+                Some(color),
+            );
+            header_resp = Some(resp);
+
+            ui.add_space(theme.sp_xxs);
+            let was_enabled = *enabled;
+            ui.add_enabled_ui(was_enabled, |ui| {
+                body_out = Some(content(ui));
+            });
+        });
+    });
+
+    (
+        header_resp.expect("fx_module always renders its header"),
+        body_out.expect("fx_module always runs its content closure"),
+    )
+}
+
 /// FaderColumn pattern — per `05-patterns.md` §FaderColumn. Composes a
 /// label, a vertical Fader, and an optional LevelMeter into a mixer
 /// channel strip. Returns the Fader's Response so callers can detect
