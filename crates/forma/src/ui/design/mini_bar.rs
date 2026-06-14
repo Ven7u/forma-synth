@@ -153,7 +153,14 @@ impl<'a> MiniBar<'a> {
 
     /// Render the bar and return its interaction Response.
     pub fn show(self, ui: &mut Ui, theme: &SynthTheme) -> Response {
-        let (rect, response) = ui.allocate_exact_size(self.size, Sense::click_and_drag());
+        // Use an explicit auto-ID (egui's built-in widget idiom) so multiple
+        // MiniBars in the same parent layout — e.g. velocity + probability
+        // across all sequencer step columns — don't collide and flash the
+        // debug ID-collision overlay on click.
+        let id = ui.next_auto_id();
+        ui.skip_ahead_auto_ids(1);
+        let rect = ui.allocate_space(self.size).1;
+        let response = ui.interact(rect, id, Sense::click_and_drag());
         let span = *self.range.end() - *self.range.start();
 
         match self.drag {
