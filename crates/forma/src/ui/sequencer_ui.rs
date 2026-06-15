@@ -5,7 +5,7 @@ use crate::ui::design::layout::{note_seq_step, NoteSeqStepState};
 use crate::ui::design::mini_bar::{MiniBar, MiniBarOrientation};
 use crate::SynthApp;
 use eframe::egui;
-use egui::{Color32, CornerRadius, Sense, Stroke, StrokeKind, Vec2};
+use egui::{CornerRadius, Sense, Stroke, StrokeKind, Vec2};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -30,7 +30,7 @@ impl SynthApp {
                     .color(if active {
                         self.theme.c(&self.theme.accent)
                     } else {
-                        Color32::GRAY
+                        self.theme.c(&self.theme.text_disabled)
                     })
                     .strong();
                 let tip = match mode {
@@ -97,7 +97,7 @@ impl SynthApp {
                     .color(if recording {
                         self.theme.c(&self.theme.seq_rec_cursor)
                     } else {
-                        Color32::GRAY
+                        self.theme.c(&self.theme.text_disabled)
                     })
                     .strong();
                 let rec_tip = if recording {
@@ -150,7 +150,7 @@ impl SynthApp {
                 let sync_label = egui::RichText::new("Sync").color(if self.seq_sync_active() {
                     self.theme.c(&self.theme.accent)
                 } else {
-                    Color32::GRAY
+                    self.theme.c(&self.theme.text_disabled)
                 });
                 if ui.button(sync_label).on_hover_text("Lock sequencer BPM to the Global BPM.").clicked() {
                     self.seq_sync = !self.seq_sync;
@@ -177,7 +177,7 @@ impl SynthApp {
                 let label = egui::RichText::new(format!("{len}")).color(if active {
                     self.theme.c(&self.theme.accent_dim)
                 } else {
-                    Color32::GRAY
+                    self.theme.c(&self.theme.text_disabled)
                 });
                 if ui.button(label).on_hover_text(format!("Set pattern length to {len} steps.")).clicked() {
                     match seq_mode {
@@ -208,7 +208,7 @@ impl SynthApp {
             };
             for (i, &label) in SeqClockDiv::LABELS.iter().enumerate() {
                 let active = cur_div == i as u8;
-                let col = if active { self.theme.c(&self.theme.accent_dim) } else { Color32::GRAY };
+                let col = if active { self.theme.c(&self.theme.accent_dim) } else { self.theme.c(&self.theme.text_disabled) };
                 if ui.button(egui::RichText::new(label).color(col))
                     .on_hover_text(format!("Step duration: {} note/bar(s).", label))
                     .clicked() && !active
@@ -270,7 +270,7 @@ impl SynthApp {
                 }
             }
             let euclid_label = egui::RichText::new("EUCLID")
-                .color(if self.seq_euclid_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+                .color(if self.seq_euclid_open { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_disabled) });
             if ui.button(euclid_label).on_hover_text("Generate a Euclidean (evenly-spaced) rhythm pattern.").clicked() {
                 self.seq_euclid_open = !self.seq_euclid_open;
                 if self.seq_euclid_open {
@@ -322,7 +322,7 @@ impl SynthApp {
                 SeqMode::ChordKb => false,
             };
             let lib_label = egui::RichText::new("Library")
-                .color(if lib_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+                .color(if lib_open { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_disabled) });
             if ui.button(lib_label).on_hover_text("Open the pattern library to load a preset into this sequencer.").clicked() {
                 match seq_mode {
                     SeqMode::NoteSeq => {
@@ -362,7 +362,7 @@ impl SynthApp {
                     let label = egui::RichText::new(sc.label()).color(if active {
                         self.theme.c(&self.theme.accent_dim)
                     } else {
-                        Color32::GRAY
+                        self.theme.c(&self.theme.text_disabled)
                     });
                     if ui.button(label)
                         .on_hover_text(match sc {
@@ -377,7 +377,7 @@ impl SynthApp {
                 ui.separator();
                 let vl = self.seq.chord_seq.lock().unwrap().voice_lead;
                 let vl_label = egui::RichText::new("Voice Lead")
-                    .color(if vl { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+                    .color(if vl { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_disabled) });
                 if ui.button(vl_label)
                     .on_hover_text("Auto-pick the inversion that minimises voice movement between steps. Overrides per-step voicing.")
                     .clicked()
@@ -880,7 +880,7 @@ impl SynthApp {
                     let all_label = egui::RichText::new("All").small().color(if all_active {
                         self.theme.c(&self.theme.accent)
                     } else {
-                        Color32::GRAY
+                        self.theme.c(&self.theme.text_disabled)
                     });
                     if ui.button(all_label).clicked() {
                         self.pattern_lib_category = None;
@@ -890,7 +890,7 @@ impl SynthApp {
                         let label = egui::RichText::new(cat).small().color(if active {
                             self.theme.c(&self.theme.accent)
                         } else {
-                            Color32::GRAY
+                            self.theme.c(&self.theme.text_disabled)
                         });
                         if ui.button(label).clicked() {
                             self.pattern_lib_category = if active { None } else { Some(cat) };
@@ -916,14 +916,14 @@ impl SynthApp {
                                     egui::RichText::new(preset.category)
                                         .small()
                                         .weak()
-                                        .color(Color32::from_gray(100)),
+                                        .color(self.theme.c(&self.theme.text_disabled)),
                                 );
                                 // Name
                                 let name_label =
                                     egui::RichText::new(preset.name).color(if selected {
                                         self.theme.c(&self.theme.accent)
                                     } else {
-                                        Color32::WHITE
+                                        self.theme.c(&self.theme.text_primary)
                                     });
                                 if ui.selectable_label(selected, name_label).clicked() {
                                     self.harmony_lib_selected = Some(idx);
@@ -1005,7 +1005,7 @@ impl SynthApp {
                     let all_active = self.pattern_lib_category.is_none();
                     let all_label = egui::RichText::new("All")
                         .small()
-                        .color(if all_active { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+                        .color(if all_active { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_disabled) });
                     if ui.button(all_label).clicked() {
                         self.pattern_lib_category = None;
                     }
@@ -1013,7 +1013,7 @@ impl SynthApp {
                         let active = self.pattern_lib_category == Some(cat);
                         let label = egui::RichText::new(cat)
                             .small()
-                            .color(if active { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+                            .color(if active { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_disabled) });
                         if ui.button(label).clicked() {
                             self.pattern_lib_category = if active { None } else { Some(cat) };
                         }
@@ -1038,10 +1038,10 @@ impl SynthApp {
                                 egui::RichText::new(preset.category)
                                     .small()
                                     .weak()
-                                    .color(Color32::from_gray(100)),
+                                    .color(self.theme.c(&self.theme.text_disabled)),
                             );
                             let name_label = egui::RichText::new(preset.name).color(
-                                if selected { self.theme.c(&self.theme.accent) } else { Color32::WHITE },
+                                if selected { self.theme.c(&self.theme.accent) } else { self.theme.c(&self.theme.text_primary) },
                             );
                             if ui.selectable_label(selected, name_label).clicked() {
                                 self.melody_lib_selected = Some(idx);
@@ -1070,7 +1070,7 @@ impl SynthApp {
                                             .color(if active {
                                                 self.theme.c(&self.theme.accent_dim)
                                             } else {
-                                                Color32::from_gray(80)
+                                                self.theme.c(&self.theme.text_disabled)
                                             }),
                                     );
                                 }
