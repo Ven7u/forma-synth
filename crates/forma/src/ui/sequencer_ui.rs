@@ -20,11 +20,8 @@ impl SynthApp {
         let seq_mode = SeqMode::from_u8(self.seq.mode.load(Ordering::Relaxed));
         let seq_playing = self.seq.playing.load(Ordering::Relaxed);
 
-        // --- Shared toolbar ---
-        // Use horizontal_wrapped so the toolbar gracefully wraps onto multiple
-        // rows on narrow windows instead of overflowing the panel.
-        // TODO(Phase 6): redesign as tier-stratified rows — transport (Tier 1) /
-        // mode + BPM (Tier 2) / length + division behind a menu (Tier 3).
+        // ── Row 1: transport + tempo ─────────────────────────────────────────────
+        // Primary controls — mode selector, play/stop/rec, BPM. Always visible.
         ui.horizontal_wrapped(|ui| {
             // Mode tabs
             for &mode in &[SeqMode::NoteSeq, SeqMode::ChordSeq] {
@@ -52,390 +49,301 @@ impl SynthApp {
 
             ui.separator();
 
-            // Play/Stop
-            {
-                let bar_quantize = self.seq.bar_quantize.load(Ordering::Relaxed);
-                let btn = if seq_playing {
-                    "■ Stop"
-                } else if self.seq_pending_start {
-                    "… Bar"
-                } else {
-                    "▶ Play"
-                };
-                let tip = if self.seq_pending_start {
-                    "Waiting for the next bar boundary — click to cancel."
-                } else if seq_playing {
-                    "Stop the sequencer."
+            // Play / Stop
+            let bar_quantize = self.seq.bar_quantize.load(Ordering::Relaxed);
+            let play_btn = if seq_playing {
+                "■ Stop"
+            } else if self.seq_pending_start {
+                "… Bar"
+            } else {
+                "▶ Play"
+            };
+            let play_tip = if self.seq_pending_start {
+                "Waiting for the next bar boundary — click to cancel."
+            } else if seq_playing {
+                "Stop the sequencer."
+            } else if bar_quantize {
+                "Start the sequencer on the next bar boundary (bar-quantize is on)."
+            } else {
+                "Start the sequencer immediately."
+            };
+            if ui.button(play_btn).on_hover_text(play_tip).clicked() {
+                if seq_playing || self.seq_pending_start {
+                    self.seq.playing.store(false, Ordering::Relaxed);
+                    self.seq.current_step.store(0, Ordering::Relaxed);
+                    self.seq_pending_start = false;
                 } else if bar_quantize {
-                    "Start the sequencer on the next bar boundary (bar-quantize is on)."
+                    self.seq_pending_start = true;
+                    self.seq.current_step.store(0, Ordering::Relaxed);
                 } else {
-                    "Start the sequencer immediately."
-                };
-                if ui.button(btn).on_hover_text(tip).clicked() {
-                    if seq_playing || self.seq_pending_start {
-                        // Stop: reset to step 0 so next Play starts from the beginning.
-                        self.seq.playing.store(false, Ordering::Relaxed);
-                        self.seq.current_step.store(0, Ordering::Relaxed);
-                        self.seq_pending_start = false;
-                    } else if bar_quantize {
-                        // Defer: sequencer fires on next bar boundary detected in tick_metronome.
-                        self.seq_pending_start = true;
-                        self.seq.current_step.store(0, Ordering::Relaxed);
-                    } else {
-                        // Start from step 0, align metronome to beat 1.
-                        self.seq.current_step.store(0, Ordering::Relaxed);
-                        self.seq.playing.store(true, Ordering::Relaxed);
-                        self.metro_reset();
-                        if self.seq.arp_restart.load(Ordering::Relaxed) {
-                            self.engine.arp_restart();
-                            self.seq.arp_restart.store(false, Ordering::Relaxed);
-                        }
-                        if self.seq.walker_restart.load(Ordering::Relaxed) {
-                            self.engine.walker_restart();
-                            self.seq.walker_restart.store(false, Ordering::Relaxed);
-                        }
+                    self.seq.current_step.store(0, Ordering::Relaxed);
+                    self.seq.playing.store(true, Ordering::Relaxed);
+                    self.metro_reset();
+                    if self.seq.arp_restart.load(Ordering::Relaxed) {
+                        self.engine.arp_restart();
+                        self.seq.arp_restart.store(false, Ordering::Relaxed);
+                    }
+                    if self.seq.walker_restart.load(Ordering::Relaxed) {
+                        self.engine.walker_restart();
+                        self.seq.walker_restart.store(false, Ordering::Relaxed);
                     }
                 }
+            }
 
-                // Record button — step entry (stopped) or live overdub (playing).
-                // NoteSeq records notes directly; ChordSeq maps played notes to scale degrees.
-                if seq_mode != crate::sequencer::SeqMode::ChordKb {
-                    let recording = self.seq.recording.load(Ordering::Relaxed);
-                    let rec_label = egui::RichText::new("● REC")
-                        .color(if recording {
-                            egui::Color32::from_rgb(220, 50, 50)
-                        } else {
-                            Color32::GRAY
-                        })
-                        .strong();
-                    let rec_tip = if recording {
-                        if seq_playing {
-                            "Live overdub active — notes you play overwrite the current step. Click to stop recording."
-                        } else {
-                            "Step entry active — each key press fills the highlighted step and advances. Click to stop."
-                        }
-                    } else if seq_playing {
-                        "Start live overdub — notes you play will overwrite steps as the sequencer runs."
-                    } else {
-                        "Start step entry — press keys to fill steps one by one."
-                    };
-                    if ui.button(rec_label).on_hover_text(rec_tip).clicked() {
-                        let next = !recording;
-                        self.seq.recording.store(next, Ordering::Relaxed);
-                        if next && !seq_playing {
-                            // Reset step cursor to beginning when starting step entry.
-                            self.seq.rec_step.store(0, Ordering::Relaxed);
-                        }
-                    }
-
-                    // REST and ← only matter in step-entry mode (stopped + recording).
-                    if recording && !seq_playing {
-                        if ui
-                            .button("REST")
-                            .on_hover_text("Insert a rest (empty step) and advance.")
-                            .clicked()
-                        {
-                            self.seq_record_rest();
-                        }
-                        if ui
-                            .button("←")
-                            .on_hover_text("Go back one step.")
-                            .clicked()
-                        {
-                            self.seq_record_back();
-                        }
-                    }
-                }
-
-                // Sequencer BPM — locked to global when seq_sync is active
-                let seq_sync_on = self.seq_sync_active();
-                if seq_sync_on {
-                    self.seq.bpm.store(self.global_bpm, Ordering::Relaxed);
-                }
-                let mut bpm_val = self.seq.bpm.load(Ordering::Relaxed);
-                ui.label("BPM:")
-                    .on_hover_text("Sequencer tempo. Follows Global BPM when Sync is enabled.");
-                ui.add_enabled_ui(!seq_sync_on, |ui| {
-                    if ui
-                        .add(egui::Slider::new(&mut bpm_val, 40..=600))
-                        .on_hover_text("Sequencer tempo (40–600 BPM).")
-                        .changed()
-                    {
-                        self.seq.bpm.store(bpm_val, Ordering::Relaxed);
-                    }
-                });
-                ui.add_enabled_ui(!self.global_sync, |ui| {
-                    let sync_label = egui::RichText::new("Sync").color(if self.seq_sync_active() {
-                        self.theme.c(&self.theme.accent)
+            // Record — step entry (stopped) or live overdub (playing).
+            if seq_mode != SeqMode::ChordKb {
+                let recording = self.seq.recording.load(Ordering::Relaxed);
+                let rec_label = egui::RichText::new("● REC")
+                    .color(if recording {
+                        self.theme.c(&self.theme.seq_rec_cursor)
                     } else {
                         Color32::GRAY
-                    });
-                    if ui
-                        .button(sync_label)
-                        .on_hover_text("Lock sequencer BPM to the Global BPM.")
-                        .clicked()
-                    {
-                        self.seq_sync = !self.seq_sync;
-                        if self.seq_sync {
-                            self.apply_clock_sync();
-                        }
-                    }
-                });
-
-                // Step length selector
-                let cur_length = match seq_mode {
-                    SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
-                    SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
-                    SeqMode::ChordKb => unreachable!(),
-                };
-                ui.label("Steps:")
-                    .on_hover_text("Number of steps in the sequencer pattern.");
-                for &len in &[8usize, 16, 24] {
-                    let active = cur_length == len;
-                    let label = egui::RichText::new(format!("{len}")).color(if active {
-                        self.theme.c(&self.theme.accent_dim)
+                    })
+                    .strong();
+                let rec_tip = if recording {
+                    if seq_playing {
+                        "Live overdub active — notes you play overwrite the current step. Click to stop recording."
                     } else {
-                        Color32::GRAY
-                    });
-                    if ui
-                        .button(label)
-                        .on_hover_text(format!("Set pattern length to {len} steps."))
-                        .clicked()
-                    {
-                        match seq_mode {
-                            SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length = len,
-                            SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length = len,
-                            SeqMode::ChordKb => {}
-                        }
-                        let current = self.seq.current_step.load(Ordering::Relaxed);
-                        if current >= len {
-                            self.seq.current_step.store(0, Ordering::Relaxed);
-                        }
+                        "Step entry active — each key press fills the highlighted step and advances. Click to stop."
+                    }
+                } else if seq_playing {
+                    "Start live overdub — notes you play will overwrite steps as the sequencer runs."
+                } else {
+                    "Start step entry — press keys to fill steps one by one."
+                };
+                if ui.button(rec_label).on_hover_text(rec_tip).clicked() {
+                    let next = !recording;
+                    self.seq.recording.store(next, Ordering::Relaxed);
+                    if next && !seq_playing {
+                        self.seq.rec_step.store(0, Ordering::Relaxed);
                     }
                 }
-
-                // Clock division selector
-                ui.label("Div:")
-                    .on_hover_text("Duration of each step. Short values = fast sequencing; long values = slow chord changes.");
-                let (cur_div, div_atomic) = match seq_mode {
-                    SeqMode::NoteSeq => (
-                        self.seq.note_div.load(Ordering::Relaxed),
-                        Arc::clone(&self.seq.note_div),
-                    ),
-                    SeqMode::ChordSeq => (
-                        self.seq.chord_div.load(Ordering::Relaxed),
-                        Arc::clone(&self.seq.chord_div),
-                    ),
-                    SeqMode::ChordKb => unreachable!(),
-                };
-                for (i, &label) in SeqClockDiv::LABELS.iter().enumerate() {
-                    let active = cur_div == i as u8;
-                    let col = if active {
-                        self.theme.c(&self.theme.accent_dim)
-                    } else {
-                        Color32::GRAY
-                    };
-                    if ui
-                        .button(egui::RichText::new(label).color(col))
-                        .on_hover_text(format!("Step duration: {} note/bar(s).", label))
-                        .clicked()
-                        && !active
-                    {
-                        div_atomic.store(i as u8, Ordering::Relaxed);
-                        // Also persist to SynthApp mirror
-                        match seq_mode {
-                            SeqMode::NoteSeq => self.note_seq_div = i as u8,
-                            SeqMode::ChordSeq => self.chord_seq_div = i as u8,
-                            SeqMode::ChordKb => {}
-                        }
+                // REST and ← only matter in step-entry mode (stopped + recording).
+                if recording && !seq_playing {
+                    if ui.button("REST").on_hover_text("Insert a rest (empty step) and advance.").clicked() {
+                        self.seq_record_rest();
+                    }
+                    if ui.button("←").on_hover_text("Go back one step.").clicked() {
+                        self.seq_record_back();
                     }
                 }
+            }
 
-                // Gate length and timing humanization.
-                ui.separator();
-                ui.label("Gate:").on_hover_text("Note gate length — how long each note is held within its step. 100% = hold until next step, lower values = shorter, more staccato notes.");
-                let mut gate = self.seq.gate.load(Ordering::Relaxed);
-                if ui
-                    .add(egui::Slider::new(&mut gate, 1u8..=100).suffix("%").fixed_decimals(0))
-                    .on_hover_text("1% = very staccato, 90% = slight separation (default), 100% = legato/tied.")
+            ui.separator();
+
+            // BPM — locked to global when seq_sync is active.
+            let seq_sync_on = self.seq_sync_active();
+            if seq_sync_on {
+                self.seq.bpm.store(self.global_bpm, Ordering::Relaxed);
+            }
+            let mut bpm_val = self.seq.bpm.load(Ordering::Relaxed);
+            ui.label("BPM:").on_hover_text("Sequencer tempo. Follows Global BPM when Sync is enabled.");
+            ui.add_enabled_ui(!seq_sync_on, |ui| {
+                if ui.add(egui::Slider::new(&mut bpm_val, 40..=600))
+                    .on_hover_text("Sequencer tempo (40–600 BPM).")
                     .changed()
                 {
-                    self.seq.gate.store(gate, Ordering::Relaxed);
+                    self.seq.bpm.store(bpm_val, Ordering::Relaxed);
                 }
-                ui.label("Human:").on_hover_text("Timing humanization — each step fires slightly early or late by a random amount. 0 = perfectly on-grid.");
-                let mut human = self.seq.humanize.load(Ordering::Relaxed);
-                if ui
-                    .add(egui::Slider::new(&mut human, 0u8..=100).suffix("%").fixed_decimals(0))
-                    .on_hover_text("0% = robot-tight, 100% = maximum humanization (±45% of step duration).")
-                    .changed()
-                {
-                    self.seq.humanize.store(human, Ordering::Relaxed);
+            });
+            ui.add_enabled_ui(!self.global_sync, |ui| {
+                let sync_label = egui::RichText::new("Sync").color(if self.seq_sync_active() {
+                    self.theme.c(&self.theme.accent)
+                } else {
+                    Color32::GRAY
+                });
+                if ui.button(sync_label).on_hover_text("Lock sequencer BPM to the Global BPM.").clicked() {
+                    self.seq_sync = !self.seq_sync;
+                    if self.seq_sync {
+                        self.apply_clock_sync();
+                    }
                 }
+            });
+        });
 
-                ui.separator();
+        // ── Row 2: pattern config + tools ────────────────────────────────────────
+        // Tier-3 controls — pattern length, clock div, gate, humanize, generators,
+        // transpose, library, and chord-specific key/scale controls.
+        ui.horizontal_wrapped(|ui| {
+            // Step length
+            let cur_length = match seq_mode {
+                SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
+                SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
+                SeqMode::ChordKb => unreachable!(),
+            };
+            ui.label("Steps:").on_hover_text("Number of steps in the sequencer pattern.");
+            for &len in &[8usize, 16, 24] {
+                let active = cur_length == len;
+                let label = egui::RichText::new(format!("{len}")).color(if active {
+                    self.theme.c(&self.theme.accent_dim)
+                } else {
+                    Color32::GRAY
+                });
+                if ui.button(label).on_hover_text(format!("Set pattern length to {len} steps.")).clicked() {
+                    match seq_mode {
+                        SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length = len,
+                        SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length = len,
+                        SeqMode::ChordKb => {}
+                    }
+                    let current = self.seq.current_step.load(Ordering::Relaxed);
+                    if current >= len {
+                        self.seq.current_step.store(0, Ordering::Relaxed);
+                    }
+                }
+            }
 
-                // Random fill
-                if ui
-                    .button("RND")
-                    .on_hover_text("Randomly fill all steps with notes.")
-                    .clicked()
+            // Clock division
+            ui.separator();
+            ui.label("Div:").on_hover_text("Duration of each step. Short values = fast sequencing; long values = slow chord changes.");
+            let (cur_div, div_atomic) = match seq_mode {
+                SeqMode::NoteSeq => (
+                    self.seq.note_div.load(Ordering::Relaxed),
+                    Arc::clone(&self.seq.note_div),
+                ),
+                SeqMode::ChordSeq => (
+                    self.seq.chord_div.load(Ordering::Relaxed),
+                    Arc::clone(&self.seq.chord_div),
+                ),
+                SeqMode::ChordKb => unreachable!(),
+            };
+            for (i, &label) in SeqClockDiv::LABELS.iter().enumerate() {
+                let active = cur_div == i as u8;
+                let col = if active { self.theme.c(&self.theme.accent_dim) } else { Color32::GRAY };
+                if ui.button(egui::RichText::new(label).color(col))
+                    .on_hover_text(format!("Step duration: {} note/bar(s).", label))
+                    .clicked() && !active
                 {
-                    use std::collections::hash_map::DefaultHasher;
-                    use std::hash::{Hash, Hasher};
-                    let mut h = DefaultHasher::new();
-                    std::time::SystemTime::now().hash(&mut h);
-                    let seed = h.finish();
+                    div_atomic.store(i as u8, Ordering::Relaxed);
+                    match seq_mode {
+                        SeqMode::NoteSeq => self.note_seq_div = i as u8,
+                        SeqMode::ChordSeq => self.chord_seq_div = i as u8,
+                        SeqMode::ChordKb => {}
+                    }
+                }
+            }
+
+            // Gate + Humanize
+            ui.separator();
+            ui.label("Gate:").on_hover_text("Note gate length — how long each note is held within its step. 100% = hold until next step, lower values = shorter, more staccato notes.");
+            let mut gate = self.seq.gate.load(Ordering::Relaxed);
+            if ui.add(egui::Slider::new(&mut gate, 1u8..=100).suffix("%").fixed_decimals(0))
+                .on_hover_text("1% = very staccato, 90% = slight separation (default), 100% = legato/tied.")
+                .changed()
+            {
+                self.seq.gate.store(gate, Ordering::Relaxed);
+            }
+            ui.label("Human:").on_hover_text("Timing humanization — each step fires slightly early or late by a random amount. 0 = perfectly on-grid.");
+            let mut human = self.seq.humanize.load(Ordering::Relaxed);
+            if ui.add(egui::Slider::new(&mut human, 0u8..=100).suffix("%").fixed_decimals(0))
+                .on_hover_text("0% = robot-tight, 100% = maximum humanization (±45% of step duration).")
+                .changed()
+            {
+                self.seq.humanize.store(human, Ordering::Relaxed);
+            }
+
+            // Generators: RND + EUCLID
+            ui.separator();
+            if ui.button("RND").on_hover_text("Randomly fill all steps with notes.").clicked() {
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut h = DefaultHasher::new();
+                std::time::SystemTime::now().hash(&mut h);
+                let seed = h.finish();
+                match seq_mode {
+                    SeqMode::NoteSeq => {
+                        let mut ns = self.seq.note_seq.lock().unwrap();
+                        let len = ns.length;
+                        for i in 0..len {
+                            ns.steps[i] = seed.wrapping_shr(i as u32) & 1 == 1;
+                            ns.notes[i] = SEQ_CHROMATIC[(seed.wrapping_shr((i * 3) as u32) & 0xff) as usize % SEQ_CHROMATIC.len()];
+                        }
+                    }
+                    SeqMode::ChordSeq => {
+                        let mut cs = self.seq.chord_seq.lock().unwrap();
+                        let len = cs.length;
+                        for i in 0..len {
+                            cs.steps[i] = seed.wrapping_shr(i as u32) & 1 == 1;
+                            cs.degrees[i] = (seed.wrapping_shr((i * 4) as u32) & 0xff) as usize % 7;
+                        }
+                    }
+                    SeqMode::ChordKb => {}
+                }
+            }
+            let euclid_label = egui::RichText::new("EUCLID")
+                .color(if self.seq_euclid_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+            if ui.button(euclid_label).on_hover_text("Generate a Euclidean (evenly-spaced) rhythm pattern.").clicked() {
+                self.seq_euclid_open = !self.seq_euclid_open;
+                if self.seq_euclid_open {
+                    let cur_len = match seq_mode {
+                        SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
+                        SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
+                        SeqMode::ChordKb => 8,
+                    };
+                    self.seq_euclid_hits = self.seq_euclid_hits.min(cur_len);
+                }
+            }
+
+            // Transpose
+            ui.separator();
+            ui.label(egui::RichText::new("Transpose:").weak().small());
+            for (label, semitones, tip) in [
+                ("−12", -12i32, "Down one octave"),
+                ("−1",  -1,     "Down one semitone"),
+                ("+1",   1,     "Up one semitone"),
+                ("+12", 12,     "Up one octave"),
+            ] {
+                if ui.button(egui::RichText::new(label).small()).on_hover_text(tip).clicked() {
                     match seq_mode {
                         SeqMode::NoteSeq => {
                             let mut ns = self.seq.note_seq.lock().unwrap();
                             let len = ns.length;
                             for i in 0..len {
-                                ns.steps[i] = seed.wrapping_shr(i as u32) & 1 == 1;
-                                ns.notes[i] = SEQ_CHROMATIC[(seed.wrapping_shr((i * 3) as u32)
-                                    & 0xff)
-                                    as usize
-                                    % SEQ_CHROMATIC.len()];
+                                ns.notes[i] = (ns.notes[i] as i32 + semitones).clamp(21, 108) as u8;
                             }
                         }
                         SeqMode::ChordSeq => {
                             let mut cs = self.seq.chord_seq.lock().unwrap();
-                            let len = cs.length;
-                            for i in 0..len {
-                                cs.steps[i] = seed.wrapping_shr(i as u32) & 1 == 1;
-                                cs.degrees[i] =
-                                    (seed.wrapping_shr((i * 4) as u32) & 0xff) as usize % 7;
+                            if semitones.abs() == 12 {
+                                cs.octave = (cs.octave + semitones / 12).clamp(1, 7);
+                            } else {
+                                cs.root = ((cs.root as i32 + semitones).rem_euclid(12)) as u8;
                             }
                         }
                         SeqMode::ChordKb => {}
                     }
                 }
-
-                // Euclidean rhythm generator.
-                let euclid_label = egui::RichText::new("EUCLID").color(
-                    if self.seq_euclid_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY }
-                );
-                if ui.button(euclid_label).on_hover_text("Generate a Euclidean (evenly-spaced) rhythm pattern.").clicked() {
-                    self.seq_euclid_open = !self.seq_euclid_open;
-                    if self.seq_euclid_open {
-                        // Pre-fill hits to half the current pattern length.
-                        let cur_len = match seq_mode {
-                            SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
-                            SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
-                            SeqMode::ChordKb => 8,
-                        };
-                        self.seq_euclid_hits = self.seq_euclid_hits.min(cur_len);
-                    }
-                }
-
-                // Transpose
-                ui.separator();
-                ui.label(egui::RichText::new("Transpose:").weak().small());
-                for (label, semitones, tip) in [
-                    ("−12", -12i32, "Down one octave"),
-                    ("−1",  -1,     "Down one semitone"),
-                    ("+1",   1,     "Up one semitone"),
-                    ("+12", 12,     "Up one octave"),
-                ] {
-                    if ui.button(egui::RichText::new(label).small()).on_hover_text(tip).clicked() {
-                        match seq_mode {
-                            SeqMode::NoteSeq => {
-                                let mut ns = self.seq.note_seq.lock().unwrap();
-                                let len = ns.length;
-                                for i in 0..len {
-                                    ns.notes[i] = (ns.notes[i] as i32 + semitones)
-                                        .clamp(21, 108) as u8;
-                                }
-                            }
-                            SeqMode::ChordSeq => {
-                                let mut cs = self.seq.chord_seq.lock().unwrap();
-                                if semitones.abs() == 12 {
-                                    cs.octave = (cs.octave + semitones / 12).clamp(1, 7);
-                                } else {
-                                    cs.root = ((cs.root as i32 + semitones).rem_euclid(12)) as u8;
-                                }
-                            }
-                            SeqMode::ChordKb => {}
-                        }
-                    }
-                }
-
-                // Pattern library button — mode-appropriate popup
-                ui.separator();
-                let lib_open = match seq_mode {
-                    SeqMode::NoteSeq => self.show_melody_library,
-                    SeqMode::ChordSeq => self.show_harmony_library,
-                    SeqMode::ChordKb => false,
-                };
-                let lib_label = egui::RichText::new("Library")
-                    .color(if lib_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
-                if ui.button(lib_label).on_hover_text("Open the pattern library to load a preset into this sequencer.").clicked() {
-                    match seq_mode {
-                        SeqMode::NoteSeq => {
-                            self.show_melody_library = !self.show_melody_library;
-                            self.show_harmony_library = false;
-                        }
-                        SeqMode::ChordSeq => {
-                            self.show_harmony_library = !self.show_harmony_library;
-                            self.show_melody_library = false;
-                        }
-                        SeqMode::ChordKb => {}
-                    }
-                    self.pattern_lib_category = None;
-                    self.harmony_lib_selected = None;
-                    self.melody_lib_selected = None;
-                }
             }
 
-            // Euclidean controls (shown inline below toolbar when open).
-            if self.seq_euclid_open && seq_mode != SeqMode::ChordKb {
-                let cur_len = match seq_mode {
-                    SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
-                    SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
-                    SeqMode::ChordKb => 8,
-                };
-                self.seq_euclid_hits = self.seq_euclid_hits.clamp(1, cur_len);
-                self.seq_euclid_offset %= cur_len;
-                ui.horizontal(|ui| {
-                    ui.label("Hits:");
-                    let mut h = self.seq_euclid_hits;
-                    if ui.add(egui::Slider::new(&mut h, 1..=cur_len)).changed() {
-                        self.seq_euclid_hits = h;
+            // Pattern library
+            ui.separator();
+            let lib_open = match seq_mode {
+                SeqMode::NoteSeq => self.show_melody_library,
+                SeqMode::ChordSeq => self.show_harmony_library,
+                SeqMode::ChordKb => false,
+            };
+            let lib_label = egui::RichText::new("Library")
+                .color(if lib_open { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
+            if ui.button(lib_label).on_hover_text("Open the pattern library to load a preset into this sequencer.").clicked() {
+                match seq_mode {
+                    SeqMode::NoteSeq => {
+                        self.show_melody_library = !self.show_melody_library;
+                        self.show_harmony_library = false;
                     }
-                    ui.label("Offset:");
-                    let mut off = self.seq_euclid_offset;
-                    if ui.add(egui::Slider::new(&mut off, 0..=cur_len - 1)).changed() {
-                        self.seq_euclid_offset = off;
+                    SeqMode::ChordSeq => {
+                        self.show_harmony_library = !self.show_harmony_library;
+                        self.show_melody_library = false;
                     }
-                    if ui.button("Apply").on_hover_text("Fill the step on/off pattern with the Euclidean rhythm.").clicked() {
-                        let pattern = crate::sequencer::bjorklund(self.seq_euclid_hits, cur_len, self.seq_euclid_offset);
-                        match seq_mode {
-                            SeqMode::NoteSeq => {
-                                let mut ns = self.seq.note_seq.lock().unwrap();
-                                for (i, &on) in pattern.iter().enumerate() {
-                                    ns.steps[i] = on;
-                                }
-                            }
-                            SeqMode::ChordSeq => {
-                                let mut cs = self.seq.chord_seq.lock().unwrap();
-                                for (i, &on) in pattern.iter().enumerate() {
-                                    cs.steps[i] = on;
-                                }
-                            }
-                            SeqMode::ChordKb => {}
-                        }
-                        self.seq_euclid_open = false;
-                    }
-                    if ui.button("✕").clicked() {
-                        self.seq_euclid_open = false;
-                    }
-                });
+                    SeqMode::ChordKb => {}
+                }
+                self.pattern_lib_category = None;
+                self.harmony_lib_selected = None;
+                self.melody_lib_selected = None;
             }
 
-            // Chord key/scale selector (ChordSeq only)
+            // Chord key / scale / voice-lead (ChordSeq only)
             if seq_mode == SeqMode::ChordSeq {
                 ui.separator();
-                ui.label("Key:")
-                    .on_hover_text("Root note for the chord scale.");
+                ui.label("Key:").on_hover_text("Root note for the chord scale.");
                 let cur_root = self.seq.chord_seq.lock().unwrap().root;
                 egui::ComboBox::from_id_salt("chord_root")
                     .selected_text(NOTE_NAMES[cur_root as usize])
@@ -456,8 +364,7 @@ impl SynthApp {
                     } else {
                         Color32::GRAY
                     });
-                    if ui
-                        .button(label)
+                    if ui.button(label)
                         .on_hover_text(match sc {
                             ScaleType::Major => "Major scale — bright, happy feel.",
                             _ => "Minor scale — dark, moody feel.",
@@ -467,19 +374,12 @@ impl SynthApp {
                         self.seq.chord_seq.lock().unwrap().scale = sc;
                     }
                 }
-
                 ui.separator();
-
-                // Voice lead toggle
                 let vl = self.seq.chord_seq.lock().unwrap().voice_lead;
                 let vl_label = egui::RichText::new("Voice Lead")
                     .color(if vl { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
-                if ui
-                    .button(vl_label)
-                    .on_hover_text(
-                        "Auto-pick the inversion that minimises voice movement between steps. \
-                         Overrides per-step voicing.",
-                    )
+                if ui.button(vl_label)
+                    .on_hover_text("Auto-pick the inversion that minimises voice movement between steps. Overrides per-step voicing.")
                     .clicked()
                 {
                     self.seq.chord_seq.lock().unwrap().voice_lead = !vl;
@@ -487,7 +387,48 @@ impl SynthApp {
             }
         });
 
-        ui.add_space(4.0);
+        // ── Row 3: Euclidean controls (shown when EUCLID is open) ────────────────
+        if self.seq_euclid_open && seq_mode != SeqMode::ChordKb {
+            let cur_len = match seq_mode {
+                SeqMode::NoteSeq => self.seq.note_seq.lock().unwrap().length,
+                SeqMode::ChordSeq => self.seq.chord_seq.lock().unwrap().length,
+                SeqMode::ChordKb => 8,
+            };
+            self.seq_euclid_hits = self.seq_euclid_hits.clamp(1, cur_len);
+            self.seq_euclid_offset %= cur_len;
+            ui.horizontal(|ui| {
+                ui.label("Hits:");
+                let mut h = self.seq_euclid_hits;
+                if ui.add(egui::Slider::new(&mut h, 1..=cur_len)).changed() {
+                    self.seq_euclid_hits = h;
+                }
+                ui.label("Offset:");
+                let mut off = self.seq_euclid_offset;
+                if ui.add(egui::Slider::new(&mut off, 0..=cur_len - 1)).changed() {
+                    self.seq_euclid_offset = off;
+                }
+                if ui.button("Apply").on_hover_text("Fill the step on/off pattern with the Euclidean rhythm.").clicked() {
+                    let pattern = crate::sequencer::bjorklund(self.seq_euclid_hits, cur_len, self.seq_euclid_offset);
+                    match seq_mode {
+                        SeqMode::NoteSeq => {
+                            let mut ns = self.seq.note_seq.lock().unwrap();
+                            for (i, &on) in pattern.iter().enumerate() { ns.steps[i] = on; }
+                        }
+                        SeqMode::ChordSeq => {
+                            let mut cs = self.seq.chord_seq.lock().unwrap();
+                            for (i, &on) in pattern.iter().enumerate() { cs.steps[i] = on; }
+                        }
+                        SeqMode::ChordKb => {}
+                    }
+                    self.seq_euclid_open = false;
+                }
+                if ui.button("✕").clicked() {
+                    self.seq_euclid_open = false;
+                }
+            });
+        }
+
+        ui.add_space(self.theme.sp_xs);
 
         match seq_mode {
             SeqMode::NoteSeq => self.ui_note_seq(ui),
@@ -536,6 +477,7 @@ impl SynthApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = step_gap;
             for i in 0..length {
+                ui.push_id(i, |ui| {
                 // Snapshot the step's mutable fields out of the lock so the
                 // design-system pattern can drive them without holding the
                 // mutex across painter calls. Writes go back in one short
@@ -596,6 +538,7 @@ impl SynthApp {
                     ns.velocities[i] = velocity;
                     ns.probabilities[i] = probability;
                 }
+                });
             }
         });
         };
@@ -634,6 +577,7 @@ impl SynthApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = step_gap;
             for i in 0..length {
+                ui.push_id(i, |ui| {
                 ui.vertical(|ui| {
                     ui.set_width(step_w);
                     let (is_on, degree, chord_type, oct_off) = {
@@ -891,6 +835,7 @@ impl SynthApp {
                             this.seq.chord_seq.lock().unwrap().voicings[i] = next;
                         }
                     }
+                });
                 });
             }
         });
