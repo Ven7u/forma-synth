@@ -686,106 +686,117 @@ pub fn winamp_classic() -> SynthTheme {
 pub fn phosphor() -> SynthTheme {
     let g = geometry();
     SynthTheme {
+        // Vintage Bakelite hardware aesthetic. Warm amber for all controls
+        // and indicators; phosphor green reserved for actual screen surfaces
+        // (oscilloscope glow tokens, ADSR display, MIDI signal dot).
         name: "Phosphor".into(),
 
-        bg_app: [1, 5, 2],
-        bg_surface: [3, 11, 5],
-        bg_sunken: [2, 7, 3],
-        bg_bar: [2, 8, 3],
+        // ── Surfaces — dark warm Bakelite/wood casing ───────────────────────
+        bg_app:     [20, 15, 10],
+        bg_surface: [30, 22, 16],
+        bg_sunken:  [13, 10,  7],
+        bg_bar:     [24, 18, 13],
 
-        border: [12, 40, 18],
-        border_focus: [25, 220, 100],
+        border:       [ 50, 36, 24],
+        border_focus: [ 88, 64, 42],
 
-        text_primary: [170, 235, 190],
-        text_secondary: [70, 140, 88],
-        text_disabled: [28, 65, 38],
-        text_on_accent: [4, 10, 7],
+        // ── Text — warm cream / parchment labels ────────────────────────────
+        text_primary:   [225, 210, 185],
+        text_secondary: [148, 128,  98],
+        text_disabled:  [ 78,  62,  46],
+        text_on_accent: [ 18,  13,   8],
 
-        accent: [30, 255, 120],
-        accent_dim: [20, 200, 90],
+        // ── Main accent — warm amber (vintage LED / backlit indicator) ───────
+        accent:     [195, 155, 65],
+        accent_dim: [ 80,  58, 20],
 
-        knob_tier1_arc: [30, 255, 120],
-        knob_tier2_arc: [20, 160, 75],
-        knob_tier3_arc: [55, 95, 65],
+        knob_tier1_arc: [210, 168, 72],
+        knob_tier2_arc: [175, 135, 52],
+        knob_tier3_arc: [128,  98, 44],
 
-        accent_hard_sync: [200, 255, 80],
-        accent_fm: [80, 255, 180],
-        accent_ring: [160, 255, 100],
-        accent_hold: [220, 255, 60],
-        accent_walker: [180, 255, 100],
-        accent_limiter: [120, 255, 80],
+        // ── Secondary accents — all desaturated / pastel ────────────────────
+        accent_hard_sync: [155, 105, 175], // dusty violet
+        accent_fm:        [105, 148, 170], // powder blue
+        accent_ring:      [175, 145,  85], // warm tan-gold
+        accent_hold:      [185, 118,  88], // pastel terracotta
+        accent_walker:    [138, 168, 105], // dusty sage
+        accent_limiter:   [190, 110,  80], // pastel burnt orange
 
-        // Phosphor — CRT-green aesthetic. Cool FX colors (delay / reverb /
-        // shimmer) are shifted from blue toward green-cyan so the FX chain
-        // stays within the theme's phosphor palette while each effect
-        // remains visually distinct.
-        fx_overdrive: [255, 220, 80],
-        fx_distortion: [255, 100, 60],
-        fx_chorus: [80, 255, 180],
-        fx_delay: [80, 220, 180],
-        fx_reverb: [150, 220, 200],
-        fx_shimmer: [180, 255, 220],
-        fx_crystallizer: [240, 255, 100],
+        // ── FX — all desaturated, vintage panel-label feel ──────────────────
+        fx_overdrive:   [182, 118,  62],
+        fx_distortion:  [182,  88,  72],
+        fx_chorus:      [152, 118,  80],
+        fx_delay:       [128, 152,  88],
+        fx_reverb:      [ 88, 128, 152],
+        fx_shimmer:     [105, 152, 168],
+        fx_crystallizer:[168, 135,  85],
 
-        seq_step_on: [20, 220, 100],
-        seq_step_off: [10, 30, 18],
-        seq_current: [200, 255, 80],
-        seq_note_bar_on: [10, 160, 70],
-        seq_note_bar_off: [12, 35, 20],
-        seq_chord_major: [10, 140, 60],
-        seq_chord_minor: [30, 80, 100],
-        seq_chord_dim: [100, 60, 30],
-        seq_kb_major: [10, 60, 30],
-        seq_kb_minor: [20, 40, 60],
-        seq_kb_dim: [50, 30, 20],
-        seq_velocity_bar: [120, 255, 180],
-        seq_prob_low: [220, 100, 80],
-        seq_prob_mid: [220, 200, 80],
-        seq_prob_high: [100, 255, 120],
-        seq_rec_cursor: [255, 120, 100],
-        seq_octave_bar: [200, 230, 100],
+        // ── Sequencer — warm amber pastels ──────────────────────────────────
+        seq_step_on:      [165, 128,  52],
+        seq_step_off:     [ 32,  24,  16],
+        seq_current:      [215, 175,  75],
+        seq_note_bar_on:  [105,  82,  32],
+        seq_note_bar_off: [ 28,  22,  15],
+        seq_chord_major:  [ 82,  65,  25],
+        seq_chord_minor:  [ 48,  62,  82],
+        seq_chord_dim:    [ 82,  45,  35],
+        seq_kb_major:     [ 42,  32,  14],
+        seq_kb_minor:     [ 28,  38,  55],
+        seq_kb_dim:       [ 55,  28,  22],
+        seq_velocity_bar: [145, 115,  55],
+        seq_prob_low:     [ 95,  75,  48],
+        seq_prob_mid:     [145, 115,  55],
+        seq_prob_high:    [195, 155,  65],
+        seq_rec_cursor:   [185,  98,  82], // pastel dusty red
+        seq_octave_bar:   [155, 118,  52],
 
-        key_white_pressed: [40, 255, 140],
-        key_black_pressed: [20, 180, 90],
-        key_white_default: [245, 245, 245],
-        key_black_default: [25, 25, 25],
-        key_white_range: [225, 245, 240],
-        key_black_range: [35, 50, 45],
-        key_scale_root: [255, 210, 80],
-        key_scale_root_dark: [110, 75, 8],
-        key_scale_in: [195, 245, 220],
-        key_scale_in_dark: [25, 70, 45],
-        key_stroke: [175, 175, 175],
-        key_label: [130, 140, 135],
+        // ── Piano keys — aged ivory and ebony ───────────────────────────────
+        key_white_pressed:    [195, 155,  65], // amber glow (= accent)
+        key_black_pressed:    [130,  98,  32], // dark amber
+        key_white_default:    [208, 192, 172], // aged ivory
+        key_black_default:    [ 28,  20,  14], // dark ebony
+        key_white_range:      [188, 175, 155], // slightly dimmed ivory
+        key_black_range:      [ 45,  34,  22],
+        key_scale_root:       [195, 155,  65], // amber root (= accent)
+        key_scale_root_dark:  [100,  78,  28],
+        key_scale_in:         [172, 158, 132], // warm tan
+        key_scale_in_dark:    [ 55,  42,  28],
+        key_stroke:           [148, 128, 100],
+        key_label:            [115,  95,  70],
 
-        scope_bg: [2, 6, 3],
-        scope_zero: [8, 24, 12],
-        scope_glow_outer: [0, 180, 80, 16],
-        scope_glow_mid: [10, 230, 110, 50],
-        scope_glow_core: [60, 255, 150, 240],
-        scope_label: [40, 100, 60],
+        // ── Scope — phosphor green glow to support hardcoded waveform ───────
+        scope_bg:         [  4,   8,   5],
+        scope_zero:       [ 10,  22,  12],
+        scope_glow_outer: [  0, 140,  60, 14],
+        scope_glow_mid:   [ 10, 200,  90, 45],
+        scope_glow_core:  [ 60, 255, 140, 230],
+        scope_label:      [ 40,  90,  55],
 
-        meter_bg: [4, 10, 6],
-        meter_green: [20, 230, 100],
-        meter_clip: [255, 80, 30],
+        // ── Meters — vintage VU feel (sage green, not harsh phosphor) ───────
+        meter_bg:    [ 16,  12,   8],
+        meter_green: [128, 168,  80], // sage green pastel
+        meter_clip:  [188,  82,  62], // pastel coral red
 
-        adsr_fill: [0, 180, 80, 25],
-        adsr_outline: [20, 220, 100],
-        adsr_label: [60, 180, 100, 180],
-        adsr_cursor: [40, 255, 140],
+        // ── ADSR display — phosphor green (screen visualizer) ────────────────
+        adsr_fill:    [  0, 160,  80,  25],
+        adsr_outline: [ 20, 200,  90],
+        adsr_label:   [ 60, 155,  85, 180],
+        adsr_cursor:  [ 40, 220, 120],
 
-        latency_ok: [20, 220, 100],
-        latency_warn: [200, 220, 40],
-        latency_bad: [220, 80, 40],
+        // ── Status ───────────────────────────────────────────────────────────
+        latency_ok:   [128, 175,  80], // sage green
+        latency_warn: [195, 155,  65], // amber
+        latency_bad:  [185,  82,  62], // pastel red
 
-        patch_browser_model: [80, 255, 180],
-        patch_load_fx_on: [220, 255, 60],
+        patch_browser_model: [105, 148, 170], // dusty blue
+        patch_load_fx_on:    [195, 155,  65], // amber
 
-        midi_connected: [30, 255, 120],
+        midi_connected: [100, 210, 140], // phosphor green (signal indicator)
 
-        bg_panel: [2, 8, 4],
-        bg_seq_bar: [8, 20, 12],
-        bg_adsr: [4, 12, 6],
+        // ── Legacy panel bg tokens ───────────────────────────────────────────
+        bg_panel:   [ 18,  13,   9],
+        bg_seq_bar: [ 26,  20,  14],
+        bg_adsr:    [ 13,  10,   7],
 
         sp_xxs: g.sp_xxs,
         sp_xs: g.sp_xs,
