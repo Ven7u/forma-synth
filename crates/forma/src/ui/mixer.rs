@@ -1,7 +1,8 @@
 use crate::audio::TRACK_COUNT;
+use crate::ui::design::level_meter::{level_meter, LevelMeterOrientation, LevelMeterSize};
 use crate::SynthApp;
 use eframe::egui;
-use egui::{Color32, Rect, Sense, Vec2};
+use egui::{Sense, Vec2};
 use std::sync::Arc;
 
 const FADER_HEIGHT: f32 = 120.0;
@@ -13,16 +14,20 @@ impl SynthApp {
         let text_sec = self.theme.c(&self.theme.text_secondary);
         let text_dis = self.theme.c(&self.theme.text_disabled);
         let border = self.theme.c(&self.theme.border);
+        let seq_rec = self.theme.c(&self.theme.seq_rec_cursor);
+        let sp_xs = self.theme.sp_xs;
+        let sp_xxs = self.theme.sp_xxs;
 
         // Header
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("MIXER").font(self.theme.font_heading()).color(accent));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let close_col = text_dis;
                 if ui
                     .add(
-                        egui::Label::new(egui::RichText::new("✕").font(self.theme.font_heading()).color(close_col))
-                            .sense(Sense::click()),
+                        egui::Label::new(
+                            egui::RichText::new("✕").font(self.theme.font_heading()).color(text_dis),
+                        )
+                        .sense(Sense::click()),
                     )
                     .clicked()
                 {
@@ -31,7 +36,7 @@ impl SynthApp {
             });
         });
 
-        ui.add_space(4.0);
+        ui.add_space(sp_xs);
 
         // Check if any track is soloed
         let any_solo = (0..TRACK_COUNT).any(|t| self.track_mixer[t].solo());
@@ -67,42 +72,22 @@ impl SynthApp {
                             .color(text_dis),
                     );
 
-                    ui.add_space(4.0);
+                    ui.add_space(sp_xs);
 
                     // VU + fader together in a horizontal strip
                     ui.horizontal(|ui| {
-                        // VU meter (vertical bar)
-                        let vu_w = 6.0;
-                        let (vu_rect, _) =
-                            ui.allocate_exact_size(Vec2::new(vu_w, FADER_HEIGHT), Sense::hover());
-                        let painter = ui.painter_at(vu_rect);
-                        painter.rect_filled(vu_rect, 1.0, Color32::from_gray(20));
-                        let fill_h = (peak.min(1.0) * FADER_HEIGHT).max(0.0);
-                        if fill_h > 0.5 {
-                            let fill_rect = Rect::from_min_size(
-                                egui::pos2(vu_rect.min.x, vu_rect.max.y - fill_h),
-                                Vec2::new(vu_w, fill_h),
-                            );
-                            let bar_col = if silenced {
-                                Color32::from_gray(40)
-                            } else if peak > 0.9 {
-                                Color32::from_rgb(220, 80, 60)
-                            } else if peak > 0.6 {
-                                Color32::from_rgb(200, 180, 40)
-                            } else {
-                                Color32::from_rgb(
-                                    (accent.r() as f32 * 0.65) as u8,
-                                    (accent.g() as f32 * 0.65) as u8,
-                                    (accent.b() as f32 * 0.65) as u8,
-                                )
-                            };
-                            painter.rect_filled(fill_rect, 1.0, bar_col);
-                        }
+                        let display_level = if silenced { 0.0 } else { peak.min(1.0) };
+                        level_meter(
+                            ui,
+                            display_level,
+                            0.0,
+                            LevelMeterOrientation::Vertical,
+                            LevelMeterSize::Large,
+                            &self.theme,
+                        );
 
-                        ui.add_space(2.0);
+                        ui.add_space(sp_xxs);
 
-                        // Volume fader (vertical slider)
-                        let fader_col = if silenced { text_dis } else { accent };
                         let fader_resp = ui.add(
                             egui::Slider::new(&mut vol, 0.0..=1.0)
                                 .vertical()
@@ -110,14 +95,12 @@ impl SynthApp {
                                 .text("")
                                 .handle_shape(egui::style::HandleShape::Rect { aspect_ratio: 2.0 }),
                         );
-                        // Tint the fader track to match the theme
-                        let _ = fader_col;
                         if fader_resp.changed() {
                             mixer.set_volume(vol);
                         }
                     });
 
-                    ui.add_space(2.0);
+                    ui.add_space(sp_xxs);
 
                     // Volume readout
                     ui.label(
@@ -126,7 +109,7 @@ impl SynthApp {
                             .color(text_dis),
                     );
 
-                    ui.add_space(2.0);
+                    ui.add_space(sp_xxs);
 
                     // Pan slider
                     let pan_resp = ui.add(
@@ -148,20 +131,18 @@ impl SynthApp {
                     };
                     ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
 
-                    ui.add_space(4.0);
+                    ui.add_space(sp_xs);
 
                     // M / S buttons
                     ui.horizontal(|ui| {
-                        let m_col = if muted {
-                            Color32::from_rgb(220, 80, 60)
-                        } else {
-                            text_dis
-                        };
+                        let m_col = if muted { seq_rec } else { text_dis };
                         if ui
                             .add(
-                                egui::Button::new(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
-                                    .frame(muted)
-                                    .min_size(Vec2::new(20.0, 14.0)),
+                                egui::Button::new(
+                                    egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
+                                )
+                                .frame(muted)
+                                .min_size(Vec2::new(20.0, 14.0)),
                             )
                             .on_hover_text("Mute")
                             .clicked()
@@ -171,9 +152,11 @@ impl SynthApp {
                         let s_col = if solo { accent } else { text_dis };
                         if ui
                             .add(
-                                egui::Button::new(egui::RichText::new("S").font(self.theme.font_body()).color(s_col))
-                                    .frame(solo)
-                                    .min_size(Vec2::new(20.0, 14.0)),
+                                egui::Button::new(
+                                    egui::RichText::new("S").font(self.theme.font_body()).color(s_col),
+                                )
+                                .frame(solo)
+                                .min_size(Vec2::new(20.0, 14.0)),
                             )
                             .on_hover_text("Solo")
                             .clicked()
@@ -194,20 +177,20 @@ impl SynthApp {
 
                 // Divider between channels
                 if t < TRACK_COUNT - 1 {
-                    ui.add_space(2.0);
+                    ui.add_space(sp_xxs);
                     let (line_rect, _) =
                         ui.allocate_exact_size(Vec2::new(1.0, FADER_HEIGHT + 80.0), Sense::hover());
                     ui.painter_at(line_rect).rect_filled(line_rect, 0.0, border);
-                    ui.add_space(2.0);
+                    ui.add_space(sp_xxs);
                 }
             }
 
             // ── Drum bus channel ─────────────────────────────────────────────
-            ui.add_space(2.0);
+            ui.add_space(sp_xxs);
             let (line_rect, _) =
                 ui.allocate_exact_size(Vec2::new(1.0, FADER_HEIGHT + 80.0), Sense::hover());
             ui.painter_at(line_rect).rect_filled(line_rect, 0.0, border);
-            ui.add_space(2.0);
+            ui.add_space(sp_xxs);
 
             ui.vertical(|ui| {
                 ui.set_min_width(CHANNEL_WIDTH);
@@ -220,7 +203,7 @@ impl SynthApp {
                 ui.label(egui::RichText::new("DRUMS").font(self.theme.font_body()).color(drums_col));
                 ui.label(egui::RichText::new("step seq").font(self.theme.font_small()).color(text_dis));
 
-                ui.add_space(4.0);
+                ui.add_space(sp_xs);
 
                 let drum_engine = std::sync::Arc::clone(&self.drum_engine);
                 let mut dvol = drum_engine.volume();
@@ -230,33 +213,16 @@ impl SynthApp {
 
                 // VU + volume fader
                 ui.horizontal(|ui| {
-                    let vu_w = 6.0;
-                    let (vu_rect, _) =
-                        ui.allocate_exact_size(Vec2::new(vu_w, FADER_HEIGHT), Sense::hover());
-                    let painter = ui.painter_at(vu_rect);
-                    painter.rect_filled(vu_rect, 1.0, Color32::from_gray(20));
-                    let fill_h = (dpeak.min(1.0) * FADER_HEIGHT).max(0.0);
-                    if fill_h > 0.5 {
-                        let fill_rect = Rect::from_min_size(
-                            egui::pos2(vu_rect.min.x, vu_rect.max.y - fill_h),
-                            Vec2::new(vu_w, fill_h),
-                        );
-                        let bar_col = if drum_muted {
-                            Color32::from_gray(40)
-                        } else if dpeak > 0.9 {
-                            Color32::from_rgb(220, 80, 60)
-                        } else if dpeak > 0.6 {
-                            Color32::from_rgb(200, 180, 40)
-                        } else {
-                            Color32::from_rgb(
-                                (accent.r() as f32 * 0.65) as u8,
-                                (accent.g() as f32 * 0.65) as u8,
-                                (accent.b() as f32 * 0.65) as u8,
-                            )
-                        };
-                        painter.rect_filled(fill_rect, 1.0, bar_col);
-                    }
-                    ui.add_space(2.0);
+                    let display_level = if drum_muted { 0.0 } else { dpeak.min(1.0) };
+                    level_meter(
+                        ui,
+                        display_level,
+                        0.0,
+                        LevelMeterOrientation::Vertical,
+                        LevelMeterSize::Large,
+                        &self.theme,
+                    );
+                    ui.add_space(sp_xxs);
                     if ui
                         .add(
                             egui::Slider::new(&mut dvol, 0.0..=1.0)
@@ -276,7 +242,7 @@ impl SynthApp {
                         .font(self.theme.font_small())
                         .color(text_dis),
                 );
-                ui.add_space(2.0);
+                ui.add_space(sp_xxs);
 
                 let pan_resp = ui.add(
                     egui::Slider::new(&mut dpan, -1.0..=1.0)
@@ -294,18 +260,16 @@ impl SynthApp {
                     format!("R{:.0}", dpan * 100.0)
                 };
                 ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
-                ui.add_space(4.0);
+                ui.add_space(sp_xs);
 
-                let m_col = if drum_muted {
-                    Color32::from_rgb(220, 80, 60)
-                } else {
-                    text_dis
-                };
+                let m_col = if drum_muted { seq_rec } else { text_dis };
                 if ui
                     .add(
-                        egui::Button::new(egui::RichText::new("M").font(self.theme.font_body()).color(m_col))
-                            .frame(drum_muted)
-                            .min_size(Vec2::new(20.0, 14.0)),
+                        egui::Button::new(
+                            egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
+                        )
+                        .frame(drum_muted)
+                        .min_size(Vec2::new(20.0, 14.0)),
                     )
                     .on_hover_text("Mute drum bus")
                     .clicked()
@@ -316,5 +280,7 @@ impl SynthApp {
                 }
             });
         });
+
+        let _ = (seq_rec, sp_xs, sp_xxs, border);
     }
 }

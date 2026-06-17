@@ -10,11 +10,16 @@ use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
 use super::{
     chip::{chip_selector as design_chip, color_chip as design_color_chip},
+    chord_pad::{
+        chord_pad as design_chord_pad, ChordPadState, ChordQuality,
+    },
+    drum_step::{drum_step as design_drum_step, DrumStepState},
     fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
     layout::fader_column as design_fader_column,
     level_meter::{level_meter as design_level_meter, LevelMeterOrientation, LevelMeterSize},
     mini_bar::{MiniBar, MiniBarOrientation},
+    piano::{piano as design_piano, KeyVisualState, PianoConfig, PianoSize},
     section::section_header as design_section_header,
     slider::Slider as DesignSlider,
     step_pad::{step_pad as design_step_pad, StepPadSize, StepState},
@@ -84,6 +89,11 @@ struct GalleryState {
     mini_bar_pitch_accum: f32,
     /// ColorChip demo — 8 EQ-band-style toggles.
     color_chip_active: [bool; 8],
+    /// DrumStep demo — 16 interactive cells.
+    drum_step_active: [bool; 16],
+    drum_step_vel: [f32; 16],
+    /// ChordPad demo — held state for the 3 interactive pads (one per quality).
+    chord_pad_held: [bool; 3],
 }
 
 impl Default for GalleryState {
@@ -109,6 +119,12 @@ impl Default for GalleryState {
             mini_bar_pitch: 60.0,
             mini_bar_pitch_accum: 0.0,
             color_chip_active: [true, false, true, true, false, true, false, true],
+            drum_step_active: [
+                true, false, false, false, true, false, false, false,
+                true, false, false, false, true, false, false, false,
+            ],
+            drum_step_vel: [0.9; 16],
+            chord_pad_held: [false; 3],
         }
     }
 }
@@ -328,8 +344,20 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     color_chip_sample(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
+    sub_header(ui, "DrumStep — drum machine step cell", theme);
+    drum_step_demo(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
     sub_header(ui, "StepPad — 2 sizes × velocity-encoded fill", theme);
     step_pad_grid(ui, theme);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "ChordPad — quality strip × 3 states", theme);
+    chord_pad_grid(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "Piano — Preview (36 px) + Full (64 px)", theme);
+    piano_samples(ui, theme);
 }
 
 fn render_patterns(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
@@ -370,6 +398,10 @@ fn render_patterns(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
     ui.add_space(theme.sp_xl);
     sub_header(ui, "FaderColumn — mixer channel strip", theme);
     fader_column_row(ui, theme, state);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "ChordGrid — 3 rows × 7 cols chord keyboard", theme);
+    chord_grid_pattern(ui, theme);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "KnobRow — uniform spacing", theme);
@@ -896,6 +928,63 @@ fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
     }
 }
 
+fn drum_step_demo(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.label(
+        RichText::new(
+            "Click to toggle · drag-y to adjust velocity · playhead pinned at step 5 \
+             · beat-group ticks at 1,5,9,13",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xs);
+
+    // Interactive row — active state is editable.
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+        for step in 0..16usize {
+            let s = DrumStepState {
+                active: state.drum_step_active[step],
+                velocity: state.drum_step_vel[step],
+                is_playhead: step == 4,
+                is_beat_group: step % 4 == 0,
+                is_muted: false,
+            };
+            let resp = design_drum_step(ui, s, theme);
+            if resp.clicked() {
+                state.drum_step_active[step] = !state.drum_step_active[step];
+            }
+            if resp.dragged() && state.drum_step_active[step] {
+                state.drum_step_vel[step] =
+                    (state.drum_step_vel[step] - resp.drag_delta().y * 0.01).clamp(0.0, 1.0);
+            }
+        }
+    });
+
+    ui.add_space(theme.sp_sm);
+    ui.label(
+        RichText::new("Same pattern — lane muted (desaturated fill, no accent)")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xs);
+
+    // Muted display row.
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = theme.sp_xxs;
+        for step in 0..16usize {
+            let s = DrumStepState {
+                active: state.drum_step_active[step],
+                velocity: state.drum_step_vel[step],
+                is_playhead: false,
+                is_beat_group: step % 4 == 0,
+                is_muted: true,
+            };
+            design_drum_step(ui, s, theme);
+        }
+    });
+}
+
 fn color_chip_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
     ui.label(
         RichText::new("8 EQ-style band chips — active gets a tinted fill, inactive goes neutral")
@@ -923,6 +1012,238 @@ fn color_chip_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
             }
         }
     });
+}
+
+fn piano_samples(ui: &mut Ui, theme: &SynthTheme) {
+    // C major scale pitch classes.
+    const C_MAJOR: [bool; 12] = [
+        true, false, true, false, true, true, false, true, false, true, false, true,
+    ];
+    // Demonstrate with C3–B5 (MIDI 48–83): C major chord pressed, C major scale highlighted.
+    let pressed: &[u8] = &[60, 64, 67]; // C4, E4, G4
+    let scale_root: u8 = 0; // C
+
+    ui.label(
+        RichText::new(
+            "Preview (36 px) — C4 major chord pressed, C major scale highlighted, read-only.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xxs);
+    design_piano(
+        ui,
+        &PianoConfig {
+            first_midi: 48, // C3
+            last_midi:  83, // B5
+            size: PianoSize::Preview,
+            interactive: false,
+            show_labels: true,
+            range_bar: None,
+        },
+        &|midi| KeyVisualState {
+            pressed: pressed.contains(&midi),
+            in_kb_range: false,
+            is_scale_root: midi % 12 == scale_root,
+            in_scale: C_MAJOR[(midi % 12) as usize],
+        },
+        theme,
+    );
+
+    ui.add_space(theme.sp_md);
+    ui.label(
+        RichText::new(
+            "Full (64 px) — same notes, plus KB range bar (C4–E5), full 88-key span.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xxs);
+    design_piano(
+        ui,
+        &PianoConfig {
+            first_midi: 21,  // A0
+            last_midi:  108, // C8
+            size: PianoSize::Full,
+            interactive: false,
+            show_labels: true,
+            range_bar: Some((60, 77)), // C4–E5
+        },
+        &|midi| KeyVisualState {
+            pressed: pressed.contains(&midi),
+            in_kb_range: (60..77).contains(&midi),
+            is_scale_root: midi % 12 == scale_root,
+            in_scale: C_MAJOR[(midi % 12) as usize],
+        },
+        theme,
+    );
+}
+
+fn chord_pad_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.label(
+        RichText::new(
+            "3 qualities × 3 states. Click an interactive pad (Normal column) to toggle held.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xs);
+
+    let qualities = [
+        (ChordQuality::Major,      "Major",      "Cmaj",  "I"),
+        (ChordQuality::Minor,      "Minor",      "Dm",    "ii"),
+        (ChordQuality::Diminished, "Diminished", "B°",    "vii°"),
+    ];
+    let pad_size = Vec2::new(88.0, 52.0);
+
+    // Column header
+    ui.horizontal(|ui| {
+        ui.add_space(80.0); // quality label indent
+        for col_label in ["Normal (click)", "Held", "Editing"] {
+            ui.add_sized(
+                Vec2::new(pad_size.x + theme.sp_sm, 16.0),
+                egui::Label::new(
+                    RichText::new(col_label)
+                        .font(theme.font_micro())
+                        .color(theme.c(&theme.text_secondary)),
+                ),
+            );
+        }
+    });
+    ui.add_space(theme.sp_xxs);
+
+    for (i, (quality, quality_label, cname, degree)) in qualities.iter().enumerate() {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.sp_sm;
+            // Row label
+            ui.add_sized(
+                Vec2::new(80.0, pad_size.y),
+                egui::Label::new(
+                    RichText::new(*quality_label)
+                        .font(theme.font_small())
+                        .color(theme.c(&theme.text_secondary)),
+                ),
+            );
+
+            // Column: Normal (interactive)
+            let resp = design_chord_pad(
+                ui,
+                ChordPadState {
+                    quality: *quality,
+                    chord_name: cname,
+                    degree,
+                    key_hint: ["Q", "A", "Z"][i],
+                    held: state.chord_pad_held[i],
+                    editing: false,
+                },
+                pad_size,
+                theme,
+            );
+            if resp.clicked() {
+                state.chord_pad_held[i] = !state.chord_pad_held[i];
+            }
+
+            // Column: Held (static)
+            design_chord_pad(
+                ui,
+                ChordPadState {
+                    quality: *quality,
+                    chord_name: cname,
+                    degree,
+                    key_hint: "",
+                    held: true,
+                    editing: false,
+                },
+                pad_size,
+                theme,
+            );
+
+            // Column: Editing (static)
+            design_chord_pad(
+                ui,
+                ChordPadState {
+                    quality: *quality,
+                    chord_name: cname,
+                    degree,
+                    key_hint: "",
+                    held: false,
+                    editing: true,
+                },
+                pad_size,
+                theme,
+            );
+        });
+        ui.add_space(theme.sp_xxs);
+    }
+}
+
+fn chord_grid_pattern(ui: &mut Ui, theme: &SynthTheme) {
+    ui.label(
+        RichText::new(
+            "Static 3 × 7 grid showing all three qualities in a realistic chord-keyboard layout.",
+        )
+        .font(theme.font_small())
+        .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xs);
+
+    let row_labels  = ["7ths", "Triads", "Sus"];
+    let degrees     = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+    let qualities   = [
+        ChordQuality::Major,
+        ChordQuality::Minor,
+        ChordQuality::Minor,
+        ChordQuality::Major,
+        ChordQuality::Major,
+        ChordQuality::Minor,
+        ChordQuality::Diminished,
+    ];
+    let chord_names = ["C", "Dm", "Em", "F", "G", "Am", "B°"];
+    let key_rows    = [
+        ["Q","W","E","R","T","Y","U"],
+        ["A","S","D","F","G","H","J"],
+        ["Z","X","C","V","B","N","M"],
+    ];
+    let label_w = 48.0_f32;
+    let sp = theme.sp_xxs;
+    let btn_w = 62.0_f32;
+    let btn_h = 52.0_f32;
+
+    egui::Grid::new("gallery_chord_grid")
+        .num_columns(8)
+        .spacing([sp, sp])
+        .show(ui, |ui| {
+            for (row, row_label) in row_labels.iter().enumerate() {
+                ui.allocate_ui_with_layout(
+                    Vec2::new(label_w, btn_h),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| {
+                        ui.label(
+                            RichText::new(*row_label)
+                                .weak()
+                                .small()
+                                .color(theme.c(&theme.text_disabled)),
+                        );
+                    },
+                );
+                for col in 0..7usize {
+                    design_chord_pad(
+                        ui,
+                        ChordPadState {
+                            quality: qualities[col],
+                            chord_name: chord_names[col],
+                            degree: degrees[col],
+                            key_hint: key_rows[row][col],
+                            held: col == 0 && row == 1,   // highlight I/Triad
+                            editing: col == 4 && row == 0, // highlight V/7th
+                        },
+                        Vec2::new(btn_w, btn_h),
+                        theme,
+                    );
+                }
+                ui.end_row();
+            }
+        });
 }
 
 fn font_samples(ui: &mut Ui, theme: &SynthTheme) {

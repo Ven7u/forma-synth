@@ -100,6 +100,36 @@ pub struct SynthTheme {
     // ── Keyboard ────────────────────────────────────────────────────────────
     pub key_white_pressed: [u8; 3],
     pub key_black_pressed: [u8; 3],
+    /// Default (unlit) white key fill — natural ivory.
+    #[serde(default = "default_key_white_default")]
+    pub key_white_default: [u8; 3],
+    /// Default (unlit) black key fill — natural ebony.
+    #[serde(default = "default_key_black_default")]
+    pub key_black_default: [u8; 3],
+    /// White key within the computer-keyboard octave range (subtle tint).
+    #[serde(default = "default_key_white_range")]
+    pub key_white_range: [u8; 3],
+    /// Black key within the computer-keyboard octave range (subtle tint).
+    #[serde(default = "default_key_black_range")]
+    pub key_black_range: [u8; 3],
+    /// Root note highlight on a white key.
+    #[serde(default = "default_key_scale_root")]
+    pub key_scale_root: [u8; 3],
+    /// Root note highlight on a black key.
+    #[serde(default = "default_key_scale_root_dark")]
+    pub key_scale_root_dark: [u8; 3],
+    /// In-scale highlight on a white key.
+    #[serde(default = "default_key_scale_in")]
+    pub key_scale_in: [u8; 3],
+    /// In-scale highlight on a black key.
+    #[serde(default = "default_key_scale_in_dark")]
+    pub key_scale_in_dark: [u8; 3],
+    /// White key separator / outline stroke color.
+    #[serde(default = "default_key_stroke")]
+    pub key_stroke: [u8; 3],
+    /// Octave label text (C3, C4, …) painted on white C keys.
+    #[serde(default = "default_key_label")]
+    pub key_label: [u8; 3],
 
     // ── Scope / visualizer ──────────────────────────────────────────────────
     pub scope_bg: [u8; 3],
@@ -186,6 +216,16 @@ fn default_rounding_xs() -> f32 {
 fn default_rounding_full() -> f32 {
     999.0
 }
+fn default_key_white_default() -> [u8; 3] { [245, 245, 245] }
+fn default_key_black_default() -> [u8; 3] { [25, 25, 25] }
+fn default_key_white_range() -> [u8; 3] { [230, 240, 245] }
+fn default_key_black_range() -> [u8; 3] { [40, 40, 50] }
+fn default_key_scale_root() -> [u8; 3] { [255, 210, 80] }
+fn default_key_scale_root_dark() -> [u8; 3] { [120, 80, 10] }
+fn default_key_scale_in() -> [u8; 3] { [200, 240, 210] }
+fn default_key_scale_in_dark() -> [u8; 3] { [30, 70, 40] }
+fn default_key_stroke() -> [u8; 3] { [180, 180, 180] }
+fn default_key_label() -> [u8; 3] { [140, 140, 140] }
 
 impl SynthTheme {
     // ── Color helpers ────────────────────────────────────────────────────────
@@ -465,6 +505,16 @@ pub fn midnight() -> SynthTheme {
 
         key_white_pressed: [100, 180, 255],
         key_black_pressed: [60, 120, 200],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [230, 240, 245],
+        key_black_range: [40, 40, 50],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [120, 80, 10],
+        key_scale_in: [200, 240, 210],
+        key_scale_in_dark: [30, 70, 40],
+        key_stroke: [180, 180, 180],
+        key_label: [140, 140, 140],
 
         scope_bg: [4, 10, 7],
         scope_zero: [12, 28, 18],
@@ -574,6 +624,16 @@ pub fn winamp_classic() -> SynthTheme {
 
         key_white_pressed: [0, 220, 0],
         key_black_pressed: [0, 160, 0],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [220, 240, 225],
+        key_black_range: [35, 55, 40],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [100, 70, 5],
+        key_scale_in: [200, 240, 210],
+        key_scale_in_dark: [25, 65, 35],
+        key_stroke: [180, 180, 180],
+        key_label: [120, 140, 120],
 
         scope_bg: [6, 6, 6],
         scope_zero: [20, 30, 20],
@@ -687,6 +747,16 @@ pub fn phosphor() -> SynthTheme {
 
         key_white_pressed: [40, 255, 140],
         key_black_pressed: [20, 180, 90],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [225, 245, 240],
+        key_black_range: [35, 50, 45],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [110, 75, 8],
+        key_scale_in: [195, 245, 220],
+        key_scale_in_dark: [25, 70, 45],
+        key_stroke: [175, 175, 175],
+        key_label: [130, 140, 135],
 
         scope_bg: [2, 6, 3],
         scope_zero: [8, 24, 12],

@@ -8,12 +8,15 @@
 #![allow(dead_code)] // Phase 0/2 establish the API; callers land in Phase 5+.
 
 pub mod chip;
+pub mod chord_pad;
+pub mod drum_step;
 pub mod fader;
 pub mod gallery;
 pub mod knob;
 pub mod layout;
 pub mod level_meter;
 pub mod mini_bar;
+pub mod piano;
 pub mod section;
 pub mod slider;
 pub mod step_pad;

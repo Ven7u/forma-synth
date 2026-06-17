@@ -129,7 +129,7 @@ impl SynthApp {
             ui.add_space(self.theme.sp_xs);
 
             // ── Canvas ───────────────────────────────────────────────────────
-            let canvas_h = (ui.available_height() - 60.0).max(120.0);
+            let canvas_h = ui.available_height().max(80.0);
             let canvas_size = Vec2::new(ui.available_width(), canvas_h);
             let (rect, response) =
                 ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
