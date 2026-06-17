@@ -689,7 +689,7 @@ pub fn phosphor() -> SynthTheme {
         // Vintage Bakelite hardware aesthetic. Warm amber for all controls
         // and indicators; phosphor green reserved for actual screen surfaces
         // (oscilloscope glow tokens, ADSR display, MIDI signal dot).
-        name: "Phosphor".into(),
+        name: "Classic".into(),
 
         // ── Surfaces — dark warm Bakelite/wood casing ───────────────────────
         bg_app:     [20, 15, 10],
