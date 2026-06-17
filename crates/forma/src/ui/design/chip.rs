@@ -5,7 +5,7 @@
 //! fill; others share `state_idle`. Chips share their inner borders
 //! (no gap between them) so the row reads as a unified control.
 
-use egui::{CornerRadius, Response, Sense, StrokeKind, Ui, Vec2};
+use egui::{Color32, CornerRadius, Response, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::ui::theme::SynthTheme;
 
@@ -113,4 +113,35 @@ pub fn chip_selector<T: Copy + PartialEq>(
     // The scope's response covers the whole chip row — return it so callers
     // can chain `.on_hover_text(...)` on the entire selector.
     inner.response
+}
+
+/// A tinted toggle chip for color-coded band controls (EQ bands, per-channel
+/// toggles, etc.). Active: dim fill + colored text/border. Inactive: neutral.
+///
+/// The caller manages state and handles clicks:
+/// ```ignore
+/// if color_chip(ui, "LS", band_color, band.enabled, theme).clicked() {
+///     band.enabled = !band.enabled;
+/// }
+/// ```
+pub fn color_chip(
+    ui: &mut Ui,
+    label: &str,
+    color: Color32,
+    active: bool,
+    theme: &crate::ui::theme::SynthTheme,
+) -> Response {
+    let (bg, text_col, stroke_col) = if active {
+        (color.gamma_multiply(0.25), color, color)
+    } else {
+        (
+            theme.c(&theme.bg_sunken),
+            theme.c(&theme.text_disabled),
+            theme.c(&theme.border),
+        )
+    };
+    let btn = egui::Button::new(RichText::new(label).small().color(text_col))
+        .fill(bg)
+        .stroke(Stroke::new(theme.stroke_ui, stroke_col));
+    ui.add(btn)
 }

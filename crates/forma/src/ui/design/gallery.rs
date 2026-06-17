@@ -9,7 +9,7 @@
 use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
 use super::{
-    chip::chip_selector as design_chip,
+    chip::{chip_selector as design_chip, color_chip as design_color_chip},
     fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
     layout::fader_column as design_fader_column,
@@ -82,6 +82,8 @@ struct GalleryState {
     mini_bar_probability: f32,
     mini_bar_pitch: f32,
     mini_bar_pitch_accum: f32,
+    /// ColorChip demo — 8 EQ-band-style toggles.
+    color_chip_active: [bool; 8],
 }
 
 impl Default for GalleryState {
@@ -106,6 +108,7 @@ impl Default for GalleryState {
             mini_bar_probability: 70.0,
             mini_bar_pitch: 60.0,
             mini_bar_pitch_accum: 0.0,
+            color_chip_active: [true, false, true, true, false, true, false, true],
         }
     }
 }
@@ -319,6 +322,10 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "LevelMeter — 3 levels × peak hold", theme);
     level_meter_row(ui, theme);
+
+    ui.add_space(theme.sp_xl);
+    sub_header(ui, "ColorChip — tinted band toggle", theme);
+    color_chip_sample(ui, theme, state);
 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "StepPad — 2 sizes × velocity-encoded fill", theme);
@@ -887,6 +894,35 @@ fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
             }
         });
     }
+}
+
+fn color_chip_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
+    ui.label(
+        RichText::new("8 EQ-style band chips — active gets a tinted fill, inactive goes neutral")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
+    );
+    ui.add_space(theme.sp_xs);
+    let band_colors = [
+        theme.c(&theme.accent_fm),
+        theme.c(&theme.fx_chorus),
+        theme.c(&theme.accent_hold),
+        theme.c(&theme.fx_overdrive),
+        theme.c(&theme.fx_distortion),
+        theme.c(&theme.fx_reverb),
+        theme.c(&theme.fx_crystallizer),
+        theme.c(&theme.accent),
+    ];
+    let labels = ["LS", "P1", "P2", "P3", "P4", "P5", "P6", "HS"];
+    ui.horizontal(|ui| {
+        for i in 0..8usize {
+            if design_color_chip(ui, labels[i], band_colors[i], state.color_chip_active[i], theme)
+                .clicked()
+            {
+                state.color_chip_active[i] = !state.color_chip_active[i];
+            }
+        }
+    });
 }
 
 fn font_samples(ui: &mut Ui, theme: &SynthTheme) {
