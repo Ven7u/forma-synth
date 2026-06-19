@@ -1244,14 +1244,12 @@ fn draw_lp_response_curve(
         rect.bottom() - t * rect.height()
     };
 
-    // ── Background ────────────────────────────────────────────────────────
-    // Token-derived: accent tinted dark.
-    let bg = Color32::from_rgba_premultiplied(accent.r() / 6, accent.g() / 6, accent.b() / 6, 140);
-    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), bg);
+    // ── Background — same dark CRT bg as scope/EQ/OSC ────────────────────
+    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.scope_bg));
 
-    // ── Grid — log-spaced vertical frequency lines ────────────────────────
-    let grid_col = theme.c(&theme.border);
-    let label_col = theme.c(&theme.text_secondary);
+    // ── Grid — accent-derived so the grid hue matches the curve ──────────
+    let grid_col = Color32::from_rgba_premultiplied(accent.r() / 4, accent.g() / 4, accent.b() / 4, 110);
+    let label_col = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 145);
     let small = theme.font_small();
     for (f, label) in [
         (100.0_f32, "100"),

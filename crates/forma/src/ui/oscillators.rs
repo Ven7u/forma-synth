@@ -256,11 +256,10 @@ impl SynthApp {
                 Sense::hover(),
             );
             if ui.is_rect_visible(rect) {
-                let line_color = if active {
-                    theme.c(&theme.accent)
-                } else {
-                    theme.c(&theme.accent).linear_multiply(0.3)
-                };
+                // OSC waveform uses the icon's mint CRT color, not the amber accent.
+                let c = &theme.scope_glow_core;
+                let mint = egui::Color32::from_rgb(c[0], c[1], c[2]);
+                let line_color = if active { mint } else { mint.linear_multiply(0.28) };
                 draw_wave_preview(
                     ui.painter(),
                     rect,

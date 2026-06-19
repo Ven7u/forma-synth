@@ -145,7 +145,7 @@ impl SynthApp {
 
             let painter = ui.painter_at(rect);
 
-            painter.rect_filled(rect, self.theme.rounding_sm, self.theme.c(&self.theme.bg_sunken));
+            painter.rect_filled(rect, self.theme.rounding_sm, self.theme.c(&self.theme.scope_bg));
             draw_grid(&painter, rect, &self.theme);
             if params.enabled {
                 draw_response_curve(&painter, rect, &params, &self.theme);
@@ -250,9 +250,11 @@ impl SynthApp {
 // ── Drawing helpers ───────────────────────────────────────────────────────────
 
 fn draw_grid(painter: &egui::Painter, rect: Rect, t: &SynthTheme) {
-    let border = t.c(&t.border);
-    let grid_col = border.gamma_multiply(0.6);
-    let zero_col = t.c(&t.border_focus).gamma_multiply(0.7);
+    // On the dark CRT bg, derive grid lines from accent so every theme gets a
+    // matching-hue grid (amber in Classic, teal in Phosphor, etc.).
+    let a = t.c(&t.accent);
+    let grid_col = Color32::from_rgba_premultiplied(a.r() / 4, a.g() / 4, a.b() / 4, 110);
+    let zero_col = Color32::from_rgba_premultiplied(a.r() / 2, a.g() / 2, a.b() / 2, 150);
 
     for &freq in &[
         50.0_f32, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
@@ -317,7 +319,8 @@ fn draw_response_curve(painter: &egui::Painter, rect: Rect, params: &EqParams, t
 }
 
 fn draw_axis_labels(painter: &egui::Painter, rect: Rect, t: &SynthTheme) {
-    let col = t.c(&t.text_secondary);
+    let a = t.c(&t.accent);
+    let col = Color32::from_rgba_premultiplied(a.r(), a.g(), a.b(), 145);
     let font = t.font_body();
 
     for &(freq, label) in &[

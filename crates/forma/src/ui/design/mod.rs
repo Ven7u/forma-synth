@@ -12,6 +12,7 @@ pub mod chord_pad;
 pub mod drum_step;
 pub mod fader;
 pub mod gallery;
+pub mod theme_editor;
 pub mod knob;
 pub mod layout;
 pub mod level_meter;
