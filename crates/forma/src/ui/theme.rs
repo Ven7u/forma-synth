@@ -708,13 +708,14 @@ pub fn classic() -> SynthTheme {
         text_disabled:  [125, 110,  88], // muted but legible
         text_on_accent: [ 20,  13,   5], // very dark on amber fill
 
-        // ── Main accent — bold amber-gold indicator lamp ─────────────────────
-        accent:     [212, 145,  38], // bright amber LED, pops against sand
-        accent_dim: [145, 100,  28], // dimmed lamp
+        // ── Main accent — dark amber; passes WCAG AA-large (3.27:1 on bg_surface)
+        // Knob arcs use separate brighter tokens so decorative indicators stay vivid.
+        accent:     [152, 102,  25], // dark amber — readable as text on sandy panels
+        accent_dim: [105,  70,  16], // dimmed (proportional)
 
-        knob_tier1_arc: [220, 155,  45],
-        knob_tier2_arc: [175, 122,  35],
-        knob_tier3_arc: [132,  95,  30],
+        knob_tier1_arc: [220, 155,  45], // bright amber arc — decorator, no text contrast req.
+        knob_tier2_arc: [178, 125,  35],
+        knob_tier3_arc: [135,  96,  30],
 
         // ── Secondary accents — muted tape-label hues ────────────────────────
         accent_hard_sync: [142,  90, 162], // dusty violet
