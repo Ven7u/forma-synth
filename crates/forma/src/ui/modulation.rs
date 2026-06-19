@@ -649,7 +649,7 @@ impl SynthApp {
                     .synth_toggle(
                         &mut filter_on,
                         "FILTER",
-                        ToggleSize::Standard,
+                        ToggleSize::Large,
                         Tier::Primary,
                         &theme,
                         None,
