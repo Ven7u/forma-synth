@@ -144,6 +144,11 @@ pub struct SynthTheme {
     pub meter_green: [u8; 3],
     pub meter_clip: [u8; 3],
 
+    // ── Filter response curve ────────────────────────────────────────────────
+    pub filter_curve_line: [u8; 3],
+    pub filter_curve_grid: [u8; 4],
+    pub filter_curve_label: [u8; 4],
+
     // ── ADSR visualizer ─────────────────────────────────────────────────────
     pub adsr_fill: [u8; 4],
     pub adsr_outline: [u8; 3],
@@ -527,6 +532,10 @@ pub fn midnight() -> SynthTheme {
         meter_green: [0, 200, 80],
         meter_clip: [255, 50, 30],
 
+        filter_curve_line:  [0, 210, 140],
+        filter_curve_grid:  [0, 140, 90, 80],
+        filter_curve_label: [0, 200, 130, 160],
+
         adsr_fill: [0, 160, 100, 30],
         adsr_outline: [0, 200, 130],
         adsr_label: [80, 160, 110, 180],
@@ -657,6 +666,10 @@ pub fn winamp_classic() -> SynthTheme {
 
         patch_browser_model: [150, 200, 60],
         patch_load_fx_on: [255, 200, 0],
+
+        filter_curve_line:  [0, 220, 0],
+        filter_curve_grid:  [0, 140, 0, 80],
+        filter_curve_label: [0, 200, 0, 160],
 
         midi_connected: [0, 230, 0],
 
@@ -795,6 +808,10 @@ pub fn classic() -> SynthTheme {
         patch_browser_model: [ 82, 132, 158], // muted steel blue
         patch_load_fx_on:    [212, 145,  38], // amber
 
+        filter_curve_line:  [220, 155,  45],       // bright amber — filter curve
+        filter_curve_grid:  [152, 102,  25,  80],  // dark amber grid, translucent
+        filter_curve_label: [220, 155,  45, 160],  // amber labels, soft
+
         midi_connected: [142, 220, 168], // icon mint (signal dot = screen)
 
         // ── Legacy panel bg tokens ───────────────────────────────────────────
@@ -913,6 +930,10 @@ pub fn phosphor() -> SynthTheme {
 
         patch_browser_model: [80, 255, 180],
         patch_load_fx_on: [220, 255, 60],
+
+        filter_curve_line:  [30, 255, 120],
+        filter_curve_grid:  [20, 160,  70,  80],
+        filter_curve_label: [30, 220, 100, 160],
 
         midi_connected: [30, 255, 120],
 

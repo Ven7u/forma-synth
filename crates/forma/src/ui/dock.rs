@@ -65,18 +65,18 @@ pub fn default_dock_state() -> DockState<Tab> {
     let mut state = DockState::new(vec![Tab::Oscillators, Tab::Mixer]);
     let surface = state.main_surface_mut();
 
-    // 1. Split bottom from root: Sequencer + ArpWalker tabbed — bottom 32%.
+    // 1. Split bottom from root: Sequencer + ArpWalker tabbed — bottom 25%.
     let [top, _bottom] = surface.split_below(
         NodeIndex::root(),
-        0.68,
+        0.75,
         vec![Tab::Sequencer, Tab::ArpWalker],
     );
 
     // 2. In top area, split right: Oscilloscope — right takes 40%.
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
-    // 3. Split top-left vertically: Modulation + Filter tabbed below Oscillators/Mixer.
-    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.65, vec![Tab::Modulation, Tab::Filter]);
+    // 3. Split top-left vertically: Oscillators/Mixer top 50%, Filter & Envelopes bottom 50%.
+    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.50, vec![Tab::Modulation, Tab::Filter]);
 
     // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
@@ -193,16 +193,23 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
                 });
             }
             Tab::Filter => {
-                ui.columns(3, |cols| {
-                    self.app.ui_filter_panel(&mut cols[0]);
-                    self.app.ui_adsr_panel(
-                        &mut cols[1],
-                        "Filter Env",
-                        &mut [0usize, 1, 2, 3],
-                        true,
-                    );
-                    self.app
-                        .ui_adsr_panel(&mut cols[2], "Amp Env", &mut [0usize, 1, 2, 3], false);
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.set_min_width(ui.available_width());
+                    self.app.ui_filter_panel(ui);
+                    ui.columns(2, |cols| {
+                        self.app.ui_adsr_panel(
+                            &mut cols[0],
+                            "Filter Env",
+                            &mut [0usize, 1, 2, 3],
+                            true,
+                        );
+                        self.app.ui_adsr_panel(
+                            &mut cols[1],
+                            "Amp Env",
+                            &mut [0usize, 1, 2, 3],
+                            false,
+                        );
+                    });
                 });
             }
             Tab::Sequencer => {
