@@ -144,6 +144,9 @@ pub struct SynthTheme {
     pub meter_green: [u8; 3],
     pub meter_clip: [u8; 3],
 
+    // ── OSC mini-waveform preview ────────────────────────────────────────────
+    pub osc_preview_line: [u8; 3],
+
     // ── Filter response curve ────────────────────────────────────────────────
     pub filter_curve_line: [u8; 3],
     pub filter_curve_grid: [u8; 4],
@@ -240,7 +243,7 @@ impl SynthTheme {
     }
 
     pub fn ca(&self, rgba: &[u8; 4]) -> Color32 {
-        Color32::from_rgba_premultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
+        Color32::from_rgba_unmultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
     }
 
     #[allow(dead_code)]
@@ -532,6 +535,8 @@ pub fn midnight() -> SynthTheme {
         meter_green: [0, 200, 80],
         meter_clip: [255, 50, 30],
 
+        osc_preview_line:   [0, 210, 140],
+
         filter_curve_line:  [0, 210, 140],
         filter_curve_grid:  [0, 140, 90, 80],
         filter_curve_label: [0, 200, 130, 160],
@@ -667,6 +672,8 @@ pub fn winamp_classic() -> SynthTheme {
         patch_browser_model: [150, 200, 60],
         patch_load_fx_on: [255, 200, 0],
 
+        osc_preview_line:   [0, 220, 0],
+
         filter_curve_line:  [0, 220, 0],
         filter_curve_grid:  [0, 140, 0, 80],
         filter_curve_label: [0, 200, 0, 160],
@@ -795,10 +802,10 @@ pub fn classic() -> SynthTheme {
         meter_clip:  [192,  78,  58], // coral red
 
         // ── ADSR — icon mint on dark CRT bg (same palette as scope) ──────────
-        adsr_fill:    [ 95, 190, 142,  22], // mint fill
-        adsr_outline: [140, 220, 168      ], // mint outline
-        adsr_label:   [100, 175, 132, 175], // muted mint label
-        adsr_cursor:  [172, 238, 192      ], // bright mint cursor
+        adsr_fill:    [152, 102,  25,  45], // amber fill, semi-transparent
+        adsr_outline: [220, 155,  45      ], // bright amber outline
+        adsr_label:   [220, 155,  45, 160], // amber labels, soft
+        adsr_cursor:  [220, 155,  45      ], // amber cursor
 
         // ── Status ───────────────────────────────────────────────────────────
         latency_ok:   [118, 172,  78], // sage green
@@ -807,6 +814,8 @@ pub fn classic() -> SynthTheme {
 
         patch_browser_model: [ 82, 132, 158], // muted steel blue
         patch_load_fx_on:    [212, 145,  38], // amber
+
+        osc_preview_line:   [220, 155,  45],       // amber — matches filter curve
 
         filter_curve_line:  [220, 155,  45],       // bright amber — filter curve
         filter_curve_grid:  [152, 102,  25,  80],  // dark amber grid, translucent
@@ -930,6 +939,8 @@ pub fn phosphor() -> SynthTheme {
 
         patch_browser_model: [80, 255, 180],
         patch_load_fx_on: [220, 255, 60],
+
+        osc_preview_line:   [30, 255, 120],
 
         filter_curve_line:  [30, 255, 120],
         filter_curve_grid:  [20, 160,  70,  80],

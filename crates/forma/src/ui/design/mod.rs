@@ -19,6 +19,7 @@ pub mod knob;
 pub mod layout;
 pub mod level_meter;
 pub mod mini_bar;
+pub mod osc_display;
 pub mod piano;
 pub mod section;
 pub mod slider;

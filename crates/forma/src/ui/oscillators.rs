@@ -2,20 +2,17 @@ use crate::ui::design::{
     fader::FaderSize,
     layout::fader_column,
     level_meter::{LevelMeterOrientation, LevelMeterSize},
+    osc_display::draw_wave_preview,
     toggle::ToggleSize,
     KnobSize, SynthUi, Tier,
 };
 use crate::ui::frame::SynthFrame;
 use crate::SynthApp;
 use eframe::egui;
-use egui::{Color32, Pos2, RichText, Sense, Stroke, Vec2};
+use egui::{RichText, Sense, Vec2};
 
 const WAVE_OPTIONS: &[(usize, &str)] =
     &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
-
-/// Shared fixed height for all dock cards (inner content, before section margins).
-/// Raise or lower this to resize all four cards together.
-const CARD_H: f32 = 260.0;
 
 impl SynthApp {
     pub fn ui_osc_panel(&mut self, ui: &mut egui::Ui, i: usize) {
@@ -88,8 +85,6 @@ impl SynthApp {
             } else {
                 self.ui_osc_front(ui, i);
             }
-            // Pad to shared fixed card height so all dock cards are the same size.
-            ui.add_space((CARD_H - ui.min_rect().height()).max(0.0));
         });
 
         if new_enabled != self.osc_enabled[i] {
@@ -256,19 +251,13 @@ impl SynthApp {
                 Sense::hover(),
             );
             if ui.is_rect_visible(rect) {
-                // OSC waveform uses the icon's mint CRT color, not the amber accent.
-                let c = &theme.scope_glow_core;
-                let mint = egui::Color32::from_rgb(c[0], c[1], c[2]);
-                let line_color = if active { mint } else { mint.linear_multiply(0.28) };
                 draw_wave_preview(
                     ui.painter(),
                     rect,
                     self.osc_wave[i],
                     self.osc_pulse_width[i],
-                    theme.c(&theme.scope_bg),
-                    line_color,
-                    theme.rounding_sm,
-                    theme.stroke_focus,
+                    active,
+                    &theme,
                 );
             }
         });
@@ -770,59 +759,3 @@ impl SynthApp {
 
 // ── Waveform preview painter ──────────────────────────────────────────────────
 
-fn draw_wave_preview(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    wave: usize,
-    pulse_width: f32,
-    bg: Color32,
-    line_color: Color32,
-    rounding: f32,
-    stroke_w: f32,
-) {
-    painter.rect_filled(rect, egui::CornerRadius::same(rounding as u8), bg);
-
-    let w = rect.width();
-    let h = rect.height();
-    let cx = rect.left();
-    let cy = rect.center().y;
-    let amp = h * 0.38;
-    let cycles = 2.0_f32;
-    let steps = 80usize;
-
-    let points: Vec<Pos2> = (0..=steps)
-        .map(|s| {
-            let t = s as f32 / steps as f32;
-            let norm_phase = (t * cycles).fract();
-            let phase_rad = t * cycles * std::f32::consts::TAU;
-
-            let y = match wave {
-                0 => phase_rad.sin(),
-                1 => 1.0 - 2.0 * norm_phase,
-                2 => {
-                    if norm_phase < pulse_width {
-                        1.0
-                    } else {
-                        -1.0
-                    }
-                }
-                3 => {
-                    if norm_phase < 0.5 {
-                        4.0 * norm_phase - 1.0
-                    } else {
-                        3.0 - 4.0 * norm_phase
-                    }
-                }
-                _ => 0.0,
-            };
-
-            Pos2::new(cx + t * w, cy - y * amp)
-        })
-        .collect();
-
-    let clip = painter.clip_rect();
-    let painter = painter.with_clip_rect(clip.intersect(rect));
-    for pair in points.windows(2) {
-        painter.line_segment([pair[0], pair[1]], Stroke::new(stroke_w, line_color));
-    }
-}
