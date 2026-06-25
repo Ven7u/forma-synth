@@ -2,6 +2,7 @@ use crate::ui::design::{
     adsr_display::draw_adsr_visualizer,
     fader::{fader, FaderOrientation, FaderSize},
     filter_display::draw_lp_response_curve,
+    lfo_indicator::lfo_pulse_dot,
     toggle::ToggleSize,
     KnobSize, SynthUi, Tier,
 };
@@ -44,29 +45,33 @@ impl SynthApp {
         SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header — LFO 1 enable toggle.
+            // Header — LFO 1 enable toggle + rate pulse dot.
             let mut lfo_on = self.lfo_enabled;
-            if ui
-                .synth_toggle(
-                    &mut lfo_on,
-                    "LFO 1",
-                    ToggleSize::Standard,
-                    Tier::Secondary,
-                    &theme,
-                    None,
-                )
-                .on_hover_text(
-                    "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
-                )
-                .clicked()
-            {
-                self.lfo_enabled = lfo_on;
-                self.engine.set_lfo_depth(if self.lfo_enabled {
-                    self.lfo_depth
-                } else {
-                    0.0
-                });
-            }
+            ui.horizontal(|ui| {
+                if ui
+                    .synth_toggle(
+                        &mut lfo_on,
+                        "LFO 1",
+                        ToggleSize::Standard,
+                        Tier::Secondary,
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text(
+                        "Low Frequency Oscillator — modulates pitch, filter cutoff, or amplitude",
+                    )
+                    .clicked()
+                {
+                    self.lfo_enabled = lfo_on;
+                    self.engine.set_lfo_depth(if self.lfo_enabled {
+                        self.lfo_depth
+                    } else {
+                        0.0
+                    });
+                }
+                ui.add_space(theme.sp_xs);
+                lfo_pulse_dot(ui, self.lfo_rate, self.lfo_enabled, &theme);
+            });
 
             ui.add_space(theme.sp_xs);
 
@@ -227,27 +232,31 @@ impl SynthApp {
         SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header — LFO 2 enable toggle.
+            // Header — LFO 2 enable toggle + rate pulse dot.
             let mut lfo2_on = self.lfo2_enabled;
-            if ui
-                .synth_toggle(
-                    &mut lfo2_on,
-                    "LFO 2",
-                    ToggleSize::Standard,
-                    Tier::Secondary,
-                    &theme,
-                    None,
-                )
-                .on_hover_text("Second LFO — runs independently of LFO 1")
-                .clicked()
-            {
-                self.lfo2_enabled = lfo2_on;
-                self.engine.set_lfo2_depth(if self.lfo2_enabled {
-                    self.lfo2_depth
-                } else {
-                    0.0
-                });
-            }
+            ui.horizontal(|ui| {
+                if ui
+                    .synth_toggle(
+                        &mut lfo2_on,
+                        "LFO 2",
+                        ToggleSize::Standard,
+                        Tier::Secondary,
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text("Second LFO — runs independently of LFO 1")
+                    .clicked()
+                {
+                    self.lfo2_enabled = lfo2_on;
+                    self.engine.set_lfo2_depth(if self.lfo2_enabled {
+                        self.lfo2_depth
+                    } else {
+                        0.0
+                    });
+                }
+                ui.add_space(theme.sp_xs);
+                lfo_pulse_dot(ui, self.lfo2_rate, self.lfo2_enabled, &theme);
+            });
 
             ui.add_space(theme.sp_xs);
 

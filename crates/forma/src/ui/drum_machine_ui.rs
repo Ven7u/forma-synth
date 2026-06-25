@@ -376,6 +376,10 @@ impl SynthApp {
             let eff_muted  = muted || (soloed_any && !self.drums.soloed[ch]);
             let expanded   = self.drums.expanded_channel == Some(ch);
 
+            // Each channel row needs its own ID namespace — without push_id every
+            // ui.horizontal() in this loop shares the same unique_id (scope_builder
+            // HACK resets the parent counter), colliding on every DrumStep and button.
+            ui.push_id(ch, |ui| {
             ui.horizontal(|ui| {
                 // ── Channel name toggle (fixed-width scope keeps step grid aligned) ──
                 let mut is_expanded = expanded;
@@ -574,6 +578,7 @@ impl SynthApp {
                         });
                     });
             }
+            }); // end push_id(ch)
         }
 
         ui.add_space(sp_xs);

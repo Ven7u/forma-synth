@@ -158,6 +158,14 @@ pub struct SynthTheme {
     pub adsr_label: [u8; 4],
     pub adsr_cursor: [u8; 3],
 
+    // ── Transport / global bar ──────────────────────────────────────────────
+    /// Sub-beat pulse dot (beats 2+). Distinct from accent — typically a blue.
+    pub accent_beat: [u8; 3],
+    /// Stop / panic button color. Also used for recording indicator fill.
+    pub transport_stop: [u8; 3],
+    /// Recording-active state (pulsing). Can match transport_stop.
+    pub transport_rec: [u8; 3],
+
     // ── Latency indicator ───────────────────────────────────────────────────
     pub latency_ok: [u8; 3],
     pub latency_warn: [u8; 3],
@@ -246,6 +254,18 @@ impl SynthTheme {
         Color32::from_rgba_unmultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
     }
 
+    /// True when the theme has a light app background (luminance > 0.3).
+    /// Used to invert active-widget fill logic: light themes use accent fill +
+    /// text_on_accent text; dark themes use dim accent glow + accent text.
+    pub fn is_light(&self) -> bool {
+        let [r, g, b] = self.bg_app;
+        let lin = |c: u8| {
+            let c = c as f32 / 255.0;
+            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055_f32).powf(2.4) }
+        };
+        0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.3
+    }
+
     #[allow(dead_code)]
     pub fn active(&self, on: bool) -> Color32 {
         if on {
@@ -287,6 +307,8 @@ impl SynthTheme {
         };
 
         // Dim accent to use as active widget fill.
+        // Dark themes: dim accent glow as fill, bright accent as text (original behaviour).
+        // Light themes: solid accent fill, text_on_accent as text — matches toggle_button pattern.
         let accent_fill =
             Color32::from_rgba_premultiplied(accent.r() / 5, accent.g() / 5, accent.b() / 5, 200);
 
@@ -338,7 +360,12 @@ impl SynthTheme {
             border_focus,
             self.stroke_focus,
         );
-        vis.widgets.active = wv(accent_fill, accent, accent, self.stroke_focus);
+        let text_on_accent = self.c(&self.text_on_accent);
+        vis.widgets.active = if self.is_light() {
+            wv(accent, text_on_accent, accent, self.stroke_focus)
+        } else {
+            wv(accent_fill, accent, accent, self.stroke_focus)
+        };
         vis.widgets.open = wv(
             lighten(bg_surface, 22),
             text_primary,
@@ -467,7 +494,7 @@ pub fn midnight() -> SynthTheme {
         border_focus: [0, 160, 120],
 
         text_primary: [210, 218, 230],
-        text_secondary: [110, 125, 145],
+        text_secondary: [113, 128, 148], // bumped 3 pts — WCAG AA on bg_surface (4.66:1)
         text_disabled: [50, 60, 78],
         text_on_accent: [6, 8, 12],
 
@@ -546,6 +573,10 @@ pub fn midnight() -> SynthTheme {
         adsr_label: [80, 160, 110, 180],
         adsr_cursor: [0, 255, 160],
 
+        accent_beat:    [ 80, 155, 215], // steel blue — sub-beat pulse dot
+        transport_stop: [220,  70,  55], // vivid red — stop / panic
+        transport_rec:  [220,  60,  50], // slightly deeper red — recording active
+
         latency_ok: [0, 180, 120],
         latency_warn: [200, 180, 0],
         latency_bad: [200, 70, 50],
@@ -592,7 +623,7 @@ pub fn winamp_classic() -> SynthTheme {
         border_focus: [0, 200, 0],
 
         text_primary: [215, 215, 215],
-        text_secondary: [130, 130, 130],
+        text_secondary: [152, 152, 152], // bumped — WCAG AA on bg_app (5.37:1) and bg_surface (4.50:1)
         text_disabled: [65, 65, 65],
         text_on_accent: [10, 10, 10],
 
@@ -665,6 +696,10 @@ pub fn winamp_classic() -> SynthTheme {
         adsr_label: [80, 160, 80, 180],
         adsr_cursor: [0, 255, 0],
 
+        accent_beat:    [ 90, 165, 225], // bright steel blue
+        transport_stop: [255,  90,  70], // hot red — passes AA on dark Winamp bar
+        transport_rec:  [255,  80,  60],
+
         latency_ok: [0, 200, 0],
         latency_warn: [220, 200, 0],
         latency_bad: [220, 60, 40],
@@ -720,18 +755,18 @@ pub fn classic() -> SynthTheme {
         bg_bar:     [192, 186, 172], // toolbars / transport strips
 
         border:       [152, 142, 125], // machined seam — visible but not harsh
-        border_focus: [145,  98,  35], // amber-brown lit edge
+        border_focus: [120,  81,  28], // amber-brown lit edge — 3.63:1 on bg_bar (WCAG non-text 3:1)
 
         // ── Text — strong contrast on sand panels ────────────────────────────
         text_primary:   [ 22,  16,   9], // near-black warm ink (maximum contrast)
         text_secondary: [ 62,  50,  34], // dark warm brown — readable secondary
         text_disabled:  [125, 110,  88], // muted but legible
-        text_on_accent: [ 20,  13,   5], // very dark on amber fill
+        text_on_accent: [235, 220, 190], // light cream on dark amber fill — 6.73:1 WCAG AA
 
-        // ── Main accent — dark amber; passes WCAG AA-large (3.27:1 on bg_surface)
+        // ── Main accent — deep amber; WCAG AA on bg_bar/bg_app/bg_surface ──────
         // Knob arcs use separate brighter tokens so decorative indicators stay vivid.
-        accent:     [152, 102,  25], // dark amber — readable as text on sandy panels
-        accent_dim: [105,  70,  16], // dimmed (proportional)
+        accent:     [ 98,  66,  16], // deep amber — 4.71:1 on bg_bar, 6.03:1 on bg_surface
+        accent_dim: [ 72,  48,  11], // dimmed (proportional, 6.38:1 on bg_bar)
 
         knob_tier1_arc: [220, 155,  45], // bright amber arc — decorator, no text contrast req.
         knob_tier2_arc: [178, 125,  35],
@@ -807,10 +842,15 @@ pub fn classic() -> SynthTheme {
         adsr_label:   [220, 155,  45, 160], // amber labels, soft
         adsr_cursor:  [220, 155,  45      ], // amber cursor
 
+        // ── Transport / global bar ───────────────────────────────────────────
+        accent_beat:    [ 35,  68, 128], // dark ink blue — 4.91:1 on sandy bg_bar
+        transport_stop: [140,  28,  22], // dark red — 4.74:1 on bg_bar
+        transport_rec:  [140,  28,  22], // same — recording uses same danger red
+
         // ── Status ───────────────────────────────────────────────────────────
-        latency_ok:   [118, 172,  78], // sage green
-        latency_warn: [212, 152,  42], // amber
-        latency_bad:  [185,  78,  58], // coral red
+        latency_ok:   [ 42,  80,  25], // dark sage green — 4.81:1 on bg_bar
+        latency_warn: [ 98,  66,  16], // dark amber (= accent) — 4.71:1 on bg_bar
+        latency_bad:  [130,  40,  30], // dark red — 4.78:1 on bg_bar
 
         patch_browser_model: [ 82, 132, 158], // muted steel blue
         patch_load_fx_on:    [212, 145,  38], // amber
@@ -932,6 +972,10 @@ pub fn phosphor() -> SynthTheme {
         adsr_outline: [20, 220, 100],
         adsr_label: [60, 180, 100, 180],
         adsr_cursor: [40, 255, 140],
+
+        accent_beat:    [ 80, 155, 215], // steel blue — sub-beat dot on dark green bg
+        transport_stop: [220,  70,  55], // vivid red
+        transport_rec:  [220,  60,  50],
 
         latency_ok: [20, 220, 100],
         latency_warn: [200, 220, 40],
