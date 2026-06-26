@@ -607,7 +607,7 @@ impl SynthApp {
         let theme = ui::theme::builtin_themes()
             .into_iter()
             .find(|t| t.name == saved.theme_name)
-            .unwrap_or_else(ui::theme::midnight);
+            .unwrap_or_else(ui::theme::classic);
         let panels = PanelVisibility::from_state(&saved.panels);
         let app_mode = saved.app_mode;
         let studio_tab = saved.studio_tab;
@@ -2808,12 +2808,23 @@ impl SynthApp {
                 |ui| {
                 // Settings menu — flat single-level list to avoid submenu overlap issues.
                 ui.menu_button(egui::RichText::new("⚙").size(14.0), |ui| {
-                    ui.set_min_width(160.0);
+                    let theme = self.theme.clone();
+                    let txt = |s: &str| {
+                        egui::RichText::new(s)
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_primary))
+                    };
+                    let section = |s: &str| {
+                        egui::RichText::new(s)
+                            .font(theme.font_micro())
+                            .color(theme.c(&theme.text_secondary))
+                    };
+                    ui.set_min_width(180.0);
 
                     // ── Patch ──────────────────────────────────────────────
-                    ui.label(egui::RichText::new("PATCH").small().weak());
+                    ui.label(section("PATCH"));
                     if ui
-                        .button("Randomize Patch")
+                        .button(txt("Randomize Patch"))
                         .on_hover_text("Generate a random patch and apply it immediately.")
                         .clicked()
                     {
@@ -2822,7 +2833,7 @@ impl SynthApp {
                         ui.close();
                     }
                     if ui
-                        .button("Init Patch")
+                        .button(txt("Init Patch"))
                         .on_hover_text("Reset all parameters to the default Init state.")
                         .clicked()
                     {
@@ -2834,11 +2845,11 @@ impl SynthApp {
                         ui.close();
                     }
                     ui.separator();
-                    if ui.button("New Patch").clicked() {
+                    if ui.button(txt("New Patch")).clicked() {
                         self.patch_name = "Init".into();
                         ui.close();
                     }
-                    if ui.button("Save Patch…").clicked() {
+                    if ui.button(txt("Save Patch…")).clicked() {
                         let p = self.capture_patch();
                         if let Some(path) = rfd::FileDialog::new()
                             .set_file_name(format!("{}.json", p.name))
@@ -2851,7 +2862,7 @@ impl SynthApp {
                         }
                         ui.close();
                     }
-                    if ui.button("Load Patch…").clicked() {
+                    if ui.button(txt("Load Patch…")).clicked() {
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter("Patch", &["json"])
                             .pick_file()
@@ -2868,12 +2879,17 @@ impl SynthApp {
                     ui.separator();
 
                     // ── Theme ──────────────────────────────────────────────
-                    ui.label(egui::RichText::new("THEME").small().weak());
+                    ui.label(section("THEME"));
                     for t in ui::theme::builtin_themes() {
-                        if ui
-                            .selectable_label(self.theme.name == t.name, &t.name)
-                            .clicked()
-                        {
+                        let selected = self.theme.name == t.name;
+                        let label = egui::RichText::new(&t.name)
+                            .font(theme.font_body())
+                            .color(if selected {
+                                theme.c(&theme.accent)
+                            } else {
+                                theme.c(&theme.text_primary)
+                            });
+                        if ui.selectable_label(selected, label).clicked() {
                             self.theme = t;
                             ui.close();
                         }
@@ -2882,10 +2898,17 @@ impl SynthApp {
                     ui.separator();
 
                     // ── View ───────────────────────────────────────────────
-                    ui.label(egui::RichText::new("VIEW").small().weak());
+                    ui.label(section("VIEW"));
                     for &tab in ui::dock::Tab::ALL {
                         let open = self.dock_state.find_tab(&tab).is_some();
-                        if ui.selectable_label(open, tab.title()).clicked() {
+                        let label = egui::RichText::new(tab.title())
+                            .font(theme.font_body())
+                            .color(if open {
+                                theme.c(&theme.accent)
+                            } else {
+                                theme.c(&theme.text_primary)
+                            });
+                        if ui.selectable_label(open, label).clicked() {
                             if open {
                                 self.dock_state
                                     .remove_tab(self.dock_state.find_tab(&tab).unwrap());
@@ -2895,7 +2918,7 @@ impl SynthApp {
                             ui.close();
                         }
                     }
-                    if ui.button("Reset Layout").clicked() {
+                    if ui.button(txt("Reset Layout")).clicked() {
                         self.reset_layout_pending = true;
                         ui.close();
                     }
@@ -2904,7 +2927,7 @@ impl SynthApp {
 
                     // ── Transport ──────────────────────────────────────────
                     if ui
-                        .button("Sync Now")
+                        .button(txt("Sync Now"))
                         .on_hover_text("Reset phases for sequencer, arpeggiator, and walker.")
                         .clicked()
                     {

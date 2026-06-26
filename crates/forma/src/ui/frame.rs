@@ -63,22 +63,15 @@ impl SynthFrame {
             .inner_margin(Margin::same(theme.sp_xs as i8))
     }
 
-    /// Tier 1 section — same as `section` but with a tinted accent border to
-    /// elevate panels that own Tier 1 (performance) controls (cutoff/resonance,
-    /// master volume, transport).
-    ///
-    /// Border choice: `accent_dim` rather than `accent`. Cards are passive
-    /// surfaces, not interactive widgets — a full-saturation perimeter reads
-    /// as "selected" or "pressed." `accent_dim` keeps the hue (so Tier 1 is
-    /// still recognizable) at a softer intensity, matching what
-    /// `02-tokens.md` describes accent_dim for ("fills behind text").
-    /// Stroke width: `stroke_focus` (1.5 px) for emphasis without chunkiness.
+    /// Tier 1 section — same visual style as `section`. The tier distinction
+    /// is expressed through control arc colors and stroke widths, not the card
+    /// border, so all cards share a consistent neutral border.
     #[allow(dead_code)]
     pub fn tier1(theme: &SynthTheme) -> Frame {
         Frame::new()
             .fill(theme.c(&theme.bg_surface))
             .corner_radius(CornerRadius::same(theme.rounding_md as u8))
-            .stroke(Stroke::new(theme.stroke_focus, theme.c(&theme.accent_dim)))
+            .stroke(Stroke::new(theme.stroke_ui, theme.c(&theme.border)))
             .inner_margin(Margin::same(theme.sp_sm as i8))
             .outer_margin(Margin::same(theme.sp_xs as i8))
     }

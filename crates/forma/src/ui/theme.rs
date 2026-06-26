@@ -483,7 +483,7 @@ fn geometry() -> Geometry {
 pub fn midnight() -> SynthTheme {
     let g = geometry();
     SynthTheme {
-        name: "Midnight".into(),
+        name: "Void".into(),
 
         bg_app: [6, 8, 12],
         bg_surface: [14, 18, 26],
@@ -612,7 +612,7 @@ pub fn midnight() -> SynthTheme {
 pub fn winamp_classic() -> SynthTheme {
     let g = geometry();
     SynthTheme {
-        name: "Winamp Classic".into(),
+        name: "Vega".into(),
 
         bg_app: [10, 10, 10],
         bg_surface: [22, 22, 22],
@@ -746,7 +746,7 @@ pub fn classic() -> SynthTheme {
         // "Screen" surfaces (scope, filter curve, EQ, OSC wave, ADSR) use the
         // icon's dark blue-grey bg [14,18,28] + mint beam — the tinted-glass CRT
         // look from the pixel-art icon. Non-screen instruments use warm sage.
-        name: "Classic".into(),
+        name: "Mars Sand".into(),
 
         // ── Surfaces — neutral warm sand, enough contrast between layers ─────
         bg_app:     [198, 192, 178], // room walls — grey-sand, not orange
@@ -889,7 +889,7 @@ pub fn classic() -> SynthTheme {
 pub fn phosphor() -> SynthTheme {
     let g = geometry();
     SynthTheme {
-        name: "Phosphor".into(),
+        name: "Sonar".into(),
 
         bg_app: [1, 5, 2],
         bg_surface: [3, 11, 5],
@@ -1015,5 +1015,5 @@ pub fn phosphor() -> SynthTheme {
 }
 
 pub fn builtin_themes() -> Vec<SynthTheme> {
-    vec![midnight(), winamp_classic(), phosphor(), classic()]
+    vec![classic(), midnight(), winamp_classic(), phosphor()]
 }
