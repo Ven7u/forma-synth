@@ -10,9 +10,7 @@ use egui::{Color32, Context, RichText, Stroke, Ui, Vec2, Window};
 
 use super::{
     chip::{chip_selector as design_chip, color_chip as design_color_chip},
-    chord_pad::{
-        chord_pad as design_chord_pad, ChordPadState, ChordQuality,
-    },
+    chord_pad::{chord_pad as design_chord_pad, ChordPadState, ChordQuality},
     drum_step::{drum_step as design_drum_step, DrumStepState},
     fader::{fader as design_fader, FaderOrientation, FaderSize},
     knob::knob as design_knob,
@@ -123,8 +121,8 @@ impl Default for GalleryState {
             mini_bar_pitch_accum: 0.0,
             color_chip_active: [true, false, true, true, false, true, false, true],
             drum_step_active: [
-                true, false, false, false, true, false, false, false,
-                true, false, false, false, true, false, false, false,
+                true, false, false, false, true, false, false, false, true, false, false, false,
+                true, false, false, false,
             ],
             drum_step_vel: [0.9; 16],
             chord_pad_held: [false; 3],
@@ -172,17 +170,11 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &SynthTheme) {
                             .auto_shrink([false, false])
                             .show(ui, |ui| match state.category {
                                 Category::Tokens => render_tokens(ui, theme),
-                                Category::Components => {
-                                    render_components(ui, theme, &mut state)
-                                }
-                                Category::Patterns => {
-                                    render_patterns(ui, theme, &mut state)
-                                }
+                                Category::Components => render_components(ui, theme, &mut state),
+                                Category::Patterns => render_patterns(ui, theme, &mut state),
                                 Category::Layouts => render_layouts(ui, theme),
                                 Category::Frames => render_frames(ui, theme),
-                                Category::Examples => {
-                                    render_examples(ui, theme, &mut state)
-                                }
+                                Category::Examples => render_examples(ui, theme, &mut state),
                             });
                     });
                 },
@@ -303,7 +295,14 @@ fn render_components(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     ui.add_space(theme.sp_xl);
     sub_header(ui, "Knob — legacy widget for comparison", theme);
     ui.horizontal(|ui| {
-        crate::ui::widgets::knob(ui, &mut state.legacy_value, 0.0..=1.0, "LEGACY", theme, false);
+        crate::ui::widgets::knob(
+            ui,
+            &mut state.legacy_value,
+            0.0..=1.0,
+            "LEGACY",
+            theme,
+            false,
+        );
         ui.add_space(theme.sp_md);
         ui.label(
             RichText::new(
@@ -484,8 +483,7 @@ fn render_examples(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
     );
     ui.add_space(theme.sp_md);
 
-    let wave_options: &[(usize, &str)] =
-        &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
+    let wave_options: &[(usize, &str)] = &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
 
     ui.set_max_width(360.0);
     SynthFrame::tier1(theme).show(ui, |ui| {
@@ -894,11 +892,31 @@ fn step_pad_grid(ui: &mut Ui, theme: &SynthTheme) {
         (StepPadSize::Note, "Note (20×20)"),
     ];
     let active_samples = [
-        ("Active 100%", StepState::Active { velocity: Some(1.0) }),
-        ("Active 50%", StepState::Active { velocity: Some(0.5) }),
-        ("Active 20%", StepState::Active { velocity: Some(0.2) }),
+        (
+            "Active 100%",
+            StepState::Active {
+                velocity: Some(1.0),
+            },
+        ),
+        (
+            "Active 50%",
+            StepState::Active {
+                velocity: Some(0.5),
+            },
+        ),
+        (
+            "Active 20%",
+            StepState::Active {
+                velocity: Some(0.2),
+            },
+        ),
         ("Active none", StepState::Active { velocity: None }),
-        ("Current 80%", StepState::Current { velocity: Some(0.8) }),
+        (
+            "Current 80%",
+            StepState::Current {
+                velocity: Some(0.8),
+            },
+        ),
         ("Inactive", StepState::Inactive),
     ];
 
@@ -1009,8 +1027,14 @@ fn color_chip_sample(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) 
     let labels = ["LS", "P1", "P2", "P3", "P4", "P5", "P6", "HS"];
     ui.horizontal(|ui| {
         for i in 0..8usize {
-            if design_color_chip(ui, labels[i], band_colors[i], state.color_chip_active[i], theme)
-                .clicked()
+            if design_color_chip(
+                ui,
+                labels[i],
+                band_colors[i],
+                state.color_chip_active[i],
+                theme,
+            )
+            .clicked()
             {
                 state.color_chip_active[i] = !state.color_chip_active[i];
             }
@@ -1039,7 +1063,7 @@ fn piano_samples(ui: &mut Ui, theme: &SynthTheme) {
         ui,
         &PianoConfig {
             first_midi: 48, // C3
-            last_midi:  83, // B5
+            last_midi: 83,  // B5
             size: PianoSize::Preview,
             interactive: false,
             show_labels: true,
@@ -1056,18 +1080,16 @@ fn piano_samples(ui: &mut Ui, theme: &SynthTheme) {
 
     ui.add_space(theme.sp_md);
     ui.label(
-        RichText::new(
-            "Full (64 px) — same notes, plus KB range bar (C4–E5), full 88-key span.",
-        )
-        .font(theme.font_small())
-        .color(theme.c(&theme.text_secondary)),
+        RichText::new("Full (64 px) — same notes, plus KB range bar (C4–E5), full 88-key span.")
+            .font(theme.font_small())
+            .color(theme.c(&theme.text_secondary)),
     );
     ui.add_space(theme.sp_xxs);
     design_piano(
         ui,
         &PianoConfig {
-            first_midi: 21,  // A0
-            last_midi:  108, // C8
+            first_midi: 21, // A0
+            last_midi: 108, // C8
             size: PianoSize::Full,
             interactive: false,
             show_labels: true,
@@ -1094,9 +1116,9 @@ fn chord_pad_grid(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
     ui.add_space(theme.sp_xs);
 
     let qualities = [
-        (ChordQuality::Major,      "Major",      "Cmaj",  "I"),
-        (ChordQuality::Minor,      "Minor",      "Dm",    "ii"),
-        (ChordQuality::Diminished, "Diminished", "B°",    "vii°"),
+        (ChordQuality::Major, "Major", "Cmaj", "I"),
+        (ChordQuality::Minor, "Minor", "Dm", "ii"),
+        (ChordQuality::Diminished, "Diminished", "B°", "vii°"),
     ];
     let pad_size = Vec2::new(88.0, 52.0);
 
@@ -1191,9 +1213,9 @@ fn chord_grid_pattern(ui: &mut Ui, theme: &SynthTheme) {
     );
     ui.add_space(theme.sp_xs);
 
-    let row_labels  = ["7ths", "Triads", "Sus"];
-    let degrees     = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
-    let qualities   = [
+    let row_labels = ["7ths", "Triads", "Sus"];
+    let degrees = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+    let qualities = [
         ChordQuality::Major,
         ChordQuality::Minor,
         ChordQuality::Minor,
@@ -1203,10 +1225,10 @@ fn chord_grid_pattern(ui: &mut Ui, theme: &SynthTheme) {
         ChordQuality::Diminished,
     ];
     let chord_names = ["C", "Dm", "Em", "F", "G", "Am", "B°"];
-    let key_rows    = [
-        ["Q","W","E","R","T","Y","U"],
-        ["A","S","D","F","G","H","J"],
-        ["Z","X","C","V","B","N","M"],
+    let key_rows = [
+        ["Q", "W", "E", "R", "T", "Y", "U"],
+        ["A", "S", "D", "F", "G", "H", "J"],
+        ["Z", "X", "C", "V", "B", "N", "M"],
     ];
     let label_w = 48.0_f32;
     let sp = theme.sp_xxs;
@@ -1238,7 +1260,7 @@ fn chord_grid_pattern(ui: &mut Ui, theme: &SynthTheme) {
                             chord_name: chord_names[col],
                             degree: degrees[col],
                             key_hint: key_rows[row][col],
-                            held: col == 0 && row == 1,   // highlight I/Triad
+                            held: col == 0 && row == 1, // highlight I/Triad
                             editing: col == 4 && row == 0, // highlight V/7th
                         },
                         Vec2::new(btn_w, btn_h),
@@ -1271,8 +1293,7 @@ fn color_swatches(ui: &mut Ui, theme: &SynthTheme, swatches: &[(&str, [u8; 3])])
     ui.horizontal_wrapped(|ui| {
         for (label, rgb) in swatches {
             ui.vertical(|ui| {
-                let (rect, _) =
-                    ui.allocate_exact_size(Vec2::new(80.0, 40.0), egui::Sense::hover());
+                let (rect, _) = ui.allocate_exact_size(Vec2::new(80.0, 40.0), egui::Sense::hover());
                 ui.painter().rect_filled(
                     rect,
                     theme.rounding_sm,
@@ -1312,8 +1333,7 @@ fn spacing_bars(ui: &mut Ui, theme: &SynthTheme) {
                     .font(theme.font_small())
                     .color(theme.c(&theme.text_secondary)),
             );
-            let (rect, _) =
-                ui.allocate_exact_size(Vec2::new(value, 12.0), egui::Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(value, 12.0), egui::Sense::hover());
             ui.painter()
                 .rect_filled(rect, 0.0, theme.c(&theme.accent_dim));
         });
@@ -1339,8 +1359,22 @@ struct LayoutCell {
 }
 
 impl LayoutCell {
-    const fn new(fx: f32, fy: f32, fw: f32, fh: f32, label: &'static str, color_idx: usize) -> Self {
-        Self { fx, fy, fw, fh, label, color_idx }
+    const fn new(
+        fx: f32,
+        fy: f32,
+        fw: f32,
+        fh: f32,
+        label: &'static str,
+        color_idx: usize,
+    ) -> Self {
+        Self {
+            fx,
+            fy,
+            fw,
+            fh,
+            label,
+            color_idx,
+        }
     }
 }
 
@@ -1357,19 +1391,34 @@ fn paint_layout_demo(
     // Slot palette — 5 colors cycling through theme tokens.
     let palette = [
         Color32::from_rgba_unmultiplied(
-            theme.knob_tier1_arc[0], theme.knob_tier1_arc[1], theme.knob_tier1_arc[2], 180,
+            theme.knob_tier1_arc[0],
+            theme.knob_tier1_arc[1],
+            theme.knob_tier1_arc[2],
+            180,
         ),
         Color32::from_rgba_unmultiplied(
-            theme.knob_tier2_arc[0], theme.knob_tier2_arc[1], theme.knob_tier2_arc[2], 180,
+            theme.knob_tier2_arc[0],
+            theme.knob_tier2_arc[1],
+            theme.knob_tier2_arc[2],
+            180,
         ),
         Color32::from_rgba_unmultiplied(
-            theme.knob_tier3_arc[0], theme.knob_tier3_arc[1], theme.knob_tier3_arc[2], 180,
+            theme.knob_tier3_arc[0],
+            theme.knob_tier3_arc[1],
+            theme.knob_tier3_arc[2],
+            180,
         ),
         Color32::from_rgba_unmultiplied(
-            theme.accent_fm[0], theme.accent_fm[1], theme.accent_fm[2], 160,
+            theme.accent_fm[0],
+            theme.accent_fm[1],
+            theme.accent_fm[2],
+            160,
         ),
         Color32::from_rgba_unmultiplied(
-            theme.accent_hold[0], theme.accent_hold[1], theme.accent_hold[2], 160,
+            theme.accent_hold[0],
+            theme.accent_hold[1],
+            theme.accent_hold[2],
+            160,
         ),
     ];
 
@@ -1400,18 +1449,41 @@ fn paint_layout_demo(
     for cell in cells {
         let cell_rect = egui::Rect::from_min_size(
             egui::Pos2::new(
-                inner.left() + cell.fx * inner.width() + if cell.fx > 0.0 { gap * 0.5 } else { 0.0 },
-                inner.top()  + cell.fy * inner.height() + if cell.fy > 0.0 { gap * 0.5 } else { 0.0 },
+                inner.left()
+                    + cell.fx * inner.width()
+                    + if cell.fx > 0.0 { gap * 0.5 } else { 0.0 },
+                inner.top()
+                    + cell.fy * inner.height()
+                    + if cell.fy > 0.0 { gap * 0.5 } else { 0.0 },
             ),
             Vec2::new(
-                cell.fw * inner.width() - if cell.fx > 0.0 && cell.fx + cell.fw < 1.0 { gap } else if cell.fx > 0.0 || cell.fx + cell.fw < 1.0 { gap * 0.5 } else { 0.0 },
-                cell.fh * inner.height() - if cell.fy > 0.0 && cell.fy + cell.fh < 1.0 { gap } else if cell.fy > 0.0 || cell.fy + cell.fh < 1.0 { gap * 0.5 } else { 0.0 },
+                cell.fw * inner.width()
+                    - if cell.fx > 0.0 && cell.fx + cell.fw < 1.0 {
+                        gap
+                    } else if cell.fx > 0.0 || cell.fx + cell.fw < 1.0 {
+                        gap * 0.5
+                    } else {
+                        0.0
+                    },
+                cell.fh * inner.height()
+                    - if cell.fy > 0.0 && cell.fy + cell.fh < 1.0 {
+                        gap
+                    } else if cell.fy > 0.0 || cell.fy + cell.fh < 1.0 {
+                        gap * 0.5
+                    } else {
+                        0.0
+                    },
             ),
         );
 
         let fill = palette[cell.color_idx % palette.len()];
         painter.rect_filled(cell_rect, rounding, fill);
-        painter.rect_stroke(cell_rect, rounding, Stroke::new(1.0, border_color), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            cell_rect,
+            rounding,
+            Stroke::new(1.0, border_color),
+            egui::StrokeKind::Inside,
+        );
 
         // Slot label centered in the cell.
         painter.text(
@@ -1433,177 +1505,303 @@ fn paint_layout_demo(
 }
 
 fn render_layouts(ui: &mut Ui, theme: &SynthTheme) {
-    let h_sm  = 64.0_f32;   // single-row layouts
-    let h_md  = 100.0_f32;  // two-row layouts
-    let h_lg  = 130.0_f32;  // magazine / complex
+    let h_sm = 64.0_f32; // single-row layouts
+    let h_md = 100.0_f32; // two-row layouts
+    let h_lg = 130.0_f32; // magazine / complex
 
     // ── Symmetric primitives ─────────────────────────────────────────────────
     sub_header(ui, "Symmetric — equal columns", theme);
 
-    paint_layout_demo(ui, theme, "col2", "LFO pairs, Filter/Amp envelopes", h_sm, &[
-        LayoutCell::new(0.0, 0.0, 0.5, 1.0, "slot 0", 0),
-        LayoutCell::new(0.5, 0.0, 0.5, 1.0, "slot 1", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "col2",
+        "LFO pairs, Filter/Amp envelopes",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.5, 1.0, "slot 0", 0),
+            LayoutCell::new(0.5, 0.0, 0.5, 1.0, "slot 1", 1),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "col3", "OSC 1 / 2 / 3, config triples", h_sm, &[
-        LayoutCell::new(0.0,       0.0, 1.0/3.0, 1.0, "slot 0", 0),
-        LayoutCell::new(1.0/3.0,   0.0, 1.0/3.0, 1.0, "slot 1", 1),
-        LayoutCell::new(2.0/3.0,   0.0, 1.0/3.0, 1.0, "slot 2", 2),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "col3",
+        "OSC 1 / 2 / 3, config triples",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0 / 3.0, 1.0, "slot 0", 0),
+            LayoutCell::new(1.0 / 3.0, 0.0, 1.0 / 3.0, 1.0, "slot 1", 1),
+            LayoutCell::new(2.0 / 3.0, 0.0, 1.0 / 3.0, 1.0, "slot 2", 2),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "col4", "ADSR, 4-knob parameter rows", h_sm, &[
-        LayoutCell::new(0.0,  0.0, 0.25, 1.0, "A", 0),
-        LayoutCell::new(0.25, 0.0, 0.25, 1.0, "D", 1),
-        LayoutCell::new(0.5,  0.0, 0.25, 1.0, "S", 2),
-        LayoutCell::new(0.75, 0.0, 0.25, 1.0, "R", 3),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "col4",
+        "ADSR, 4-knob parameter rows",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.25, 1.0, "A", 0),
+            LayoutCell::new(0.25, 0.0, 0.25, 1.0, "D", 1),
+            LayoutCell::new(0.5, 0.0, 0.25, 1.0, "S", 2),
+            LayoutCell::new(0.75, 0.0, 0.25, 1.0, "R", 3),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── L-shaped: full top + split bottom ───────────────────────────────────
     sub_header(ui, "L-shaped — full-width header, then columns", theme);
 
-    paint_layout_demo(ui, theme, "top_then_col2", "LFO card (header toggle + knobs/chips), scope + readouts", h_md, &[
-        LayoutCell::new(0.0, 0.0,  1.0, 0.35, "header", 4),
-        LayoutCell::new(0.0, 0.35, 0.5, 0.65, "body 0", 0),
-        LayoutCell::new(0.5, 0.35, 0.5, 0.65, "body 1", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "top_then_col2",
+        "LFO card (header toggle + knobs/chips), scope + readouts",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.35, "header", 4),
+            LayoutCell::new(0.0, 0.35, 0.5, 0.65, "body 0", 0),
+            LayoutCell::new(0.5, 0.35, 0.5, 0.65, "body 1", 1),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "top_then_col3", "OSC card (header + 3 control groups)", h_md, &[
-        LayoutCell::new(0.0,       0.0,  1.0,     0.35, "header", 4),
-        LayoutCell::new(0.0,       0.35, 1.0/3.0, 0.65, "body 0", 0),
-        LayoutCell::new(1.0/3.0,   0.35, 1.0/3.0, 0.65, "body 1", 1),
-        LayoutCell::new(2.0/3.0,   0.35, 1.0/3.0, 0.65, "body 2", 2),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "top_then_col3",
+        "OSC card (header + 3 control groups)",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.35, "header", 4),
+            LayoutCell::new(0.0, 0.35, 1.0 / 3.0, 0.65, "body 0", 0),
+            LayoutCell::new(1.0 / 3.0, 0.35, 1.0 / 3.0, 0.65, "body 1", 1),
+            LayoutCell::new(2.0 / 3.0, 0.35, 1.0 / 3.0, 0.65, "body 2", 2),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "top_then_col4", "ADSR (header row + 4 fader columns)", h_md, &[
-        LayoutCell::new(0.0,  0.0,  1.0,  0.3,  "header", 4),
-        LayoutCell::new(0.0,  0.3,  0.25, 0.7,  "A", 0),
-        LayoutCell::new(0.25, 0.3,  0.25, 0.7,  "D", 1),
-        LayoutCell::new(0.5,  0.3,  0.25, 0.7,  "S", 2),
-        LayoutCell::new(0.75, 0.3,  0.25, 0.7,  "R", 3),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "top_then_col4",
+        "ADSR (header row + 4 fader columns)",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.3, "header", 4),
+            LayoutCell::new(0.0, 0.3, 0.25, 0.7, "A", 0),
+            LayoutCell::new(0.25, 0.3, 0.25, 0.7, "D", 1),
+            LayoutCell::new(0.5, 0.3, 0.25, 0.7, "S", 2),
+            LayoutCell::new(0.75, 0.3, 0.25, 0.7, "R", 3),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── L-shaped: split top + full bottom ───────────────────────────────────
     sub_header(ui, "L-shaped — columns, then full-width footer", theme);
 
-    paint_layout_demo(ui, theme, "col2_then_bottom", "Mixer (channel strips → master row), OSC (knob columns → waveform preview)", h_md, &[
-        LayoutCell::new(0.0, 0.0,  0.5, 0.65, "col 0", 0),
-        LayoutCell::new(0.5, 0.0,  0.5, 0.65, "col 1", 1),
-        LayoutCell::new(0.0, 0.65, 1.0, 0.35, "footer", 4),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "col2_then_bottom",
+        "Mixer (channel strips → master row), OSC (knob columns → waveform preview)",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.5, 0.65, "col 0", 0),
+            LayoutCell::new(0.5, 0.0, 0.5, 0.65, "col 1", 1),
+            LayoutCell::new(0.0, 0.65, 1.0, 0.35, "footer", 4),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "col3_then_bottom", "PULSE (controls → step grid), drum lane (pad row → step row)", h_md, &[
-        LayoutCell::new(0.0,       0.0,  1.0/3.0, 0.55, "col 0", 0),
-        LayoutCell::new(1.0/3.0,   0.0,  1.0/3.0, 0.55, "col 1", 1),
-        LayoutCell::new(2.0/3.0,   0.0,  1.0/3.0, 0.55, "col 2", 2),
-        LayoutCell::new(0.0,       0.55, 1.0,     0.45, "footer", 4),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "col3_then_bottom",
+        "PULSE (controls → step grid), drum lane (pad row → step row)",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0 / 3.0, 0.55, "col 0", 0),
+            LayoutCell::new(1.0 / 3.0, 0.0, 1.0 / 3.0, 0.55, "col 1", 1),
+            LayoutCell::new(2.0 / 3.0, 0.0, 1.0 / 3.0, 0.55, "col 2", 2),
+            LayoutCell::new(0.0, 0.55, 1.0, 0.45, "footer", 4),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── Asymmetric splits ────────────────────────────────────────────────────
     sub_header(ui, "Asymmetric — fixed-ratio splits", theme);
 
-    paint_layout_demo(ui, theme, "sidebar_right  (30 / 70)", "Knob left + display/chips right: LFO, mod wheel, aftertouch", h_sm, &[
-        LayoutCell::new(0.0,  0.0, 0.30, 1.0, "30%", 0),
-        LayoutCell::new(0.30, 0.0, 0.70, 1.0, "70%", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "sidebar_right  (30 / 70)",
+        "Knob left + display/chips right: LFO, mod wheel, aftertouch",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.30, 1.0, "30%", 0),
+            LayoutCell::new(0.30, 0.0, 0.70, 1.0, "70%", 1),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "sidebar_left   (30 / 70)", "Label/indicator left + main content right", h_sm, &[
-        LayoutCell::new(0.0,  0.0, 0.30, 1.0, "30%", 2),
-        LayoutCell::new(0.30, 0.0, 0.70, 1.0, "70%", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "sidebar_left   (30 / 70)",
+        "Label/indicator left + main content right",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.30, 1.0, "30%", 2),
+            LayoutCell::new(0.30, 0.0, 0.70, 1.0, "70%", 1),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "split_40_60", "Balanced asymmetric: two unequal panels", h_sm, &[
-        LayoutCell::new(0.0,  0.0, 0.40, 1.0, "40%", 0),
-        LayoutCell::new(0.40, 0.0, 0.60, 1.0, "60%", 3),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "split_40_60",
+        "Balanced asymmetric: two unequal panels",
+        h_sm,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.40, 1.0, "40%", 0),
+            LayoutCell::new(0.40, 0.0, 0.60, 1.0, "60%", 3),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── Asymmetric L-shapes ──────────────────────────────────────────────────
     sub_header(ui, "Asymmetric L-shaped — header + sidebar body", theme);
 
-    paint_layout_demo(ui, theme, "header_sidebar_right", "LFO (title + pulse dot | SYNC) → knobs left + chips right", h_md, &[
-        LayoutCell::new(0.0,  0.0,  1.0,  0.3,  "header (full width)", 4),
-        LayoutCell::new(0.0,  0.3,  0.35, 0.7,  "main (35%)", 0),
-        LayoutCell::new(0.35, 0.3,  0.65, 0.7,  "sidebar right (65%)", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "header_sidebar_right",
+        "LFO (title + pulse dot | SYNC) → knobs left + chips right",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.3, "header (full width)", 4),
+            LayoutCell::new(0.0, 0.3, 0.35, 0.7, "main (35%)", 0),
+            LayoutCell::new(0.35, 0.3, 0.65, 0.7, "sidebar right (65%)", 1),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "header_sidebar_left", "Filter (title | toggle) → curve display right + controls left", h_md, &[
-        LayoutCell::new(0.0,  0.0,  1.0,  0.3,  "header (full width)", 4),
-        LayoutCell::new(0.0,  0.3,  0.35, 0.7,  "sidebar left (35%)", 2),
-        LayoutCell::new(0.35, 0.3,  0.65, 0.7,  "main (65%)", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "header_sidebar_left",
+        "Filter (title | toggle) → curve display right + controls left",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.3, "header (full width)", 4),
+            LayoutCell::new(0.0, 0.3, 0.35, 0.7, "sidebar left (35%)", 2),
+            LayoutCell::new(0.35, 0.3, 0.65, 0.7, "main (65%)", 1),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── Magazine layouts ─────────────────────────────────────────────────────
     sub_header(ui, "Magazine — one tall column + stacked rows", theme);
 
-    paint_layout_demo(ui, theme, "left_tall_right_stacked", "OSC mod back (sync/FM/ring controls | shared indicator), EQ (band list + curve)", h_lg, &[
-        LayoutCell::new(0.0,  0.0,  0.35, 1.0,  "left (tall)", 0),
-        LayoutCell::new(0.35, 0.0,  0.65, 0.33, "right row 0", 1),
-        LayoutCell::new(0.35, 0.33, 0.65, 0.34, "right row 1", 2),
-        LayoutCell::new(0.35, 0.67, 0.65, 0.33, "right row 2", 3),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "left_tall_right_stacked",
+        "OSC mod back (sync/FM/ring controls | shared indicator), EQ (band list + curve)",
+        h_lg,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.35, 1.0, "left (tall)", 0),
+            LayoutCell::new(0.35, 0.0, 0.65, 0.33, "right row 0", 1),
+            LayoutCell::new(0.35, 0.33, 0.65, 0.34, "right row 1", 2),
+            LayoutCell::new(0.35, 0.67, 0.65, 0.33, "right row 2", 3),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "right_tall_left_stacked", "Live view (meters tall right | stacked controls left)", h_lg, &[
-        LayoutCell::new(0.0,  0.0,  0.65, 0.33, "left row 0", 1),
-        LayoutCell::new(0.0,  0.33, 0.65, 0.34, "left row 1", 2),
-        LayoutCell::new(0.0,  0.67, 0.65, 0.33, "left row 2", 3),
-        LayoutCell::new(0.65, 0.0,  0.35, 1.0,  "right (tall)", 0),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "right_tall_left_stacked",
+        "Live view (meters tall right | stacked controls left)",
+        h_lg,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.65, 0.33, "left row 0", 1),
+            LayoutCell::new(0.0, 0.33, 0.65, 0.34, "left row 1", 2),
+            LayoutCell::new(0.0, 0.67, 0.65, 0.33, "left row 2", 3),
+            LayoutCell::new(0.65, 0.0, 0.35, 1.0, "right (tall)", 0),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
     // ── True grids ───────────────────────────────────────────────────────────
     sub_header(ui, "Grids — rows × columns", theme);
 
-    paint_layout_demo(ui, theme, "grid 2 × 2", "4-param control groups, paired displays", h_md, &[
-        LayoutCell::new(0.0, 0.0,  0.5, 0.5, "[0,0]", 0),
-        LayoutCell::new(0.5, 0.0,  0.5, 0.5, "[0,1]", 1),
-        LayoutCell::new(0.0, 0.5,  0.5, 0.5, "[1,0]", 2),
-        LayoutCell::new(0.5, 0.5,  0.5, 0.5, "[1,1]", 3),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "grid 2 × 2",
+        "4-param control groups, paired displays",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.5, 0.5, "[0,0]", 0),
+            LayoutCell::new(0.5, 0.0, 0.5, 0.5, "[0,1]", 1),
+            LayoutCell::new(0.0, 0.5, 0.5, 0.5, "[1,0]", 2),
+            LayoutCell::new(0.5, 0.5, 0.5, 0.5, "[1,1]", 3),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "grid 2 × 3", "Mod matrix rows, sequencer chord grid, effect parameter tables", h_md, &[
-        LayoutCell::new(0.0,       0.0,  1.0/3.0, 0.5, "[0,0]", 0),
-        LayoutCell::new(1.0/3.0,   0.0,  1.0/3.0, 0.5, "[0,1]", 1),
-        LayoutCell::new(2.0/3.0,   0.0,  1.0/3.0, 0.5, "[0,2]", 2),
-        LayoutCell::new(0.0,       0.5,  1.0/3.0, 0.5, "[1,0]", 3),
-        LayoutCell::new(1.0/3.0,   0.5,  1.0/3.0, 0.5, "[1,1]", 4),
-        LayoutCell::new(2.0/3.0,   0.5,  1.0/3.0, 0.5, "[1,2]", 0),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "grid 2 × 3",
+        "Mod matrix rows, sequencer chord grid, effect parameter tables",
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0 / 3.0, 0.5, "[0,0]", 0),
+            LayoutCell::new(1.0 / 3.0, 0.0, 1.0 / 3.0, 0.5, "[0,1]", 1),
+            LayoutCell::new(2.0 / 3.0, 0.0, 1.0 / 3.0, 0.5, "[0,2]", 2),
+            LayoutCell::new(0.0, 0.5, 1.0 / 3.0, 0.5, "[1,0]", 3),
+            LayoutCell::new(1.0 / 3.0, 0.5, 1.0 / 3.0, 0.5, "[1,1]", 4),
+            LayoutCell::new(2.0 / 3.0, 0.5, 1.0 / 3.0, 0.5, "[1,2]", 0),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
-    paint_layout_demo(ui, theme, "grid 3 × 4  (step grid)", "Drum machine step rows, sequencer pattern grids", h_lg, &[
-        LayoutCell::new(0.0,  0.0,       0.25, 1.0/3.0, "r0c0", 0),
-        LayoutCell::new(0.25, 0.0,       0.25, 1.0/3.0, "r0c1", 1),
-        LayoutCell::new(0.5,  0.0,       0.25, 1.0/3.0, "r0c2", 2),
-        LayoutCell::new(0.75, 0.0,       0.25, 1.0/3.0, "r0c3", 3),
-        LayoutCell::new(0.0,  1.0/3.0,   0.25, 1.0/3.0, "r1c0", 1),
-        LayoutCell::new(0.25, 1.0/3.0,   0.25, 1.0/3.0, "r1c1", 2),
-        LayoutCell::new(0.5,  1.0/3.0,   0.25, 1.0/3.0, "r1c2", 3),
-        LayoutCell::new(0.75, 1.0/3.0,   0.25, 1.0/3.0, "r1c3", 0),
-        LayoutCell::new(0.0,  2.0/3.0,   0.25, 1.0/3.0, "r2c0", 2),
-        LayoutCell::new(0.25, 2.0/3.0,   0.25, 1.0/3.0, "r2c1", 3),
-        LayoutCell::new(0.5,  2.0/3.0,   0.25, 1.0/3.0, "r2c2", 0),
-        LayoutCell::new(0.75, 2.0/3.0,   0.25, 1.0/3.0, "r2c3", 1),
-    ]);
+    paint_layout_demo(
+        ui,
+        theme,
+        "grid 3 × 4  (step grid)",
+        "Drum machine step rows, sequencer pattern grids",
+        h_lg,
+        &[
+            LayoutCell::new(0.0, 0.0, 0.25, 1.0 / 3.0, "r0c0", 0),
+            LayoutCell::new(0.25, 0.0, 0.25, 1.0 / 3.0, "r0c1", 1),
+            LayoutCell::new(0.5, 0.0, 0.25, 1.0 / 3.0, "r0c2", 2),
+            LayoutCell::new(0.75, 0.0, 0.25, 1.0 / 3.0, "r0c3", 3),
+            LayoutCell::new(0.0, 1.0 / 3.0, 0.25, 1.0 / 3.0, "r1c0", 1),
+            LayoutCell::new(0.25, 1.0 / 3.0, 0.25, 1.0 / 3.0, "r1c1", 2),
+            LayoutCell::new(0.5, 1.0 / 3.0, 0.25, 1.0 / 3.0, "r1c2", 3),
+            LayoutCell::new(0.75, 1.0 / 3.0, 0.25, 1.0 / 3.0, "r1c3", 0),
+            LayoutCell::new(0.0, 2.0 / 3.0, 0.25, 1.0 / 3.0, "r2c0", 2),
+            LayoutCell::new(0.25, 2.0 / 3.0, 0.25, 1.0 / 3.0, "r2c1", 3),
+            LayoutCell::new(0.5, 2.0 / 3.0, 0.25, 1.0 / 3.0, "r2c2", 0),
+            LayoutCell::new(0.75, 2.0 / 3.0, 0.25, 1.0 / 3.0, "r2c3", 1),
+        ],
+    );
 
     ui.add_space(theme.sp_xl);
 
@@ -1630,68 +1828,91 @@ fn render_layouts(ui: &mut Ui, theme: &SynthTheme) {
 
     // LFO card: header + (col2 knobs left | 2 stacked chip rows right).
     // Left 35% = 2 knobs side by side; right 65% = SHAPE row + DEST row stacked.
-    paint_layout_demo(ui, theme,
+    paint_layout_demo(
+        ui,
+        theme,
         "header  +  (col2 | stacked rows)  — LFO card",
         "Title + SYNC toggle · left 35% = 2 equal knob slots · right 65% = 2 chip-selector rows",
-        h_lg, &[
-        LayoutCell::new(0.0,   0.0,  1.0,   0.22, "title  +  SYNC →", 4),
-        LayoutCell::new(0.0,   0.22, 0.175, 0.78, "RATE", 0),
-        LayoutCell::new(0.175, 0.22, 0.175, 0.78, "DEPTH", 1),
-        LayoutCell::new(0.35,  0.22, 0.65,  0.39, "SHAPE chips", 2),
-        LayoutCell::new(0.35,  0.61, 0.65,  0.39, "→ DEST chips", 3),
-    ]);
+        h_lg,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.22, "title  +  SYNC →", 4),
+            LayoutCell::new(0.0, 0.22, 0.175, 0.78, "RATE", 0),
+            LayoutCell::new(0.175, 0.22, 0.175, 0.78, "DEPTH", 1),
+            LayoutCell::new(0.35, 0.22, 0.65, 0.39, "SHAPE chips", 2),
+            LayoutCell::new(0.35, 0.61, 0.65, 0.39, "→ DEST chips", 3),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
     // Mixer channel strip: col4_then_bottom, each col = label + fader stacked.
     // 4 equal columns (O1/O2/O3/N), each internally: label top + fader body.
     // Footer = full-width master row.
-    paint_layout_demo(ui, theme,
+    paint_layout_demo(
+        ui,
+        theme,
         "col4_then_bottom  with  stacked label+fader inside each col  — Mixer channels",
         "4 equal channel strips each with label + fader · full-width master footer",
-        h_lg, &[
-        // col 0
-        LayoutCell::new(0.0,   0.0,  0.25, 0.15, "O1", 4),
-        LayoutCell::new(0.0,   0.15, 0.25, 0.60, "fader", 0),
-        LayoutCell::new(0.0,   0.75, 0.25, 0.10, "0.80", 0),
-        // col 1
-        LayoutCell::new(0.25,  0.0,  0.25, 0.15, "O2", 4),
-        LayoutCell::new(0.25,  0.15, 0.25, 0.60, "fader", 1),
-        LayoutCell::new(0.25,  0.75, 0.25, 0.10, "0.60", 1),
-        // col 2
-        LayoutCell::new(0.5,   0.0,  0.25, 0.15, "O3", 4),
-        LayoutCell::new(0.5,   0.15, 0.25, 0.60, "fader", 2),
-        LayoutCell::new(0.5,   0.75, 0.25, 0.10, "0.40", 2),
-        // col 3
-        LayoutCell::new(0.75,  0.0,  0.25, 0.15, "N",  4),
-        LayoutCell::new(0.75,  0.15, 0.25, 0.60, "fader", 3),
-        LayoutCell::new(0.75,  0.75, 0.25, 0.10, "0.20", 3),
-        // footer
-        LayoutCell::new(0.0,   0.85, 1.0,  0.15, "master footer", 4),
-    ]);
+        h_lg,
+        &[
+            // col 0
+            LayoutCell::new(0.0, 0.0, 0.25, 0.15, "O1", 4),
+            LayoutCell::new(0.0, 0.15, 0.25, 0.60, "fader", 0),
+            LayoutCell::new(0.0, 0.75, 0.25, 0.10, "0.80", 0),
+            // col 1
+            LayoutCell::new(0.25, 0.0, 0.25, 0.15, "O2", 4),
+            LayoutCell::new(0.25, 0.15, 0.25, 0.60, "fader", 1),
+            LayoutCell::new(0.25, 0.75, 0.25, 0.10, "0.60", 1),
+            // col 2
+            LayoutCell::new(0.5, 0.0, 0.25, 0.15, "O3", 4),
+            LayoutCell::new(0.5, 0.15, 0.25, 0.60, "fader", 2),
+            LayoutCell::new(0.5, 0.75, 0.25, 0.10, "0.40", 2),
+            // col 3
+            LayoutCell::new(0.75, 0.0, 0.25, 0.15, "N", 4),
+            LayoutCell::new(0.75, 0.15, 0.25, 0.60, "fader", 3),
+            LayoutCell::new(0.75, 0.75, 0.25, 0.10, "0.20", 3),
+            // footer
+            LayoutCell::new(0.0, 0.85, 1.0, 0.15, "master footer", 4),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
     // OSC card: header + body where body = col3 (knobs) + full-width preview strip.
     // top_then_col3 for the knobs, then waveform preview spans the full width below.
-    paint_layout_demo(ui, theme,
+    paint_layout_demo(
+        ui,
+        theme,
         "header  +  col3  +  full-width strip  — OSC card",
         "Title · chip selector · 3-column knob row (OCT/DET/PW) · full-width waveform preview",
-        h_lg, &[
-        LayoutCell::new(0.0,       0.0,  1.0,     0.18, "title  +  waveform chips", 4),
-        LayoutCell::new(0.0,       0.18, 1.0/3.0, 0.57, "OCT", 0),
-        LayoutCell::new(1.0/3.0,   0.18, 1.0/3.0, 0.57, "DET", 1),
-        LayoutCell::new(2.0/3.0,   0.18, 1.0/3.0, 0.57, "PW", 2),
-        LayoutCell::new(0.0,       0.75, 1.0,     0.25, "waveform preview", 3),
-    ]);
+        h_lg,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.18, "title  +  waveform chips", 4),
+            LayoutCell::new(0.0, 0.18, 1.0 / 3.0, 0.57, "OCT", 0),
+            LayoutCell::new(1.0 / 3.0, 0.18, 1.0 / 3.0, 0.57, "DET", 1),
+            LayoutCell::new(2.0 / 3.0, 0.18, 1.0 / 3.0, 0.57, "PW", 2),
+            LayoutCell::new(0.0, 0.75, 1.0, 0.25, "waveform preview", 3),
+        ],
+    );
     ui.add_space(theme.sp_sm);
 
     // MOD WHEEL / AFTERTOUCH: title + (knob left | chip row right), no header row.
     // Pure sidebar_right: narrow left knob, wide right destination chips.
-    paint_layout_demo(ui, theme,
+    paint_layout_demo(
+        ui,
+        theme,
         "title  +  sidebar_right  (knob | chips)  — Mod Wheel / Aftertouch",
         "Title label · left 28% = single knob · right 72% = destination chip-selector row",
-        h_md, &[
-        LayoutCell::new(0.0,  0.0,  1.0,  0.28, "MOD WHEEL", 4),
-        LayoutCell::new(0.0,  0.28, 0.28, 0.72, "DEPTH", 0),
-        LayoutCell::new(0.28, 0.28, 0.72, 0.72, "→  [Off]  [Filter]  [LFO D]  [Amp]", 1),
-    ]);
+        h_md,
+        &[
+            LayoutCell::new(0.0, 0.0, 1.0, 0.28, "MOD WHEEL", 4),
+            LayoutCell::new(0.0, 0.28, 0.28, 0.72, "DEPTH", 0),
+            LayoutCell::new(
+                0.28,
+                0.28,
+                0.72,
+                0.72,
+                "→  [Off]  [Filter]  [LFO D]  [Amp]",
+                1,
+            ),
+        ],
+    );
 }

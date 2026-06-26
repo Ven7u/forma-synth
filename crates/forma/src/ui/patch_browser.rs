@@ -211,7 +211,9 @@ impl SynthApp {
                 for &tag in &relevant {
                     let active = self.patch_active_tags.contains(tag);
                     let col = if active { accent } else { text_dim };
-                    let label_text = egui::RichText::new(tag).font(self.theme.font_heading()).color(col);
+                    let label_text = egui::RichText::new(tag)
+                        .font(self.theme.font_heading())
+                        .color(col);
                     if ui.selectable_label(active, label_text).clicked() {
                         if active {
                             self.patch_active_tags.remove(tag);
@@ -283,9 +285,14 @@ impl SynthApp {
                         .color(Color32::from_rgb(220, 185, 60)),
                 );
                 for i in &fav_indices {
-                    if let Some(action) =
-                        Self::patch_row(ui, &self.patch_library[*i], true, accent, text_dim, &self.theme)
-                    {
+                    if let Some(action) = Self::patch_row(
+                        ui,
+                        &self.patch_library[*i],
+                        true,
+                        accent,
+                        text_dim,
+                        &self.theme,
+                    ) {
                         match action {
                             PatchAction::Load => load_idx = Some(*i),
                             PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -312,9 +319,14 @@ impl SynthApp {
                 ui.label(egui::RichText::new("⏱  Recent").small().color(text_dim));
                 for i in &recent_indices {
                     let is_fav = self.patch_favorites.contains(&self.patch_library[*i].name);
-                    if let Some(action) =
-                        Self::patch_row(ui, &self.patch_library[*i], is_fav, accent, text_dim, &self.theme)
-                    {
+                    if let Some(action) = Self::patch_row(
+                        ui,
+                        &self.patch_library[*i],
+                        is_fav,
+                        accent,
+                        text_dim,
+                        &self.theme,
+                    ) {
                         match action {
                             PatchAction::Load => load_idx = Some(*i),
                             PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -327,9 +339,14 @@ impl SynthApp {
             // ── All filtered ──────────────────────────────────────────────
             for i in &filtered {
                 let is_fav = self.patch_favorites.contains(&self.patch_library[*i].name);
-                if let Some(action) =
-                    Self::patch_row(ui, &self.patch_library[*i], is_fav, accent, text_dim, &self.theme)
-                {
+                if let Some(action) = Self::patch_row(
+                    ui,
+                    &self.patch_library[*i],
+                    is_fav,
+                    accent,
+                    text_dim,
+                    &self.theme,
+                ) {
                     match action {
                         PatchAction::Load => load_idx = Some(*i),
                         PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -374,8 +391,12 @@ impl SynthApp {
             };
             if ui
                 .add(
-                    egui::Button::new(egui::RichText::new(star).color(star_col).font(theme.font_heading()))
-                        .frame(false),
+                    egui::Button::new(
+                        egui::RichText::new(star)
+                            .color(star_col)
+                            .font(theme.font_heading()),
+                    )
+                    .frame(false),
                 )
                 .clicked()
             {

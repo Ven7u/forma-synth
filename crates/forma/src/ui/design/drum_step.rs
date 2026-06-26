@@ -40,8 +40,7 @@ pub struct DrumStepState {
 /// 4. Playhead bar — 2 px top-edge line in `accent`, overrides the beat tick.
 /// 5. Hover / press stroke — `border_focus` ring that brightens on interaction.
 pub fn drum_step(ui: &mut Ui, state: DrumStepState, theme: &SynthTheme) -> Response {
-    let (rect, response) =
-        ui.allocate_exact_size(Vec2::new(26.0, 24.0), Sense::click_and_drag());
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(26.0, 24.0), Sense::click_and_drag());
 
     if !ui.is_rect_visible(rect) {
         return response;
@@ -72,19 +71,13 @@ pub fn drum_step(ui: &mut Ui, state: DrumStepState, theme: &SynthTheme) -> Respo
 
     // ── 3. Beat-group tick ────────────────────────────────────────────────────
     if state.is_beat_group && !state.is_playhead {
-        let tick = Rect::from_min_size(
-            rect.min,
-            Vec2::new(rect.width(), theme.stroke_active),
-        );
+        let tick = Rect::from_min_size(rect.min, Vec2::new(rect.width(), theme.stroke_active));
         painter.rect_filled(tick, CornerRadius::ZERO, theme.c(&theme.border_focus));
     }
 
     // ── 4. Playhead bar ───────────────────────────────────────────────────────
     if state.is_playhead {
-        let bar = Rect::from_min_size(
-            rect.min,
-            Vec2::new(rect.width(), theme.stroke_active),
-        );
+        let bar = Rect::from_min_size(rect.min, Vec2::new(rect.width(), theme.stroke_active));
         painter.rect_filled(bar, CornerRadius::ZERO, theme.c(&theme.accent));
     }
 

@@ -45,12 +45,7 @@ impl StepPadSize {
 
 /// Render a step pad. Returns the egui Response so the caller can detect
 /// click / drag / hover.
-pub fn step_pad(
-    ui: &mut Ui,
-    state: StepState,
-    size: StepPadSize,
-    theme: &SynthTheme,
-) -> Response {
+pub fn step_pad(ui: &mut Ui, state: StepState, size: StepPadSize, theme: &SynthTheme) -> Response {
     let (rect, response) = ui.allocate_exact_size(size.rect(), Sense::click());
 
     if !ui.is_rect_visible(rect) {

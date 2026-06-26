@@ -25,7 +25,11 @@ pub fn draw_wave_preview(
     theme: &SynthTheme,
 ) {
     // Background — same dark CRT surface as scope / filter / ADSR
-    painter.rect_filled(rect, CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.scope_bg));
+    painter.rect_filled(
+        rect,
+        CornerRadius::same(theme.rounding_sm as u8),
+        theme.c(&theme.scope_bg),
+    );
 
     let line_base = theme.c(&theme.osc_preview_line);
     let line_color = if active {
@@ -55,7 +59,13 @@ pub fn draw_wave_preview(
             let y = match wave {
                 0 => phase_rad.sin(),
                 1 => 1.0 - 2.0 * norm_phase,
-                2 => if norm_phase < pulse_width { 1.0 } else { -1.0 },
+                2 => {
+                    if norm_phase < pulse_width {
+                        1.0
+                    } else {
+                        -1.0
+                    }
+                }
                 3 => {
                     if norm_phase < 0.5 {
                         4.0 * norm_phase - 1.0
@@ -73,6 +83,9 @@ pub fn draw_wave_preview(
     let clip = painter.clip_rect();
     let painter = painter.with_clip_rect(clip.intersect(rect));
     for pair in points.windows(2) {
-        painter.line_segment([pair[0], pair[1]], Stroke::new(theme.stroke_focus, line_color));
+        painter.line_segment(
+            [pair[0], pair[1]],
+            Stroke::new(theme.stroke_focus, line_color),
+        );
     }
 }

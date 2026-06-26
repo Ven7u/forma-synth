@@ -28,7 +28,11 @@ impl SynthApp {
             )
             .show(ctx, |ui| {
                 // ── Save section ──────────────────────────────────────────────
-                ui.label(egui::RichText::new("SAVE SCENE").font(self.theme.font_body()).color(accent));
+                ui.label(
+                    egui::RichText::new("SAVE SCENE")
+                        .font(self.theme.font_body())
+                        .color(accent),
+                );
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     ui.add(
@@ -38,8 +42,12 @@ impl SynthApp {
                     );
                     if ui
                         .add(
-                            egui::Button::new(egui::RichText::new("SAVE").font(self.theme.font_heading()).color(accent))
-                                .min_size(egui::Vec2::new(50.0, 0.0)),
+                            egui::Button::new(
+                                egui::RichText::new("SAVE")
+                                    .font(self.theme.font_heading())
+                                    .color(accent),
+                            )
+                            .min_size(egui::Vec2::new(50.0, 0.0)),
                         )
                         .on_hover_text("Save current rig state as a scene")
                         .clicked()
@@ -68,7 +76,11 @@ impl SynthApp {
                             .color(text_dis),
                     );
                 } else {
-                    ui.label(egui::RichText::new("SCENES").font(self.theme.font_body()).color(text_sec));
+                    ui.label(
+                        egui::RichText::new("SCENES")
+                            .font(self.theme.font_body())
+                            .color(text_sec),
+                    );
                     ui.add_space(4.0);
 
                     // Data-driven: scene library grows with user content.
@@ -84,7 +96,9 @@ impl SynthApp {
                                 let in_chain = self.scene_chain.contains(&i);
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new(&scene.name).font(self.theme.font_heading()).color(text_pri),
+                                        egui::RichText::new(&scene.name)
+                                            .font(self.theme.font_heading())
+                                            .color(text_pri),
                                     );
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
@@ -166,11 +180,19 @@ impl SynthApp {
 
                 // ── Scene chain ───────────────────────────────────────────────
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("CHAIN").font(self.theme.font_body()).color(accent));
+                    ui.label(
+                        egui::RichText::new("CHAIN")
+                            .font(self.theme.font_body())
+                            .color(accent),
+                    );
                     ui.add_space(8.0);
 
                     // Bars-per-step control.
-                    ui.label(egui::RichText::new("Bars/step:").font(self.theme.font_body()).color(text_dis));
+                    ui.label(
+                        egui::RichText::new("Bars/step:")
+                            .font(self.theme.font_body())
+                            .color(text_dis),
+                    );
                     let mut bars = self.scene_chain_bars as i32;
                     if ui
                         .add(egui::DragValue::new(&mut bars).range(1..=64).speed(1.0))
@@ -190,7 +212,9 @@ impl SynthApp {
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new(play_label).font(self.theme.font_body()).color(play_col),
+                                egui::RichText::new(play_label)
+                                    .font(self.theme.font_body())
+                                    .color(play_col),
                             )
                             .min_size(egui::Vec2::new(60.0, 0.0)),
                         )

@@ -399,10 +399,10 @@ impl SynthApp {
     /// Render the persistent bottom keyboard strip.
     pub fn ui_keyboard_panel(&mut self, ui: &mut egui::Ui) {
         // Pre-resolve tokens.
-        let accent     = self.theme.c(&self.theme.accent);
-        let accent_fm  = self.theme.c(&self.theme.accent_fm);
+        let accent = self.theme.c(&self.theme.accent);
+        let accent_fm = self.theme.c(&self.theme.accent_fm);
         let accent_hold = self.theme.c(&self.theme.accent_hold);
-        let text_dis   = self.theme.c(&self.theme.text_disabled);
+        let text_dis = self.theme.c(&self.theme.text_disabled);
 
         ui.horizontal(|ui| {
             // ── Mode selector: Piano / Chord KB ──────────────────────────
@@ -627,8 +627,8 @@ impl SynthApp {
         let btn_h = 52.0;
 
         // Collect held state snapshot before mutable borrows below.
-        let held_pad    = self.chord_kb.held_pad;
-        let edit_mode   = self.chord_kb.edit_mode;
+        let held_pad = self.chord_kb.held_pad;
+        let edit_mode = self.chord_kb.edit_mode;
         let editing_pad = self.chord_kb.editing_pad;
         let text_disabled = self.theme.c(&self.theme.text_disabled);
 
@@ -653,9 +653,9 @@ impl SynthApp {
 
                     for col in 0..CHORD_KB_COLS {
                         let is_held_mouse = held_pad == Some((row, col));
-                        let is_held_kb   = self.chord_kb.kb_held.contains(&(row, col));
-                        let is_held      = is_held_mouse || is_held_kb;
-                        let is_editing   = editing_pad == Some((row, col));
+                        let is_held_kb = self.chord_kb.kb_held.contains(&(row, col));
+                        let is_held = is_held_mouse || is_held_kb;
+                        let is_editing = editing_pad == Some((row, col));
 
                         let quality = parse_quality(chord_quality(self.chord_kb.scale, col));
                         let cname = chord_name(self.chord_kb.root, self.chord_kb.scale, col);
@@ -801,7 +801,7 @@ impl SynthApp {
             ui,
             &PianoConfig {
                 first_midi: PIANO_FIRST_MIDI,
-                last_midi:  PIANO_LAST_MIDI,
+                last_midi: PIANO_LAST_MIDI,
                 size: PianoSize::Preview,
                 interactive: false,
                 show_labels: true,
@@ -823,25 +823,25 @@ impl SynthApp {
 
         let kb_max_semitone = KEY_MAP.iter().map(|&(_, s)| s).max().unwrap_or(14);
         let kb_range_start = (self.piano_octave * 12) as u8;
-        let kb_range_end   = kb_range_start + kb_max_semitone as u8 + 1;
+        let kb_range_end = kb_range_start + kb_max_semitone as u8 + 1;
 
         let result = piano(
             ui,
             &PianoConfig {
                 first_midi: PIANO_FIRST_MIDI,
-                last_midi:  PIANO_LAST_MIDI,
+                last_midi: PIANO_LAST_MIDI,
                 size: PianoSize::Full,
                 interactive: true,
                 show_labels: true,
                 range_bar: Some((kb_range_start, kb_range_end)),
             },
             &|midi| {
-                let pressed = self.piano_held_midi.contains(&midi)
-                    || self.piano_mouse_midi == Some(midi);
+                let pressed =
+                    self.piano_held_midi.contains(&midi) || self.piano_mouse_midi == Some(midi);
                 let pitch_class = (midi % 12) as usize;
                 KeyVisualState {
                     pressed,
-                    in_kb_range:   midi >= kb_range_start && midi < kb_range_end,
+                    in_kb_range: midi >= kb_range_start && midi < kb_range_end,
                     is_scale_root: scale_pcs.is_some()
                         && pitch_class == self.piano_scale_root as usize,
                     in_scale: scale_pcs.is_some_and(|pcs| pcs[pitch_class]),

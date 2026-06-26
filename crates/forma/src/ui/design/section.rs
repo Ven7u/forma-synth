@@ -26,13 +26,10 @@ pub fn section_header<R>(
                     .color(theme.c(&theme.text_primary)),
             );
             if let Some(slot) = right_slot {
-                ui.with_layout(
-                    egui::Layout::right_to_left(egui::Align::Center),
-                    |ui| {
-                        ui.add_space(theme.sp_md);
-                        slot(ui);
-                    },
-                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add_space(theme.sp_md);
+                    slot(ui);
+                });
             }
         })
         .response;

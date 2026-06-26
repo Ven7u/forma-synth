@@ -256,21 +256,21 @@ impl SynthApp {
         let pat = self.drums.active_pattern;
         for ch in 0..CHANNEL_COUNT {
             if self.drums.euclid_on[ch] {
-                let hits  = self.drums.euclid_hits[ch] as usize;
+                let hits = self.drums.euclid_hits[ch] as usize;
                 let steps = self.drums.euclid_steps[ch] as usize;
-                let off   = self.drums.euclid_offset[ch] as usize;
+                let off = self.drums.euclid_offset[ch] as usize;
                 self.drums.patterns[pat][ch] = euclidean_pattern(hits, steps, off);
             }
         }
 
         // Pre-resolve Copy-type token values so closures can capture them.
-        let accent      = self.theme.c(&self.theme.accent);
-        let text_sec    = self.theme.c(&self.theme.text_secondary);
-        let text_dis    = self.theme.c(&self.theme.text_disabled);
+        let accent = self.theme.c(&self.theme.accent);
+        let text_sec = self.theme.c(&self.theme.text_secondary);
+        let text_dis = self.theme.c(&self.theme.text_disabled);
         let accent_hold = self.theme.c(&self.theme.accent_hold);
-        let seq_rec     = self.theme.c(&self.theme.seq_rec_cursor);
-        let sp_xs       = self.theme.sp_xs;
-        let sp_xxs      = self.theme.sp_xxs;
+        let seq_rec = self.theme.c(&self.theme.seq_rec_cursor);
+        let sp_xs = self.theme.sp_xs;
+        let sp_xxs = self.theme.sp_xxs;
 
         ui.add_space(sp_xs);
 
@@ -279,35 +279,56 @@ impl SynthApp {
             ui.horizontal(|ui| {
                 // ON / OFF
                 toggle_button(
-                    ui, &mut self.drums.enabled, "DRUM",
-                    ToggleSize::Standard, Tier::Secondary, &self.theme, None,
+                    ui,
+                    &mut self.drums.enabled,
+                    "DRUM",
+                    ToggleSize::Standard,
+                    Tier::Secondary,
+                    &self.theme,
+                    None,
                 );
 
                 ui.separator();
 
                 // Pattern selector A / B / C / D
                 ui.label(egui::RichText::new("Pattern").small().color(text_sec));
-                let pat_opts: &[(usize, &str)] = &[(0,"A"),(1,"B"),(2,"C"),(3,"D")];
+                let pat_opts: &[(usize, &str)] = &[(0, "A"), (1, "B"), (2, "C"), (3, "D")];
                 chip_selector(
-                    ui, &mut self.drums.active_pattern, pat_opts, &self.theme, None,
+                    ui,
+                    &mut self.drums.active_pattern,
+                    pat_opts,
+                    &self.theme,
+                    None,
                 )
                 .on_hover_text("Select active pattern");
 
                 ui.separator();
 
                 // Copy / Paste / Clear — plain buttons, theme handles color.
-                if ui.button("Copy").on_hover_text("Copy active pattern").clicked() {
+                if ui
+                    .button("Copy")
+                    .on_hover_text("Copy active pattern")
+                    .clicked()
+                {
                     self.drums.pattern_clipboard =
                         Some(self.drums.patterns[self.drums.active_pattern]);
                 }
                 ui.add_enabled_ui(self.drums.pattern_clipboard.is_some(), |ui| {
-                    if ui.button("Paste").on_hover_text("Paste into active pattern").clicked() {
+                    if ui
+                        .button("Paste")
+                        .on_hover_text("Paste into active pattern")
+                        .clicked()
+                    {
                         if let Some(clip) = self.drums.pattern_clipboard {
                             self.drums.patterns[self.drums.active_pattern] = clip;
                         }
                     }
                 });
-                if ui.button("Clear").on_hover_text("Clear all steps").clicked() {
+                if ui
+                    .button("Clear")
+                    .on_hover_text("Clear all steps")
+                    .clicked()
+                {
                     self.drums.patterns[self.drums.active_pattern] =
                         [[false; STEP_COUNT]; CHANNEL_COUNT];
                 }
@@ -340,8 +361,13 @@ impl SynthApp {
 
                 // KITS browser toggle
                 toggle_button(
-                    ui, &mut self.show_kit_browser, "KITS",
-                    ToggleSize::Standard, Tier::Tertiary, &self.theme, None,
+                    ui,
+                    &mut self.show_kit_browser,
+                    "KITS",
+                    ToggleSize::Standard,
+                    Tier::Tertiary,
+                    &self.theme,
+                    None,
                 )
                 .on_hover_text("Open kit browser");
             });
@@ -371,213 +397,237 @@ impl SynthApp {
         let playhead = self.drums.current_step;
 
         for (ch, &ch_name) in CHANNEL_NAMES.iter().enumerate().take(CHANNEL_COUNT) {
-            let muted      = self.drums.muted[ch];
+            let muted = self.drums.muted[ch];
             let soloed_any = self.drums.soloed.iter().any(|&s| s);
-            let eff_muted  = muted || (soloed_any && !self.drums.soloed[ch]);
-            let expanded   = self.drums.expanded_channel == Some(ch);
+            let eff_muted = muted || (soloed_any && !self.drums.soloed[ch]);
+            let expanded = self.drums.expanded_channel == Some(ch);
 
             // Each channel row needs its own ID namespace — without push_id every
             // ui.horizontal() in this loop shares the same unique_id (scope_builder
             // HACK resets the parent counter), colliding on every DrumStep and button.
             ui.push_id(ch, |ui| {
-            ui.horizontal(|ui| {
-                // ── Channel name toggle (fixed-width scope keeps step grid aligned) ──
-                let mut is_expanded = expanded;
-                ui.scope(|ui| {
-                    ui.set_min_width(CHANNEL_LABEL_W);
-                    ui.set_max_width(CHANNEL_LABEL_W);
-                    let tint = if eff_muted {
-                        Some(text_dis)
-                    } else if self.drums.soloed[ch] {
-                        Some(accent_hold)
-                    } else {
-                        None
-                    };
-                    toggle_button(
-                        ui, &mut is_expanded, ch_name,
-                        ToggleSize::Standard, Tier::Tertiary, &self.theme, tint,
-                    )
-                    .on_hover_text("Click to open voice editor");
-                });
-                if is_expanded != expanded {
-                    self.drums.expanded_channel = if is_expanded { Some(ch) } else { None };
-                }
-
-                // ── 16 DrumStep cells ─────────────────────────────────────
-                ui.spacing_mut().item_spacing.x = sp_xxs;
-                for step in 0..STEP_COUNT {
-                    let active   = self.drums.patterns[self.drums.active_pattern][ch][step];
-                    let velocity = self.drums.step_vel[self.drums.active_pattern][ch][step] as f32
-                        / 127.0;
-                    let resp = drum_step(
-                        ui,
-                        DrumStepState {
-                            active,
-                            velocity,
-                            is_playhead:   step == playhead && self.drums.enabled,
-                            is_beat_group: step % 4 == 0,
-                            is_muted:      eff_muted,
-                        },
-                        &self.theme,
-                    );
-                    let p = self.drums.active_pattern;
-                    if resp.clicked() {
-                        self.drums.patterns[p][ch][step] = !active;
-                    }
-                    if resp.dragged() && active {
-                        let v = &mut self.drums.step_vel[p][ch][step];
-                        *v = (*v as f32 - resp.drag_delta().y * 2.0).clamp(1.0, 127.0) as u8;
-                    }
-                }
-                // Restore default spacing for the control buttons.
-                ui.spacing_mut().item_spacing.x = sp_xs;
-
-                // ── Per-lane controls ─────────────────────────────────────
-                if color_chip(ui, "M", seq_rec, muted, &self.theme)
-                    .on_hover_text("Mute this lane")
-                    .clicked()
-                {
-                    self.drums.muted[ch] = !muted;
-                }
-
-                let soloed = self.drums.soloed[ch];
-                if color_chip(ui, "S", accent_hold, soloed, &self.theme)
-                    .on_hover_text("Solo — mutes all other lanes")
-                    .clicked()
-                {
-                    self.drums.soloed[ch] = !soloed;
-                }
-
-                if ui.button("⇄").on_hover_text("Reverse this lane's pattern").clicked() {
-                    let p = self.drums.active_pattern;
-                    self.drums.patterns[p][ch].reverse();
-                    self.drums.step_vel[p][ch].reverse();
-                }
-
-                if ui.button("?").on_hover_text("Randomize (50% density)").clicked() {
-                    let p = self.drums.active_pattern;
-                    // LCG seeded from time — avoids pulling the `rand` crate.
-                    let seed = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.subsec_nanos())
-                        .unwrap_or(12345)
-                        .wrapping_add((ch as u32).wrapping_mul(2891336453u32));
-                    let mut rng = seed;
-                    for step in 0..STEP_COUNT {
-                        rng = rng.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                        self.drums.patterns[p][ch][step] = (rng >> 31) != 0;
-                    }
-                }
-
-                let euclid_on = self.drums.euclid_on[ch];
-                if color_chip(ui, "E", accent, euclid_on, &self.theme)
-                    .on_hover_text("Toggle euclidean rhythm generator")
-                    .clicked()
-                {
-                    self.drums.euclid_on[ch] = !euclid_on;
-                }
-            });
-
-            // ── Voice editor (expands below channel row) ──────────────────
-            if expanded {
-                SynthFrame::inset(&self.theme)
-                    .outer_margin(egui::Margin {
-                        left:   CHANNEL_LABEL_W as i8,
-                        right:  0,
-                        top:    self.theme.sp_xxs as i8,
-                        bottom: self.theme.sp_xs as i8,
-                    })
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new(format!("{ch_name} — Voice Editor"))
-                                    .font(self.theme.font_body())
-                                    .color(accent),
-                            );
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if ui.button("✕").clicked() {
-                                        self.drums.expanded_channel = None;
-                                    }
-                                },
-                            );
-                        });
-                        ui.add_space(self.theme.sp_xs);
-
-                        // Voice params — vertical Slider stack.
-                        DesignSlider::new(
-                            &mut self.drums.base_freq[ch], 0.0..=800.0, "Freq",
-                        )
-                        .suffix(" Hz").decimals(0).show(ui, &self.theme);
-
-                        DesignSlider::new(
-                            &mut self.drums.pitch_range[ch], 0.0..=500.0, "Sweep",
-                        )
-                        .suffix(" Hz").decimals(0).show(ui, &self.theme);
-
-                        DesignSlider::new(
-                            &mut self.drums.amp_decay[ch], 0.01..=2.0, "Decay",
-                        )
-                        .suffix(" s").decimals(3).show(ui, &self.theme);
-
-                        DesignSlider::new(
-                            &mut self.drums.noise_mix[ch], 0.0..=1.0, "Noise",
-                        )
-                        .decimals(2).show(ui, &self.theme);
-
-                        DesignSlider::new(
-                            &mut self.drums.channel_volume[ch], 0.0..=1.0, "Volume",
-                        )
-                        .decimals(2).show(ui, &self.theme);
-
-                        // Euclidean section.
-                        ui.add_space(self.theme.sp_xs);
-
+                ui.horizontal(|ui| {
+                    // ── Channel name toggle (fixed-width scope keeps step grid aligned) ──
+                    let mut is_expanded = expanded;
+                    ui.scope(|ui| {
+                        ui.set_min_width(CHANNEL_LABEL_W);
+                        ui.set_max_width(CHANNEL_LABEL_W);
+                        let tint = if eff_muted {
+                            Some(text_dis)
+                        } else if self.drums.soloed[ch] {
+                            Some(accent_hold)
+                        } else {
+                            None
+                        };
                         toggle_button(
-                            ui, &mut self.drums.euclid_on[ch], "Euclidean",
-                            ToggleSize::Standard, Tier::Tertiary, &self.theme, None,
+                            ui,
+                            &mut is_expanded,
+                            ch_name,
+                            ToggleSize::Standard,
+                            Tier::Tertiary,
+                            &self.theme,
+                            tint,
                         )
-                        .on_hover_text("Toggle euclidean rhythm generator");
-
-                        ui.add_enabled_ui(self.drums.euclid_on[ch], |ui| {
-                            let steps_max = self.drums.euclid_steps[ch] as f32;
-                            let mut hits = self.drums.euclid_hits[ch] as f32;
-                            if DesignSlider::new(&mut hits, 1.0..=steps_max, "Hits")
-                                .decimals(0)
-                                .show(ui, &self.theme)
-                                .changed()
-                            {
-                                self.drums.euclid_hits[ch] = hits as u8;
-                            }
-
-                            let mut steps = self.drums.euclid_steps[ch] as f32;
-                            if DesignSlider::new(&mut steps, 1.0..=16.0, "Steps")
-                                .decimals(0)
-                                .show(ui, &self.theme)
-                                .changed()
-                            {
-                                self.drums.euclid_steps[ch] = steps as u8;
-                                self.drums.euclid_hits[ch] =
-                                    self.drums.euclid_hits[ch].min(steps as u8);
-                            }
-
-                            let steps_max = self.drums.euclid_steps[ch] as f32;
-                            let mut offset = self.drums.euclid_offset[ch] as f32;
-                            if DesignSlider::new(
-                                &mut offset,
-                                0.0..=(steps_max - 1.0).max(0.0),
-                                "Offset",
-                            )
-                            .decimals(0)
-                            .show(ui, &self.theme)
-                            .changed()
-                            {
-                                self.drums.euclid_offset[ch] = offset as u8;
-                            }
-                        });
+                        .on_hover_text("Click to open voice editor");
                     });
-            }
+                    if is_expanded != expanded {
+                        self.drums.expanded_channel = if is_expanded { Some(ch) } else { None };
+                    }
+
+                    // ── 16 DrumStep cells ─────────────────────────────────────
+                    ui.spacing_mut().item_spacing.x = sp_xxs;
+                    for step in 0..STEP_COUNT {
+                        let active = self.drums.patterns[self.drums.active_pattern][ch][step];
+                        let velocity =
+                            self.drums.step_vel[self.drums.active_pattern][ch][step] as f32 / 127.0;
+                        let resp = drum_step(
+                            ui,
+                            DrumStepState {
+                                active,
+                                velocity,
+                                is_playhead: step == playhead && self.drums.enabled,
+                                is_beat_group: step % 4 == 0,
+                                is_muted: eff_muted,
+                            },
+                            &self.theme,
+                        );
+                        let p = self.drums.active_pattern;
+                        if resp.clicked() {
+                            self.drums.patterns[p][ch][step] = !active;
+                        }
+                        if resp.dragged() && active {
+                            let v = &mut self.drums.step_vel[p][ch][step];
+                            *v = (*v as f32 - resp.drag_delta().y * 2.0).clamp(1.0, 127.0) as u8;
+                        }
+                    }
+                    // Restore default spacing for the control buttons.
+                    ui.spacing_mut().item_spacing.x = sp_xs;
+
+                    // ── Per-lane controls ─────────────────────────────────────
+                    if color_chip(ui, "M", seq_rec, muted, &self.theme)
+                        .on_hover_text("Mute this lane")
+                        .clicked()
+                    {
+                        self.drums.muted[ch] = !muted;
+                    }
+
+                    let soloed = self.drums.soloed[ch];
+                    if color_chip(ui, "S", accent_hold, soloed, &self.theme)
+                        .on_hover_text("Solo — mutes all other lanes")
+                        .clicked()
+                    {
+                        self.drums.soloed[ch] = !soloed;
+                    }
+
+                    if ui
+                        .button("⇄")
+                        .on_hover_text("Reverse this lane's pattern")
+                        .clicked()
+                    {
+                        let p = self.drums.active_pattern;
+                        self.drums.patterns[p][ch].reverse();
+                        self.drums.step_vel[p][ch].reverse();
+                    }
+
+                    if ui
+                        .button("?")
+                        .on_hover_text("Randomize (50% density)")
+                        .clicked()
+                    {
+                        let p = self.drums.active_pattern;
+                        // LCG seeded from time — avoids pulling the `rand` crate.
+                        let seed = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.subsec_nanos())
+                            .unwrap_or(12345)
+                            .wrapping_add((ch as u32).wrapping_mul(2891336453u32));
+                        let mut rng = seed;
+                        for step in 0..STEP_COUNT {
+                            rng = rng.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                            self.drums.patterns[p][ch][step] = (rng >> 31) != 0;
+                        }
+                    }
+
+                    let euclid_on = self.drums.euclid_on[ch];
+                    if color_chip(ui, "E", accent, euclid_on, &self.theme)
+                        .on_hover_text("Toggle euclidean rhythm generator")
+                        .clicked()
+                    {
+                        self.drums.euclid_on[ch] = !euclid_on;
+                    }
+                });
+
+                // ── Voice editor (expands below channel row) ──────────────────
+                if expanded {
+                    SynthFrame::inset(&self.theme)
+                        .outer_margin(egui::Margin {
+                            left: CHANNEL_LABEL_W as i8,
+                            right: 0,
+                            top: self.theme.sp_xxs as i8,
+                            bottom: self.theme.sp_xs as i8,
+                        })
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new(format!("{ch_name} — Voice Editor"))
+                                        .font(self.theme.font_body())
+                                        .color(accent),
+                                );
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        if ui.button("✕").clicked() {
+                                            self.drums.expanded_channel = None;
+                                        }
+                                    },
+                                );
+                            });
+                            ui.add_space(self.theme.sp_xs);
+
+                            // Voice params — vertical Slider stack.
+                            DesignSlider::new(&mut self.drums.base_freq[ch], 0.0..=800.0, "Freq")
+                                .suffix(" Hz")
+                                .decimals(0)
+                                .show(ui, &self.theme);
+
+                            DesignSlider::new(
+                                &mut self.drums.pitch_range[ch],
+                                0.0..=500.0,
+                                "Sweep",
+                            )
+                            .suffix(" Hz")
+                            .decimals(0)
+                            .show(ui, &self.theme);
+
+                            DesignSlider::new(&mut self.drums.amp_decay[ch], 0.01..=2.0, "Decay")
+                                .suffix(" s")
+                                .decimals(3)
+                                .show(ui, &self.theme);
+
+                            DesignSlider::new(&mut self.drums.noise_mix[ch], 0.0..=1.0, "Noise")
+                                .decimals(2)
+                                .show(ui, &self.theme);
+
+                            DesignSlider::new(
+                                &mut self.drums.channel_volume[ch],
+                                0.0..=1.0,
+                                "Volume",
+                            )
+                            .decimals(2)
+                            .show(ui, &self.theme);
+
+                            // Euclidean section.
+                            ui.add_space(self.theme.sp_xs);
+
+                            toggle_button(
+                                ui,
+                                &mut self.drums.euclid_on[ch],
+                                "Euclidean",
+                                ToggleSize::Standard,
+                                Tier::Tertiary,
+                                &self.theme,
+                                None,
+                            )
+                            .on_hover_text("Toggle euclidean rhythm generator");
+
+                            ui.add_enabled_ui(self.drums.euclid_on[ch], |ui| {
+                                let steps_max = self.drums.euclid_steps[ch] as f32;
+                                let mut hits = self.drums.euclid_hits[ch] as f32;
+                                if DesignSlider::new(&mut hits, 1.0..=steps_max, "Hits")
+                                    .decimals(0)
+                                    .show(ui, &self.theme)
+                                    .changed()
+                                {
+                                    self.drums.euclid_hits[ch] = hits as u8;
+                                }
+
+                                let mut steps = self.drums.euclid_steps[ch] as f32;
+                                if DesignSlider::new(&mut steps, 1.0..=16.0, "Steps")
+                                    .decimals(0)
+                                    .show(ui, &self.theme)
+                                    .changed()
+                                {
+                                    self.drums.euclid_steps[ch] = steps as u8;
+                                    self.drums.euclid_hits[ch] =
+                                        self.drums.euclid_hits[ch].min(steps as u8);
+                                }
+
+                                let steps_max = self.drums.euclid_steps[ch] as f32;
+                                let mut offset = self.drums.euclid_offset[ch] as f32;
+                                if DesignSlider::new(
+                                    &mut offset,
+                                    0.0..=(steps_max - 1.0).max(0.0),
+                                    "Offset",
+                                )
+                                .decimals(0)
+                                .show(ui, &self.theme)
+                                .changed()
+                                {
+                                    self.drums.euclid_offset[ch] = offset as u8;
+                                }
+                            });
+                        });
+                }
             }); // end push_id(ch)
         }
 
@@ -595,7 +645,15 @@ impl SynthApp {
             .color(text_dis),
         );
 
-        let _ = (accent, text_sec, text_dis, accent_hold, seq_rec, sp_xs, sp_xxs);
+        let _ = (
+            accent,
+            text_sec,
+            text_dis,
+            accent_hold,
+            seq_rec,
+            sp_xs,
+            sp_xxs,
+        );
     }
 
     /// Floating kit browser window — call every frame from `ui_drum_machine`.

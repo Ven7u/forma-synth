@@ -27,7 +27,11 @@ impl SynthApp {
                 let peak = self.track_mixer[t].peak();
 
                 // Cell frame
-                let cell_fill = if focused { bg_surface } else { Color32::TRANSPARENT };
+                let cell_fill = if focused {
+                    bg_surface
+                } else {
+                    Color32::TRANSPARENT
+                };
                 let cell_stroke = if focused {
                     Stroke::new(self.theme.stroke_ui, accent)
                 } else {
@@ -46,14 +50,15 @@ impl SynthApp {
                         ui.horizontal(|ui| {
                             let dot_col = if !muted { accent } else { border };
                             ui.label(
-                                egui::RichText::new("●").font(self.theme.font_small()).color(dot_col),
+                                egui::RichText::new("●")
+                                    .font(self.theme.font_small())
+                                    .color(dot_col),
                             );
                             let name_col = if focused { accent } else { text_sec };
-                            let label = egui::RichText::new(
-                                format!("T{}  {}", t + 1, self.track_names[t]),
-                            )
-                            .font(self.theme.font_body())
-                            .color(name_col);
+                            let label =
+                                egui::RichText::new(format!("T{}  {}", t + 1, self.track_names[t]))
+                                    .font(self.theme.font_body())
+                                    .color(name_col);
                             if ui
                                 .add(egui::Label::new(label).sense(Sense::click()))
                                 .clicked()
@@ -132,7 +137,11 @@ impl SynthApp {
                 Stroke::new(self.theme.stroke_ui * 0.5, border)
             };
             egui::Frame::new()
-                .fill(if drums_focused { bg_surface } else { Color32::TRANSPARENT })
+                .fill(if drums_focused {
+                    bg_surface
+                } else {
+                    Color32::TRANSPARENT
+                })
                 .stroke(drums_cell_stroke)
                 .corner_radius(rounding_sm)
                 .inner_margin(egui::Margin::symmetric(6, 4))
@@ -141,7 +150,9 @@ impl SynthApp {
                     ui.horizontal(|ui| {
                         let dot_col = if self.drums.enabled { accent } else { border };
                         ui.label(
-                            egui::RichText::new("●").font(self.theme.font_small()).color(dot_col),
+                            egui::RichText::new("●")
+                                .font(self.theme.font_small())
+                                .color(dot_col),
                         );
                         let col = if drums_focused { accent } else { text_sec };
                         if ui
@@ -177,7 +188,9 @@ impl SynthApp {
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
+                                egui::RichText::new("M")
+                                    .font(self.theme.font_body())
+                                    .color(m_col),
                             )
                             .frame(drum_muted)
                             .min_size(Vec2::new(18.0, 14.0)),
@@ -204,7 +217,9 @@ impl SynthApp {
                 if ui
                     .add(
                         egui::Label::new(
-                            egui::RichText::new("MIX▸").font(self.theme.font_body()).color(mix_col),
+                            egui::RichText::new("MIX▸")
+                                .font(self.theme.font_body())
+                                .color(mix_col),
                         )
                         .sense(egui::Sense::click()),
                     )

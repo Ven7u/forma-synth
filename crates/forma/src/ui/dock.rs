@@ -96,7 +96,8 @@ pub fn default_dock_state() -> DockState<Tab> {
     // 3. Split top-left vertically: Oscillators/Mixer top, Modulation/Filter bottom.
     // Fraction is overridden by ui_synth_dock() using the measured OSC content height;
     // 0.55 is the fallback used only on the very first launch (before measurement).
-    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.55, vec![Tab::Filter, Tab::Modulation]);
+    let [_osc_mixer, _mod] =
+        surface.split_below(top_left, 0.55, vec![Tab::Filter, Tab::Modulation]);
 
     // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
@@ -119,7 +120,8 @@ impl crate::SynthApp {
         // NodeIndex(3) is the Vertical split OSC/Mixer ↔ Modulation/Filter.
         if !self.osc_split_calibrated && self.osc_tab_content_h > 0.0 {
             let frac = osc_split_fraction(ui.available_height(), self.osc_tab_content_h);
-            if let Some(tree) = self.dock_state
+            if let Some(tree) = self
+                .dock_state
                 .get_surface_mut(egui_dock::SurfaceIndex::main())
                 .and_then(|s| s.node_tree_mut())
             {
@@ -252,12 +254,8 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
                         &mut [0usize, 1, 2, 3],
                         true,
                     );
-                    self.app.ui_adsr_panel(
-                        &mut cols[1],
-                        "Amp Env",
-                        &mut [0usize, 1, 2, 3],
-                        false,
-                    );
+                    self.app
+                        .ui_adsr_panel(&mut cols[1], "Amp Env", &mut [0usize, 1, 2, 3], false);
                 });
             }
             Tab::Sequencer => {

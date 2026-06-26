@@ -26,7 +26,11 @@ pub fn draw_adsr_visualizer(
     );
     let rect = resp.rect;
 
-    painter.rect_filled(rect, CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.bg_adsr));
+    painter.rect_filled(
+        rect,
+        CornerRadius::same(theme.rounding_sm as u8),
+        theme.c(&theme.bg_adsr),
+    );
 
     let a = adsr[0];
     let d = adsr[1];

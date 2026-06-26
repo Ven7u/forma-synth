@@ -32,17 +32,11 @@ pub struct BeatState {
 ///
 /// Returns the `Response` so the caller can attach `.on_hover_text()` and a
 /// click handler for opening the metronome settings popover.
-pub fn draw_beat_indicator(
-    ui: &mut egui::Ui,
-    state: &BeatState,
-    theme: &SynthTheme,
-) -> Response {
+pub fn draw_beat_indicator(ui: &mut egui::Ui, state: &BeatState, theme: &SynthTheme) -> Response {
     // Fixed layout: 30 px sig text + 5 px gap + dot + 4 px gap + dot
     let total_w = 30.0 + 5.0 + DOT_R * 2.0 + 4.0 + DOT_R * 2.0;
-    let (rect, response) = ui.allocate_exact_size(
-        Vec2::new(total_w, ui.available_height()),
-        Sense::click(),
-    );
+    let (rect, response) =
+        ui.allocate_exact_size(Vec2::new(total_w, ui.available_height()), Sense::click());
 
     if ui.is_rect_visible(rect) {
         paint_beat_indicator(ui.painter(), rect, state, theme);

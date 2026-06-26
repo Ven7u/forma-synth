@@ -220,7 +220,13 @@ impl SynthApp {
 
         // ── CPU-drawn modes: Spectrum and Envelope ────────────────────────────
         if self.viz_mode == VizMode::Spectrum {
-            draw_spectrum(&cpu_painter, row, &buf, self.engine.sample_rate(), &self.theme);
+            draw_spectrum(
+                &cpu_painter,
+                row,
+                &buf,
+                self.engine.sample_rate(),
+                &self.theme,
+            );
             return;
         }
         if self.viz_mode == VizMode::Envelope {

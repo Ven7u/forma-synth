@@ -20,12 +20,18 @@ impl SynthApp {
 
         // Header
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("MIXER").font(self.theme.font_heading()).color(accent));
+            ui.label(
+                egui::RichText::new("MIXER")
+                    .font(self.theme.font_heading())
+                    .color(accent),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
                     .add(
                         egui::Label::new(
-                            egui::RichText::new("✕").font(self.theme.font_heading()).color(text_dis),
+                            egui::RichText::new("✕")
+                                .font(self.theme.font_heading())
+                                .color(text_dis),
                         )
                         .sense(Sense::click()),
                     )
@@ -129,7 +135,11 @@ impl SynthApp {
                     } else {
                         format!("R{:.0}", pan * 100.0)
                     };
-                    ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
+                    ui.label(
+                        egui::RichText::new(pan_label)
+                            .font(self.theme.font_small())
+                            .color(text_dis),
+                    );
 
                     ui.add_space(sp_xs);
 
@@ -139,7 +149,9 @@ impl SynthApp {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
+                                    egui::RichText::new("M")
+                                        .font(self.theme.font_body())
+                                        .color(m_col),
                                 )
                                 .frame(muted)
                                 .min_size(Vec2::new(20.0, 14.0)),
@@ -153,7 +165,9 @@ impl SynthApp {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("S").font(self.theme.font_body()).color(s_col),
+                                    egui::RichText::new("S")
+                                        .font(self.theme.font_body())
+                                        .color(s_col),
                                 )
                                 .frame(solo)
                                 .min_size(Vec2::new(20.0, 14.0)),
@@ -200,8 +214,16 @@ impl SynthApp {
                 } else {
                     text_sec
                 };
-                ui.label(egui::RichText::new("DRUMS").font(self.theme.font_body()).color(drums_col));
-                ui.label(egui::RichText::new("step seq").font(self.theme.font_small()).color(text_dis));
+                ui.label(
+                    egui::RichText::new("DRUMS")
+                        .font(self.theme.font_body())
+                        .color(drums_col),
+                );
+                ui.label(
+                    egui::RichText::new("step seq")
+                        .font(self.theme.font_small())
+                        .color(text_dis),
+                );
 
                 ui.add_space(sp_xs);
 
@@ -259,14 +281,20 @@ impl SynthApp {
                 } else {
                     format!("R{:.0}", dpan * 100.0)
                 };
-                ui.label(egui::RichText::new(pan_label).font(self.theme.font_small()).color(text_dis));
+                ui.label(
+                    egui::RichText::new(pan_label)
+                        .font(self.theme.font_small())
+                        .color(text_dis),
+                );
                 ui.add_space(sp_xs);
 
                 let m_col = if drum_muted { seq_rec } else { text_dis };
                 if ui
                     .add(
                         egui::Button::new(
-                            egui::RichText::new("M").font(self.theme.font_body()).color(m_col),
+                            egui::RichText::new("M")
+                                .font(self.theme.font_body())
+                                .color(m_col),
                         )
                         .frame(drum_muted)
                         .min_size(Vec2::new(20.0, 14.0)),

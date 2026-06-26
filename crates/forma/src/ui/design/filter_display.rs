@@ -44,7 +44,11 @@ pub fn draw_lp_response_curve(
     };
 
     // Background
-    painter.rect_filled(rect, CornerRadius::same(theme.rounding_sm as u8), theme.c(&theme.scope_bg));
+    painter.rect_filled(
+        rect,
+        CornerRadius::same(theme.rounding_sm as u8),
+        theme.c(&theme.scope_bg),
+    );
 
     // Grid — uses filter_curve_grid token
     let grid_col = theme.ca(&theme.filter_curve_grid);
@@ -74,7 +78,11 @@ pub fn draw_lp_response_curve(
     }
     for db in [-48.0_f32, -24.0, -12.0, 0.0, 18.0] {
         let y = sy(db);
-        let w = if db == 0.0 { theme.stroke_ui } else { theme.stroke_ui * 0.5 };
+        let w = if db == 0.0 {
+            theme.stroke_ui
+        } else {
+            theme.stroke_ui * 0.5
+        };
         painter.line_segment(
             [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
             Stroke::new(w, grid_col),
@@ -120,14 +128,24 @@ pub fn draw_lp_response_curve(
     let node_y = rect.bottom() - (q_engine / 0.95) * rect.height();
     let cross = Color32::from_rgba_premultiplied(line.r(), line.g(), line.b(), 45);
     painter.line_segment(
-        [egui::pos2(node_x, rect.top()), egui::pos2(node_x, rect.bottom())],
+        [
+            egui::pos2(node_x, rect.top()),
+            egui::pos2(node_x, rect.bottom()),
+        ],
         Stroke::new(theme.stroke_ui, cross),
     );
     painter.line_segment(
-        [egui::pos2(rect.left(), node_y), egui::pos2(rect.right(), node_y)],
+        [
+            egui::pos2(rect.left(), node_y),
+            egui::pos2(rect.right(), node_y),
+        ],
         Stroke::new(theme.stroke_ui, cross),
     );
-    painter.circle_filled(egui::pos2(node_x, node_y), 5.0, theme.c(&theme.filter_curve_line));
+    painter.circle_filled(
+        egui::pos2(node_x, node_y),
+        5.0,
+        theme.c(&theme.filter_curve_line),
+    );
     painter.circle_stroke(
         egui::pos2(node_x, node_y),
         5.0,

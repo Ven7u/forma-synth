@@ -11,8 +11,7 @@ use crate::SynthApp;
 use eframe::egui;
 use egui::{RichText, Sense, Vec2};
 
-const WAVE_OPTIONS: &[(usize, &str)] =
-    &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
+const WAVE_OPTIONS: &[(usize, &str)] = &[(0, "Sin"), (1, "Saw"), (2, "Sqr"), (3, "Tri")];
 
 impl SynthApp {
     pub fn ui_osc_panel(&mut self, ui: &mut egui::Ui, i: usize) {
@@ -50,31 +49,28 @@ impl SynthApp {
                 .on_hover_text("Toggle oscillator on/off");
 
                 if is_osc1 {
-                    ui.with_layout(
-                        egui::Layout::right_to_left(egui::Align::Center),
-                        |ui| {
-                            let flip_label = if flip { "‹ back" } else { "mod ›" };
-                            let flip_col = theme.c(&theme.text_secondary);
-                            if ui
-                                .add(
-                                    egui::Label::new(
-                                        RichText::new(flip_label)
-                                            .font(theme.font_body())
-                                            .color(flip_col),
-                                    )
-                                    .sense(Sense::click()),
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let flip_label = if flip { "‹ back" } else { "mod ›" };
+                        let flip_col = theme.c(&theme.text_secondary);
+                        if ui
+                            .add(
+                                egui::Label::new(
+                                    RichText::new(flip_label)
+                                        .font(theme.font_body())
+                                        .color(flip_col),
                                 )
-                                .on_hover_text(if flip {
-                                    "Back to main controls"
-                                } else {
-                                    "Sync / FM / Ring mod"
-                                })
-                                .clicked()
-                            {
-                                flip_clicked = true;
-                            }
-                        },
-                    );
+                                .sense(Sense::click()),
+                            )
+                            .on_hover_text(if flip {
+                                "Back to main controls"
+                            } else {
+                                "Sync / FM / Ring mod"
+                            })
+                            .clicked()
+                        {
+                            flip_clicked = true;
+                        }
+                    });
                 }
             });
 
@@ -470,8 +466,7 @@ impl SynthApp {
         let peak_raw_l = self.engine.peak_l();
         let peak_raw_r = self.engine.peak_r();
         let dt = 1.0 / 60.0_f32;
-        self.peak_display =
-            (self.peak_display * 0.85 + peak_raw_l * 0.15).max(peak_raw_l * 0.3);
+        self.peak_display = (self.peak_display * 0.85 + peak_raw_l * 0.15).max(peak_raw_l * 0.3);
         let peak_raw_max = peak_raw_l.max(peak_raw_r);
         if peak_raw_max > self.peak_hold {
             self.peak_hold = peak_raw_max;
@@ -805,4 +800,3 @@ impl SynthApp {
 }
 
 // ── Waveform preview painter ──────────────────────────────────────────────────
-

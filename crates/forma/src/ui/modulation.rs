@@ -278,7 +278,9 @@ impl SynthApp {
                                     KnobSize::Standard,
                                     Tier::Secondary,
                                 )
-                                .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
+                                .on_hover_text(
+                                    "LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells",
+                                )
                                 .changed()
                             {
                                 self.engine.set_lfo2_rate(self.lfo2_rate);
@@ -320,7 +322,9 @@ impl SynthApp {
                                 &theme,
                                 None,
                             )
-                            .on_hover_text("Sine: smooth · Triangle: linear ramp · Saw: ramp + reset");
+                            .on_hover_text(
+                                "Sine: smooth · Triangle: linear ramp · Saw: ramp + reset",
+                            );
                             if shape != prev {
                                 self.lfo2_shape = shape;
                                 self.engine.set_lfo2_shape(shape as u8);
@@ -400,7 +404,11 @@ impl SynthApp {
                             .color(theme.c(&theme.text_secondary)),
                     );
                     if ui
-                        .add(egui::DragValue::new(&mut self.pulse_depth).range(0.0..=1.0).speed(0.01))
+                        .add(
+                            egui::DragValue::new(&mut self.pulse_depth)
+                                .range(0.0..=1.0)
+                                .speed(0.01),
+                        )
                         .on_hover_text("How hard each step ducks the master output")
                         .changed()
                     {
@@ -432,10 +440,15 @@ impl SynthApp {
                                 let div_u8 = div.to_u8();
                                 let rate = div.hz(self.global_bpm as f32);
                                 if ui
-                                    .selectable_label(self.pulse_division as u8 == div_u8, div.label())
+                                    .selectable_label(
+                                        self.pulse_division as u8 == div_u8,
+                                        div.label(),
+                                    )
                                     .on_hover_text(format!(
                                         "{} → {:.3} Hz @ {} BPM",
-                                        div.label(), rate, self.global_bpm
+                                        div.label(),
+                                        rate,
+                                        self.global_bpm
                                     ))
                                     .clicked()
                                 {
@@ -482,7 +495,11 @@ impl SynthApp {
                             fill.b(),
                             alpha,
                         );
-                        painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
+                        painter.rect_filled(
+                            rect,
+                            egui::CornerRadius::same(theme.rounding_xs as u8),
+                            fill,
+                        );
                         painter.rect_stroke(
                             rect,
                             egui::CornerRadius::same(theme.rounding_xs as u8),
@@ -597,7 +614,11 @@ impl SynthApp {
                     let alpha = if in_active_len { 255 } else { 90 };
                     let fill =
                         egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), alpha);
-                    painter.rect_filled(rect, egui::CornerRadius::same(theme.rounding_xs as u8), fill);
+                    painter.rect_filled(
+                        rect,
+                        egui::CornerRadius::same(theme.rounding_xs as u8),
+                        fill,
+                    );
                     painter.rect_stroke(
                         rect,
                         egui::CornerRadius::same(theme.rounding_xs as u8),
@@ -1149,81 +1170,78 @@ impl SynthApp {
                     ui.columns(4, |cols| {
                         for i in 0..4 {
                             let col = &mut cols[i];
-                            col.with_layout(
-                                egui::Layout::top_down(egui::Align::Center),
-                                |col| {
-                                    // Stage label
-                                    col.add_sized(
-                                        [col_w, stage_label_h],
-                                        egui::Label::new(
-                                            RichText::new(labels[i])
-                                                .font(theme.font_body())
-                                                .color(theme.c(&theme.text_secondary)),
-                                        ),
-                                    );
+                            col.with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                                // Stage label
+                                col.add_sized(
+                                    [col_w, stage_label_h],
+                                    egui::Label::new(
+                                        RichText::new(labels[i])
+                                            .font(theme.font_body())
+                                            .color(theme.c(&theme.text_secondary)),
+                                    ),
+                                );
 
-                                    // A/D/R: log scale → normalize to 0..1 for fader
-                                    let log = i != 2;
-                                    let (lo, hi) = (*ranges[i].start(), *ranges[i].end());
-                                    let mut norm = if log {
-                                        (adsr[i].max(lo).ln() - lo.ln()) / (hi.ln() - lo.ln())
+                                // A/D/R: log scale → normalize to 0..1 for fader
+                                let log = i != 2;
+                                let (lo, hi) = (*ranges[i].start(), *ranges[i].end());
+                                let mut norm = if log {
+                                    (adsr[i].max(lo).ln() - lo.ln()) / (hi.ln() - lo.ln())
+                                } else {
+                                    (adsr[i] - lo) / (hi - lo)
+                                };
+                                norm = norm.clamp(0.0, 1.0);
+                                let resp = fader(
+                                    col,
+                                    &mut norm,
+                                    0.0..=1.0,
+                                    FaderOrientation::Vertical,
+                                    FaderSize::Large,
+                                    &theme,
+                                )
+                                .on_hover_text(tips[i]);
+                                if resp.changed() {
+                                    let v = if log {
+                                        (lo.ln() + norm * (hi.ln() - lo.ln())).exp()
                                     } else {
-                                        (adsr[i] - lo) / (hi - lo)
-                                    };
-                                    norm = norm.clamp(0.0, 1.0);
-                                    let resp = fader(
-                                        col,
-                                        &mut norm,
-                                        0.0..=1.0,
-                                        FaderOrientation::Vertical,
-                                        FaderSize::Large,
-                                        &theme,
-                                    )
-                                    .on_hover_text(tips[i]);
-                                    if resp.changed() {
-                                        let v = if log {
-                                            (lo.ln() + norm * (hi.ln() - lo.ln())).exp()
-                                        } else {
-                                            lo + norm * (hi - lo)
+                                        lo + norm * (hi - lo)
+                                    }
+                                    .clamp(lo, hi);
+                                    adsr[i] = v;
+                                    if is_filter {
+                                        match i {
+                                            0 => self.engine.set_fenv_attack(v),
+                                            1 => self.engine.set_fenv_decay(v),
+                                            2 => self.engine.set_fenv_sustain(v),
+                                            _ => self.engine.set_fenv_release(v),
                                         }
-                                        .clamp(lo, hi);
-                                        adsr[i] = v;
-                                        if is_filter {
-                                            match i {
-                                                0 => self.engine.set_fenv_attack(v),
-                                                1 => self.engine.set_fenv_decay(v),
-                                                2 => self.engine.set_fenv_sustain(v),
-                                                _ => self.engine.set_fenv_release(v),
-                                            }
-                                        } else {
-                                            match i {
-                                                0 => self.engine.set_amp_attack(v),
-                                                1 => self.engine.set_amp_decay(v),
-                                                2 => self.engine.set_amp_sustain(v),
-                                                _ => self.engine.set_amp_release(v),
-                                            }
+                                    } else {
+                                        match i {
+                                            0 => self.engine.set_amp_attack(v),
+                                            1 => self.engine.set_amp_decay(v),
+                                            2 => self.engine.set_amp_sustain(v),
+                                            _ => self.engine.set_amp_release(v),
                                         }
                                     }
+                                }
 
-                                    // Value readout — fixed-size slot keeps width
-                                    // stable regardless of displayed text length.
-                                    let val_str = if i == 2 {
-                                        format!("{:.2}", adsr[i])
-                                    } else if adsr[i] < 1.0 {
-                                        format!("{:.0}ms", adsr[i] * 1000.0)
-                                    } else {
-                                        format!("{:.1}s", adsr[i])
-                                    };
-                                    col.add_sized(
-                                        [col_w, val_label_h],
-                                        egui::Label::new(
-                                            RichText::new(val_str)
-                                                .font(theme.font_small())
-                                                .color(theme.c(&theme.text_secondary)),
-                                        ),
-                                    );
-                                },
-                            );
+                                // Value readout — fixed-size slot keeps width
+                                // stable regardless of displayed text length.
+                                let val_str = if i == 2 {
+                                    format!("{:.2}", adsr[i])
+                                } else if adsr[i] < 1.0 {
+                                    format!("{:.0}ms", adsr[i] * 1000.0)
+                                } else {
+                                    format!("{:.1}s", adsr[i])
+                                };
+                                col.add_sized(
+                                    [col_w, val_label_h],
+                                    egui::Label::new(
+                                        RichText::new(val_str)
+                                            .font(theme.font_small())
+                                            .color(theme.c(&theme.text_secondary)),
+                                    ),
+                                );
+                            });
                         }
                     });
                 });

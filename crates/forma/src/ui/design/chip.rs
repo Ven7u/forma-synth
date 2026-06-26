@@ -31,12 +31,11 @@ pub fn chip_selector<T: Copy + PartialEq>(
     let mut chip_widths: Vec<f32> = options
         .iter()
         .map(|(_, lbl)| {
-            let g =
-                ui.painter().layout_no_wrap(
-                    lbl.to_string(),
-                    font.clone(),
-                    theme.c(&theme.text_primary),
-                );
+            let g = ui.painter().layout_no_wrap(
+                lbl.to_string(),
+                font.clone(),
+                theme.c(&theme.text_primary),
+            );
             (g.size().x + theme.sp_md * 2.0).max(28.0)
         })
         .collect();
@@ -52,8 +51,7 @@ pub fn chip_selector<T: Copy + PartialEq>(
         ui.horizontal(|ui| {
             for (i, (value, label)) in options.iter().enumerate() {
                 let w = chip_widths[i];
-                let (rect, resp) =
-                    ui.allocate_exact_size(Vec2::new(w, chip_h), Sense::click());
+                let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, chip_h), Sense::click());
                 let active = *selected == *value;
                 if resp.clicked() {
                     *selected = *value;

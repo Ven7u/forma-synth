@@ -250,19 +250,28 @@ impl SynthUi for Ui {
             f(ui);
         };
         if let Some(f) = tier1 {
-            zone(self, Box::new(move |ui| {
-                let _ = f(ui);
-            }));
+            zone(
+                self,
+                Box::new(move |ui| {
+                    let _ = f(ui);
+                }),
+            );
         }
         if let Some(f) = tier2 {
-            zone(self, Box::new(move |ui| {
-                let _ = f(ui);
-            }));
+            zone(
+                self,
+                Box::new(move |ui| {
+                    let _ = f(ui);
+                }),
+            );
         }
         if let Some(f) = tier3 {
-            zone(self, Box::new(move |ui| {
-                let _ = f(ui);
-            }));
+            zone(
+                self,
+                Box::new(move |ui| {
+                    let _ = f(ui);
+                }),
+            );
         }
     }
 }
@@ -569,14 +578,7 @@ pub fn fader_column(
         ui.add_space(theme.sp_xxs);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = theme.sp_xxs;
-            let resp = fader(
-                ui,
-                value,
-                range,
-                FaderOrientation::Vertical,
-                size,
-                theme,
-            );
+            let resp = fader(ui, value, range, FaderOrientation::Vertical, size, theme);
             response = Some(resp);
             if let Some((level, peak_hold)) = meter {
                 level_meter(
@@ -767,8 +769,7 @@ pub fn note_seq_step(
         *state.probability = prob_f.round().clamp(0.0, 100.0) as u8;
     });
 
-    events.changed = *state.note != prev_note
-        || *state.velocity != prev_vel
-        || *state.probability != prev_prob;
+    events.changed =
+        *state.note != prev_note || *state.velocity != prev_vel || *state.probability != prev_prob;
     events
 }

@@ -14,14 +14,20 @@ impl SynthApp {
 
         // ── ARP card ─────────────────────────────────────────────────────────
         SynthFrame::section(&theme).show(ui, |ui| {
-            ui.label(RichText::new("ARP").font(theme.font_heading()).color(theme.c(&theme.text_primary)));
+            ui.label(
+                RichText::new("ARP")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
             ui.add_space(theme.sp_xs);
 
             // Transport row — ARP / RST / HOLD
             ui.horizontal(|ui| {
                 let bar_quantize = self.seq.bar_quantize.load(Ordering::Relaxed);
                 let arp_label = if self.arp_pending_start {
-                    RichText::new("… Bar").strong().color(theme.c(&theme.accent_hold))
+                    RichText::new("… Bar")
+                        .strong()
+                        .color(theme.c(&theme.accent_hold))
                 } else {
                     RichText::new("ARP").strong().color(if enabled {
                         theme.c(&theme.accent)
@@ -67,11 +73,12 @@ impl SynthApp {
                     }
                 }
 
-                let rst_tip = if self.seq.bar_quantize.load(Ordering::Relaxed) && self.arp_sync_active() {
-                    "Restart arp at the next bar boundary (BAR is on)."
-                } else {
-                    "Restart arp phase/step from beginning."
-                };
+                let rst_tip =
+                    if self.seq.bar_quantize.load(Ordering::Relaxed) && self.arp_sync_active() {
+                        "Restart arp at the next bar boundary (BAR is on)."
+                    } else {
+                        "Restart arp phase/step from beginning."
+                    };
                 if ui.button("RST").on_hover_text(rst_tip).clicked() {
                     self.schedule_or_restart_arp();
                 }
@@ -96,7 +103,8 @@ impl SynthApp {
                 ui.label("BPM:");
                 let sync_active = self.arp_sync_active();
                 if sync_active {
-                    self.engine.set_arp_bpm(self.seq.bpm.load(Ordering::Relaxed) as f32);
+                    self.engine
+                        .set_arp_bpm(self.seq.bpm.load(Ordering::Relaxed) as f32);
                 }
                 let mut bpm = self.engine.arp_bpm();
                 ui.add_enabled_ui(!sync_active, |ui| {
@@ -110,7 +118,11 @@ impl SynthApp {
                     } else {
                         theme.c(&theme.text_disabled)
                     });
-                    if ui.button(sync_label).on_hover_text("Lock Arp BPM to the Global BPM.").clicked() {
+                    if ui
+                        .button(sync_label)
+                        .on_hover_text("Lock Arp BPM to the Global BPM.")
+                        .clicked()
+                    {
                         self.arp_sync = !self.arp_sync;
                         if self.arp_sync {
                             self.apply_clock_sync();
@@ -129,7 +141,11 @@ impl SynthApp {
                     ui.label("Div:");
                     for (i, &label) in ClockDiv::LABELS.iter().enumerate() {
                         let active = current_div == i as u8;
-                        let col = if active { theme.c(&theme.accent_dim) } else { theme.c(&theme.text_disabled) };
+                        let col = if active {
+                            theme.c(&theme.accent_dim)
+                        } else {
+                            theme.c(&theme.text_disabled)
+                        };
                         if ui.button(RichText::new(label).color(col)).clicked() && !active {
                             self.engine.set_arp_division(i as u8);
                         }
@@ -142,7 +158,11 @@ impl SynthApp {
                     ui.label("Mode:");
                     for (i, &label) in ArpMode::LABELS.iter().enumerate() {
                         let active = current_mode == i as u8;
-                        let col = if active { theme.c(&theme.accent_dim) } else { theme.c(&theme.text_disabled) };
+                        let col = if active {
+                            theme.c(&theme.accent_dim)
+                        } else {
+                            theme.c(&theme.text_disabled)
+                        };
                         if ui.button(RichText::new(label).color(col)).clicked() && !active {
                             self.engine.set_arp_mode(i as u8);
                         }
@@ -155,8 +175,16 @@ impl SynthApp {
                     ui.label("Oct:");
                     for oct in 1u8..=4 {
                         let active = current_oct == oct;
-                        let col = if active { theme.c(&theme.accent_dim) } else { theme.c(&theme.text_disabled) };
-                        if ui.button(RichText::new(oct.to_string()).color(col)).clicked() && !active {
+                        let col = if active {
+                            theme.c(&theme.accent_dim)
+                        } else {
+                            theme.c(&theme.text_disabled)
+                        };
+                        if ui
+                            .button(RichText::new(oct.to_string()).color(col))
+                            .clicked()
+                            && !active
+                        {
                             self.engine.set_arp_octave_range(oct);
                         }
                     }
@@ -174,7 +202,11 @@ impl SynthApp {
 
         // ── RING card ─────────────────────────────────────────────────────────
         SynthFrame::section(&theme).show(ui, |ui| {
-            ui.label(RichText::new("RING").font(theme.font_heading()).color(theme.c(&theme.text_primary)));
+            ui.label(
+                RichText::new("RING")
+                    .font(theme.font_heading())
+                    .color(theme.c(&theme.text_primary)),
+            );
             ui.add_space(theme.sp_xs);
             ui.add_enabled_ui(enabled, |ui| {
                 self.ui_arp_ring(ui);
@@ -195,7 +227,8 @@ impl SynthApp {
             } else {
                 theme.c(&theme.text_disabled)
             };
-            if ui.button(RichText::new("RING").color(ring_col))
+            if ui
+                .button(RichText::new("RING").color(ring_col))
                 .on_hover_text("Euclidean ring gate — controls which arp steps fire a note.")
                 .clicked()
             {
@@ -204,7 +237,8 @@ impl SynthApp {
             }
             ui.label("N:");
             let mut n = self.arp_ring_steps as usize;
-            if ui.add(egui::DragValue::new(&mut n).range(2..=16))
+            if ui
+                .add(egui::DragValue::new(&mut n).range(2..=16))
                 .on_hover_text("Number of steps in the ring (2–16).")
                 .changed()
             {
@@ -217,13 +251,15 @@ impl SynthApp {
             ui.label("K:");
             let max_k = self.arp_ring_steps as usize;
             let mut k = (self.arp_ring_k as usize).min(max_k);
-            if ui.add(egui::DragValue::new(&mut k).range(1..=max_k))
+            if ui
+                .add(egui::DragValue::new(&mut k).range(1..=max_k))
                 .on_hover_text("Hits to distribute (euclidean generator).")
                 .changed()
             {
                 self.arp_ring_k = k as u8;
             }
-            if ui.button("Gen")
+            if ui
+                .button("Gen")
                 .on_hover_text("Fill ring with K hits spread as evenly as possible (Euclidean).")
                 .clicked()
             {
@@ -235,7 +271,8 @@ impl SynthApp {
         // Preset chips
         ui.horizontal_wrapped(|ui| {
             for &(name, k, n, rot) in RING_PRESETS {
-                if ui.small_button(name)
+                if ui
+                    .small_button(name)
                     .on_hover_text(format!("E({k},{n}) rot={rot}"))
                     .clicked()
                 {
@@ -260,7 +297,11 @@ impl SynthApp {
             let ring_pos = self.engine.arp_ring_pos() as usize;
 
             // Background guide circle
-            painter.circle_stroke(center, ring_r, Stroke::new(theme.stroke_ui, theme.c(&theme.border)));
+            painter.circle_stroke(
+                center,
+                ring_r,
+                Stroke::new(theme.stroke_ui, theme.c(&theme.border)),
+            );
 
             for i in 0..n {
                 let angle = i as f32 * TAU / n as f32 - FRAC_PI_2;
@@ -278,10 +319,18 @@ impl SynthApp {
                     painter.circle_filled(
                         dot,
                         6.0,
-                        if is_head { accent } else { accent.gamma_multiply(0.75) },
+                        if is_head {
+                            accent
+                        } else {
+                            accent.gamma_multiply(0.75)
+                        },
                     );
                 } else {
-                    painter.circle_stroke(dot, 5.0, Stroke::new(theme.stroke_ui, theme.c(&theme.text_disabled)));
+                    painter.circle_stroke(
+                        dot,
+                        5.0,
+                        Stroke::new(theme.stroke_ui, theme.c(&theme.text_disabled)),
+                    );
                     if is_head {
                         painter.circle_filled(dot, 3.5, theme.c(&theme.text_secondary));
                     }

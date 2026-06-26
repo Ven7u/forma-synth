@@ -98,7 +98,9 @@ impl SynthApp {
                                 .show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         ui.label(
-                                            egui::RichText::new(dot).color(dot_col).font(self.theme.font_body()),
+                                            egui::RichText::new(dot)
+                                                .color(dot_col)
+                                                .font(self.theme.font_body()),
                                         );
                                         let patch_btn = ui.add(
                                             egui::Button::new(

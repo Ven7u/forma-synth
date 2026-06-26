@@ -45,11 +45,8 @@ pub fn lfo_pulse_dot(ui: &mut egui::Ui, rate_hz: f32, active: bool, theme: &Synt
         if t > 0.7 {
             let glow_alpha = ((t - 0.7) / 0.3 * 60.0) as u8;
             let glow = Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), glow_alpha);
-            ui.painter().circle_stroke(
-                center,
-                radius + 1.5,
-                egui::Stroke::new(1.0, glow),
-            );
+            ui.painter()
+                .circle_stroke(center, radius + 1.5, egui::Stroke::new(1.0, glow));
         }
         // Keep repainting so the animation ticks every frame.
         ui.ctx().request_repaint();
@@ -59,7 +56,12 @@ pub fn lfo_pulse_dot(ui: &mut egui::Ui, rate_hz: f32, active: bool, theme: &Synt
     ui.painter().circle_filled(
         center,
         radius * 0.35,
-        Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), if active { 200 } else { 50 }),
+        Color32::from_rgba_unmultiplied(
+            base.r(),
+            base.g(),
+            base.b(),
+            if active { 200 } else { 50 },
+        ),
     );
 }
 

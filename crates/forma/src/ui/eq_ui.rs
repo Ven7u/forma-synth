@@ -315,7 +315,10 @@ fn draw_response_curve(painter: &egui::Painter, rect: Rect, params: &EqParams, t
 
     // Curve line — derived from accent with alpha; stroke_active gives the right weight.
     let line_col = Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 200);
-    painter.add(egui::Shape::line(points, Stroke::new(t.stroke_active, line_col)));
+    painter.add(egui::Shape::line(
+        points,
+        Stroke::new(t.stroke_active, line_col),
+    ));
 }
 
 fn draw_axis_labels(painter: &egui::Painter, rect: Rect, t: &SynthTheme) {

@@ -111,8 +111,7 @@ impl<'a> Slider<'a> {
         let track_w = (available_w - label_w - value_w).max(min_track_w);
         let row_w = label_w + track_w + value_w;
 
-        let (row_rect, _) =
-            ui.allocate_exact_size(Vec2::new(row_w, row_h), Sense::hover());
+        let (row_rect, _) = ui.allocate_exact_size(Vec2::new(row_w, row_h), Sense::hover());
 
         // Label — vertically centered, left-aligned.
         ui.painter_at(row_rect).text(
@@ -126,8 +125,10 @@ impl<'a> Slider<'a> {
         // Track rect — vertically centered, with the rest of the row.
         let track_left = row_rect.left() + label_w;
         let track_top = row_rect.center().y - track_h * 0.5;
-        let track_rect =
-            Rect::from_min_size(Pos2::new(track_left, track_top), Vec2::new(track_w, track_h));
+        let track_rect = Rect::from_min_size(
+            Pos2::new(track_left, track_top),
+            Vec2::new(track_w, track_h),
+        );
 
         // Hit-test rect — larger than the visible track so the thumb is
         // easy to grab vertically.
@@ -186,8 +187,7 @@ impl<'a> Slider<'a> {
             let t = log_t(*self.value).clamp(0.0, 1.0);
             let fill_w = track_w * t;
             if fill_w > 0.0 {
-                let fill_rect =
-                    Rect::from_min_size(track_rect.min, Vec2::new(fill_w, track_h));
+                let fill_rect = Rect::from_min_size(track_rect.min, Vec2::new(fill_w, track_h));
                 painter.rect_filled(fill_rect, rounding, theme.c(&theme.accent_dim));
             }
 

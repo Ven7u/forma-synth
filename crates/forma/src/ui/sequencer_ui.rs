@@ -404,19 +404,34 @@ impl SynthApp {
                 }
                 ui.label("Offset:");
                 let mut off = self.seq_euclid_offset;
-                if ui.add(egui::Slider::new(&mut off, 0..=cur_len - 1)).changed() {
+                if ui
+                    .add(egui::Slider::new(&mut off, 0..=cur_len - 1))
+                    .changed()
+                {
                     self.seq_euclid_offset = off;
                 }
-                if ui.button("Apply").on_hover_text("Fill the step on/off pattern with the Euclidean rhythm.").clicked() {
-                    let pattern = crate::sequencer::bjorklund(self.seq_euclid_hits, cur_len, self.seq_euclid_offset);
+                if ui
+                    .button("Apply")
+                    .on_hover_text("Fill the step on/off pattern with the Euclidean rhythm.")
+                    .clicked()
+                {
+                    let pattern = crate::sequencer::bjorklund(
+                        self.seq_euclid_hits,
+                        cur_len,
+                        self.seq_euclid_offset,
+                    );
                     match seq_mode {
                         SeqMode::NoteSeq => {
                             let mut ns = self.seq.note_seq.lock().unwrap();
-                            for (i, &on) in pattern.iter().enumerate() { ns.steps[i] = on; }
+                            for (i, &on) in pattern.iter().enumerate() {
+                                ns.steps[i] = on;
+                            }
                         }
                         SeqMode::ChordSeq => {
                             let mut cs = self.seq.chord_seq.lock().unwrap();
-                            for (i, &on) in pattern.iter().enumerate() { cs.steps[i] = on; }
+                            for (i, &on) in pattern.iter().enumerate() {
+                                cs.steps[i] = on;
+                            }
                         }
                         SeqMode::ChordKb => {}
                     }
@@ -474,73 +489,73 @@ impl SynthApp {
         // below. Lets us mount the ScrollArea conditionally so the wide-window
         // path stays free of any scroll-area machinery.
         let render = |this: &mut Self, ui: &mut egui::Ui| {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = step_gap;
-            for i in 0..length {
-                ui.push_id(i, |ui| {
-                // Snapshot the step's mutable fields out of the lock so the
-                // design-system pattern can drive them without holding the
-                // mutex across painter calls. Writes go back in one short
-                // critical section after the pattern returns.
-                let (mut is_on, mut note, mut drag_accum, mut velocity, mut probability) = {
-                    let ns = this.seq.note_seq.lock().unwrap();
-                    (
-                        ns.steps[i],
-                        ns.notes[i],
-                        ns.drag_accum[i],
-                        ns.velocities[i],
-                        ns.probabilities[i],
-                    )
-                };
-                let is_current = seq_playing && seq_current_step == i;
-                let is_rec_cursor = recording && !seq_playing && rec_step == i;
-                let note_label = super::midi_note_name(note).to_string();
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = step_gap;
+                for i in 0..length {
+                    ui.push_id(i, |ui| {
+                        // Snapshot the step's mutable fields out of the lock so the
+                        // design-system pattern can drive them without holding the
+                        // mutex across painter calls. Writes go back in one short
+                        // critical section after the pattern returns.
+                        let (mut is_on, mut note, mut drag_accum, mut velocity, mut probability) = {
+                            let ns = this.seq.note_seq.lock().unwrap();
+                            (
+                                ns.steps[i],
+                                ns.notes[i],
+                                ns.drag_accum[i],
+                                ns.velocities[i],
+                                ns.probabilities[i],
+                            )
+                        };
+                        let is_current = seq_playing && seq_current_step == i;
+                        let is_rec_cursor = recording && !seq_playing && rec_step == i;
+                        let note_label = super::midi_note_name(note).to_string();
 
-                let events = note_seq_step(
-                    ui,
-                    NoteSeqStepState {
-                        is_on: &mut is_on,
-                        note: &mut note,
-                        drag_accum: &mut drag_accum,
-                        velocity: &mut velocity,
-                        probability: &mut probability,
-                        midi_min,
-                        midi_max,
-                        is_current,
-                        is_rec_cursor,
-                    },
-                    &note_label,
-                    step_w,
-                    bar_area_h,
-                    &this.theme,
-                );
+                        let events = note_seq_step(
+                            ui,
+                            NoteSeqStepState {
+                                is_on: &mut is_on,
+                                note: &mut note,
+                                drag_accum: &mut drag_accum,
+                                velocity: &mut velocity,
+                                probability: &mut probability,
+                                midi_min,
+                                midi_max,
+                                is_current,
+                                is_rec_cursor,
+                            },
+                            &note_label,
+                            step_w,
+                            bar_area_h,
+                            &this.theme,
+                        );
 
-                if events.pad_clicked {
-                    is_on = !is_on;
+                        if events.pad_clicked {
+                            is_on = !is_on;
+                        }
+
+                        // Snap `note` to the nearest legal chromatic index so the
+                        // pitch bar's continuous range still produces the same
+                        // discrete pitches the engine expects.
+                        let nearest = SEQ_CHROMATIC
+                            .iter()
+                            .min_by_key(|&&c| ((c as i32) - (note as i32)).abs())
+                            .copied()
+                            .unwrap_or(note);
+                        note = nearest;
+
+                        // Write back any deltas in a single lock acquisition.
+                        if events.pad_clicked || events.changed || drag_accum != 0.0 {
+                            let mut ns = this.seq.note_seq.lock().unwrap();
+                            ns.steps[i] = is_on;
+                            ns.notes[i] = note;
+                            ns.drag_accum[i] = drag_accum;
+                            ns.velocities[i] = velocity;
+                            ns.probabilities[i] = probability;
+                        }
+                    });
                 }
-
-                // Snap `note` to the nearest legal chromatic index so the
-                // pitch bar's continuous range still produces the same
-                // discrete pitches the engine expects.
-                let nearest = SEQ_CHROMATIC
-                    .iter()
-                    .min_by_key(|&&c| ((c as i32) - (note as i32)).abs())
-                    .copied()
-                    .unwrap_or(note);
-                note = nearest;
-
-                // Write back any deltas in a single lock acquisition.
-                if events.pad_clicked || events.changed || drag_accum != 0.0 {
-                    let mut ns = this.seq.note_seq.lock().unwrap();
-                    ns.steps[i] = is_on;
-                    ns.notes[i] = note;
-                    ns.drag_accum[i] = drag_accum;
-                    ns.velocities[i] = velocity;
-                    ns.probabilities[i] = probability;
-                }
-                });
-            }
-        });
+            });
         };
 
         if needs_scroll {
@@ -574,271 +589,298 @@ impl SynthApp {
         let needs_scroll = natural_w < MIN_STEP_W;
 
         let render = |this: &mut Self, ui: &mut egui::Ui| {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = step_gap;
-            for i in 0..length {
-                ui.push_id(i, |ui| {
-                ui.vertical(|ui| {
-                    ui.set_width(step_w);
-                    let (is_on, degree, chord_type, oct_off) = {
-                        let cs = this.seq.chord_seq.lock().unwrap();
-                        (
-                            cs.steps[i],
-                            cs.degrees[i],
-                            cs.chord_types[i],
-                            cs.octave_offsets[i],
-                        )
-                    };
-                    let is_current = seq_playing && seq_current_step == i;
-                    let is_rec_cursor = recording && !seq_playing && rec_step == i;
-
-                    let (bar_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, bar_area_h), Sense::click_and_drag());
-                    let r = bar_resp.rect;
-                    painter.rect_filled(
-                        r,
-                        CornerRadius::same(this.theme.rounding_sm as u8),
-                        this.theme.c(&this.theme.bg_seq_bar),
-                    );
-                    let t = degree as f32 / 6.0;
-                    let bar_h = (t * (bar_area_h - 4.0)).max(4.0);
-                    let bar_rect = egui::Rect::from_min_size(
-                        egui::pos2(r.min.x + 2.0, r.max.y - bar_h - 2.0),
-                        Vec2::new(step_w - 4.0, bar_h),
-                    );
-                    let quality = chord_quality(scale, degree);
-                    let bar_color = if is_current {
-                        this.theme.c(&this.theme.seq_current)
-                    } else if !is_on {
-                        this.theme.c(&this.theme.seq_note_bar_off)
-                    } else if quality == "m" {
-                        this.theme.c(&this.theme.seq_chord_minor)
-                    } else if quality == "°" {
-                        this.theme.c(&this.theme.seq_chord_dim)
-                    } else {
-                        this.theme.c(&this.theme.seq_chord_major)
-                    };
-                    painter.rect_filled(bar_rect, CornerRadius::same(this.theme.rounding_xs as u8), bar_color);
-                    // Rec cursor border.
-                    if is_rec_cursor {
-                        painter.rect_stroke(
-                            r,
-                            CornerRadius::same(this.theme.rounding_sm as u8),
-                            Stroke::new(this.theme.stroke_active, this.theme.c(&this.theme.seq_rec_cursor)),
-                            StrokeKind::Middle,
-                        );
-                    }
-
-                    let cname = chord_name(root, scale, degree);
-                    let primary = this.theme.c(&this.theme.text_primary);
-                    let secondary = this.theme.c(&this.theme.text_secondary);
-                    let disabled = this.theme.c(&this.theme.text_disabled);
-                    painter.text(
-                        egui::pos2(r.center().x, r.min.y + 10.0),
-                        egui::Align2::CENTER_CENTER,
-                        &cname,
-                        this.theme.font_value(),
-                        if is_on { primary } else { secondary },
-                    );
-                    painter.text(
-                        egui::pos2(r.center().x, r.min.y + 22.0),
-                        egui::Align2::CENTER_CENTER,
-                        DEGREE_LABELS[degree],
-                        this.theme.font_micro(),
-                        if is_on { secondary } else { disabled },
-                    );
-                    // Chord type label (bottom of bar). Uses the accent
-                    // family to differentiate from the chord-name and
-                    // degree labels stacked above.
-                    let chord_type_color = if is_on {
-                        this.theme.c(&this.theme.accent_dim)
-                    } else {
-                        disabled
-                    };
-                    painter.text(
-                        egui::pos2(r.center().x, r.max.y - 8.0),
-                        egui::Align2::CENTER_CENTER,
-                        chord_type.label(),
-                        this.theme.font_micro(),
-                        chord_type_color,
-                    );
-
-                    // Left drag: change degree.
-                    if bar_resp.dragged() {
-                        let mut cs = this.seq.chord_seq.lock().unwrap();
-                        cs.drag_accum[i] -= bar_resp.drag_delta().y * 0.6;
-                        let steps = cs.drag_accum[i] as i32;
-                        if steps != 0 {
-                            cs.drag_accum[i] -= steps as f32;
-                            cs.degrees[i] = (degree as i32 + steps).clamp(0, 6) as usize;
-                        }
-                    }
-                    if bar_resp.drag_stopped() {
-                        this.seq.chord_seq.lock().unwrap().drag_accum[i] = 0.0;
-                    }
-                    // Scroll wheel: change degree.
-                    if bar_resp.hovered() {
-                        let scroll = ui.input(|inp| inp.smooth_scroll_delta.y);
-                        if scroll != 0.0 {
-                            let delta = if scroll > 0.0 { 1i32 } else { -1 };
-                            let mut cs = this.seq.chord_seq.lock().unwrap();
-                            cs.degrees[i] = (degree as i32 + delta).clamp(0, 6) as usize;
-                        }
-                    }
-                    // Right-click: cycle chord type.
-                    if bar_resp.secondary_clicked() {
-                        use crate::sequencer::ChordType;
-                        let all = ChordType::all();
-                        let cur_idx = all.iter().position(|&t| t == chord_type).unwrap_or(0);
-                        let next = all[(cur_idx + 1) % all.len()];
-                        this.seq.chord_seq.lock().unwrap().chord_types[i] = next;
-                    }
-
-                    // ── Step pad (on/off) ────────────────────────────────
-                    let fill = if is_current {
-                        this.theme.c(&this.theme.seq_current)
-                    } else if is_on {
-                        this.theme.c(&this.theme.seq_step_on)
-                    } else {
-                        this.theme.c(&this.theme.seq_step_off)
-                    };
-                    let pad_border = if is_current {
-                        this.theme.c(&this.theme.text_primary)
-                    } else {
-                        this.theme.c(&this.theme.border)
-                    };
-                    let (pad_resp, painter) = ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
-                    painter.rect_filled(pad_resp.rect, CornerRadius::same(this.theme.rounding_sm as u8), fill);
-                    painter.rect_stroke(
-                        pad_resp.rect,
-                        CornerRadius::same(this.theme.rounding_sm as u8),
-                        Stroke::new(this.theme.stroke_ui, pad_border),
-                        StrokeKind::Middle,
-                    );
-                    if pad_resp.clicked() {
-                        let mut cs = this.seq.chord_seq.lock().unwrap();
-                        cs.steps[i] = !cs.steps[i];
-                    }
-
-                    // ── Velocity MiniBar ─────────────────────────────────
-                    let mut velocity = this.seq.chord_seq.lock().unwrap().velocities[i];
-                    let mut vel_f = velocity as f32;
-                    let vel_label = format!("{velocity}");
-                    MiniBar::new(
-                        &mut vel_f,
-                        0.0..=127.0,
-                        MiniBarOrientation::Horizontal,
-                        Vec2::new(step_w, 14.0),
-                    )
-                    .fill(this.theme.c(&this.theme.seq_velocity_bar))
-                    .label(vel_label, this.theme.font_micro(), this.theme.c(&this.theme.text_primary))
-                    .show(ui, &this.theme);
-                    let new_vel = vel_f.round().clamp(0.0, 127.0) as u8;
-                    if new_vel != velocity {
-                        this.seq.chord_seq.lock().unwrap().velocities[i] = new_vel;
-                        velocity = new_vel;
-                    }
-                    let _ = velocity;
-
-                    // ── Probability MiniBar ──────────────────────────────
-                    let probability = this.seq.chord_seq.lock().unwrap().probabilities[i];
-                    let mut prob_f = probability as f32;
-                    MiniBar::new(
-                        &mut prob_f,
-                        0.0..=100.0,
-                        MiniBarOrientation::Horizontal,
-                        Vec2::new(step_w, 10.0),
-                    )
-                    .zoned(
-                        50.0,
-                        100.0,
-                        this.theme.c(&this.theme.seq_prob_low),
-                        this.theme.c(&this.theme.seq_prob_mid),
-                        this.theme.c(&this.theme.seq_prob_high),
-                    )
-                    .show(ui, &this.theme);
-                    let new_prob = prob_f.round().clamp(0.0, 100.0) as u8;
-                    if new_prob != probability {
-                        this.seq.chord_seq.lock().unwrap().probabilities[i] = new_prob;
-                    }
-
-                    // ── Octave offset row ────────────────────────────────
-                    // Click left half = -1, right half = +1.
-                    let oct_h = 14.0;
-                    let (oct_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, oct_h), Sense::click());
-                    let or_ = oct_resp.rect;
-                    let oct_t = (oct_off + 2) as f32 / 4.0;
-                    painter.rect_filled(or_, CornerRadius::same(this.theme.rounding_xs as u8), this.theme.c(&this.theme.bg_sunken));
-                    let oct_fill_w = oct_t * or_.width();
-                    painter.rect_filled(
-                        egui::Rect::from_min_size(or_.min, Vec2::new(oct_fill_w, oct_h)),
-                        CornerRadius::same(this.theme.rounding_xs as u8),
-                        this.theme.c(&this.theme.seq_octave_bar),
-                    );
-                    let oct_label = match oct_off {
-                        0 => "oct".to_string(),
-                        n if n > 0 => format!("+{n}"),
-                        n => format!("{n}"),
-                    };
-                    painter.text(
-                        or_.center(),
-                        egui::Align2::CENTER_CENTER,
-                        oct_label,
-                        this.theme.font_micro(),
-                        this.theme.c(&this.theme.text_primary),
-                    );
-                    if oct_resp.clicked() {
-                        if let Some(pos) = oct_resp.interact_pointer_pos() {
-                            let mid = or_.center().x;
-                            let new_off = if pos.x > mid {
-                                (oct_off + 1).min(2)
-                            } else {
-                                (oct_off - 1).max(-2)
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = step_gap;
+                for i in 0..length {
+                    ui.push_id(i, |ui| {
+                        ui.vertical(|ui| {
+                            ui.set_width(step_w);
+                            let (is_on, degree, chord_type, oct_off) = {
+                                let cs = this.seq.chord_seq.lock().unwrap();
+                                (
+                                    cs.steps[i],
+                                    cs.degrees[i],
+                                    cs.chord_types[i],
+                                    cs.octave_offsets[i],
+                                )
                             };
-                            this.seq.chord_seq.lock().unwrap().octave_offsets[i] = new_off;
-                        }
-                    }
+                            let is_current = seq_playing && seq_current_step == i;
+                            let is_rec_cursor = recording && !seq_playing && rec_step == i;
 
-                    // ── Voicing row ──────────────────────────────────────
-                    // Click left = prev inversion, right = next inversion.
-                    // Voice-lead-active variant uses chord_major (green hue)
-                    // for the label; non-VL uses the velocity-bar color so
-                    // the row reads as a velocity sibling.
-                    let voicing_h = 12.0;
-                    let voicing = this.seq.chord_seq.lock().unwrap().voicings[i];
-                    let voice_lead = this.seq.chord_seq.lock().unwrap().voice_lead;
-                    let (v_resp, painter) =
-                        ui.allocate_painter(Vec2::new(step_w, voicing_h), Sense::click());
-                    let v_rect = v_resp.rect;
-                    painter.rect_filled(v_rect, CornerRadius::same(this.theme.rounding_xs as u8), this.theme.c(&this.theme.bg_sunken));
-                    let vcolor = if voice_lead {
-                        this.theme.c(&this.theme.seq_chord_major)
-                    } else {
-                        this.theme.c(&this.theme.seq_velocity_bar)
-                    };
-                    let vlabel = if voice_lead { "VL" } else { voicing.short() };
-                    painter.text(
-                        v_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        vlabel,
-                        this.theme.font_micro(),
-                        vcolor,
-                    );
-                    if v_resp.clicked() && !voice_lead {
-                        if let Some(pos) = v_resp.interact_pointer_pos() {
-                            let next = if pos.x > v_rect.center().x {
-                                voicing.next()
+                            let (bar_resp, painter) = ui.allocate_painter(
+                                Vec2::new(step_w, bar_area_h),
+                                Sense::click_and_drag(),
+                            );
+                            let r = bar_resp.rect;
+                            painter.rect_filled(
+                                r,
+                                CornerRadius::same(this.theme.rounding_sm as u8),
+                                this.theme.c(&this.theme.bg_seq_bar),
+                            );
+                            let t = degree as f32 / 6.0;
+                            let bar_h = (t * (bar_area_h - 4.0)).max(4.0);
+                            let bar_rect = egui::Rect::from_min_size(
+                                egui::pos2(r.min.x + 2.0, r.max.y - bar_h - 2.0),
+                                Vec2::new(step_w - 4.0, bar_h),
+                            );
+                            let quality = chord_quality(scale, degree);
+                            let bar_color = if is_current {
+                                this.theme.c(&this.theme.seq_current)
+                            } else if !is_on {
+                                this.theme.c(&this.theme.seq_note_bar_off)
+                            } else if quality == "m" {
+                                this.theme.c(&this.theme.seq_chord_minor)
+                            } else if quality == "°" {
+                                this.theme.c(&this.theme.seq_chord_dim)
                             } else {
-                                voicing.prev()
+                                this.theme.c(&this.theme.seq_chord_major)
                             };
-                            this.seq.chord_seq.lock().unwrap().voicings[i] = next;
-                        }
-                    }
-                });
-                });
-            }
-        });
+                            painter.rect_filled(
+                                bar_rect,
+                                CornerRadius::same(this.theme.rounding_xs as u8),
+                                bar_color,
+                            );
+                            // Rec cursor border.
+                            if is_rec_cursor {
+                                painter.rect_stroke(
+                                    r,
+                                    CornerRadius::same(this.theme.rounding_sm as u8),
+                                    Stroke::new(
+                                        this.theme.stroke_active,
+                                        this.theme.c(&this.theme.seq_rec_cursor),
+                                    ),
+                                    StrokeKind::Middle,
+                                );
+                            }
+
+                            let cname = chord_name(root, scale, degree);
+                            let primary = this.theme.c(&this.theme.text_primary);
+                            let secondary = this.theme.c(&this.theme.text_secondary);
+                            let disabled = this.theme.c(&this.theme.text_disabled);
+                            painter.text(
+                                egui::pos2(r.center().x, r.min.y + 10.0),
+                                egui::Align2::CENTER_CENTER,
+                                &cname,
+                                this.theme.font_value(),
+                                if is_on { primary } else { secondary },
+                            );
+                            painter.text(
+                                egui::pos2(r.center().x, r.min.y + 22.0),
+                                egui::Align2::CENTER_CENTER,
+                                DEGREE_LABELS[degree],
+                                this.theme.font_micro(),
+                                if is_on { secondary } else { disabled },
+                            );
+                            // Chord type label (bottom of bar). Uses the accent
+                            // family to differentiate from the chord-name and
+                            // degree labels stacked above.
+                            let chord_type_color = if is_on {
+                                this.theme.c(&this.theme.accent_dim)
+                            } else {
+                                disabled
+                            };
+                            painter.text(
+                                egui::pos2(r.center().x, r.max.y - 8.0),
+                                egui::Align2::CENTER_CENTER,
+                                chord_type.label(),
+                                this.theme.font_micro(),
+                                chord_type_color,
+                            );
+
+                            // Left drag: change degree.
+                            if bar_resp.dragged() {
+                                let mut cs = this.seq.chord_seq.lock().unwrap();
+                                cs.drag_accum[i] -= bar_resp.drag_delta().y * 0.6;
+                                let steps = cs.drag_accum[i] as i32;
+                                if steps != 0 {
+                                    cs.drag_accum[i] -= steps as f32;
+                                    cs.degrees[i] = (degree as i32 + steps).clamp(0, 6) as usize;
+                                }
+                            }
+                            if bar_resp.drag_stopped() {
+                                this.seq.chord_seq.lock().unwrap().drag_accum[i] = 0.0;
+                            }
+                            // Scroll wheel: change degree.
+                            if bar_resp.hovered() {
+                                let scroll = ui.input(|inp| inp.smooth_scroll_delta.y);
+                                if scroll != 0.0 {
+                                    let delta = if scroll > 0.0 { 1i32 } else { -1 };
+                                    let mut cs = this.seq.chord_seq.lock().unwrap();
+                                    cs.degrees[i] = (degree as i32 + delta).clamp(0, 6) as usize;
+                                }
+                            }
+                            // Right-click: cycle chord type.
+                            if bar_resp.secondary_clicked() {
+                                use crate::sequencer::ChordType;
+                                let all = ChordType::all();
+                                let cur_idx =
+                                    all.iter().position(|&t| t == chord_type).unwrap_or(0);
+                                let next = all[(cur_idx + 1) % all.len()];
+                                this.seq.chord_seq.lock().unwrap().chord_types[i] = next;
+                            }
+
+                            // ── Step pad (on/off) ────────────────────────────────
+                            let fill = if is_current {
+                                this.theme.c(&this.theme.seq_current)
+                            } else if is_on {
+                                this.theme.c(&this.theme.seq_step_on)
+                            } else {
+                                this.theme.c(&this.theme.seq_step_off)
+                            };
+                            let pad_border = if is_current {
+                                this.theme.c(&this.theme.text_primary)
+                            } else {
+                                this.theme.c(&this.theme.border)
+                            };
+                            let (pad_resp, painter) =
+                                ui.allocate_painter(Vec2::new(step_w, 28.0), Sense::click());
+                            painter.rect_filled(
+                                pad_resp.rect,
+                                CornerRadius::same(this.theme.rounding_sm as u8),
+                                fill,
+                            );
+                            painter.rect_stroke(
+                                pad_resp.rect,
+                                CornerRadius::same(this.theme.rounding_sm as u8),
+                                Stroke::new(this.theme.stroke_ui, pad_border),
+                                StrokeKind::Middle,
+                            );
+                            if pad_resp.clicked() {
+                                let mut cs = this.seq.chord_seq.lock().unwrap();
+                                cs.steps[i] = !cs.steps[i];
+                            }
+
+                            // ── Velocity MiniBar ─────────────────────────────────
+                            let mut velocity = this.seq.chord_seq.lock().unwrap().velocities[i];
+                            let mut vel_f = velocity as f32;
+                            let vel_label = format!("{velocity}");
+                            MiniBar::new(
+                                &mut vel_f,
+                                0.0..=127.0,
+                                MiniBarOrientation::Horizontal,
+                                Vec2::new(step_w, 14.0),
+                            )
+                            .fill(this.theme.c(&this.theme.seq_velocity_bar))
+                            .label(
+                                vel_label,
+                                this.theme.font_micro(),
+                                this.theme.c(&this.theme.text_primary),
+                            )
+                            .show(ui, &this.theme);
+                            let new_vel = vel_f.round().clamp(0.0, 127.0) as u8;
+                            if new_vel != velocity {
+                                this.seq.chord_seq.lock().unwrap().velocities[i] = new_vel;
+                                velocity = new_vel;
+                            }
+                            let _ = velocity;
+
+                            // ── Probability MiniBar ──────────────────────────────
+                            let probability = this.seq.chord_seq.lock().unwrap().probabilities[i];
+                            let mut prob_f = probability as f32;
+                            MiniBar::new(
+                                &mut prob_f,
+                                0.0..=100.0,
+                                MiniBarOrientation::Horizontal,
+                                Vec2::new(step_w, 10.0),
+                            )
+                            .zoned(
+                                50.0,
+                                100.0,
+                                this.theme.c(&this.theme.seq_prob_low),
+                                this.theme.c(&this.theme.seq_prob_mid),
+                                this.theme.c(&this.theme.seq_prob_high),
+                            )
+                            .show(ui, &this.theme);
+                            let new_prob = prob_f.round().clamp(0.0, 100.0) as u8;
+                            if new_prob != probability {
+                                this.seq.chord_seq.lock().unwrap().probabilities[i] = new_prob;
+                            }
+
+                            // ── Octave offset row ────────────────────────────────
+                            // Click left half = -1, right half = +1.
+                            let oct_h = 14.0;
+                            let (oct_resp, painter) =
+                                ui.allocate_painter(Vec2::new(step_w, oct_h), Sense::click());
+                            let or_ = oct_resp.rect;
+                            let oct_t = (oct_off + 2) as f32 / 4.0;
+                            painter.rect_filled(
+                                or_,
+                                CornerRadius::same(this.theme.rounding_xs as u8),
+                                this.theme.c(&this.theme.bg_sunken),
+                            );
+                            let oct_fill_w = oct_t * or_.width();
+                            painter.rect_filled(
+                                egui::Rect::from_min_size(or_.min, Vec2::new(oct_fill_w, oct_h)),
+                                CornerRadius::same(this.theme.rounding_xs as u8),
+                                this.theme.c(&this.theme.seq_octave_bar),
+                            );
+                            let oct_label = match oct_off {
+                                0 => "oct".to_string(),
+                                n if n > 0 => format!("+{n}"),
+                                n => format!("{n}"),
+                            };
+                            painter.text(
+                                or_.center(),
+                                egui::Align2::CENTER_CENTER,
+                                oct_label,
+                                this.theme.font_micro(),
+                                this.theme.c(&this.theme.text_primary),
+                            );
+                            if oct_resp.clicked() {
+                                if let Some(pos) = oct_resp.interact_pointer_pos() {
+                                    let mid = or_.center().x;
+                                    let new_off = if pos.x > mid {
+                                        (oct_off + 1).min(2)
+                                    } else {
+                                        (oct_off - 1).max(-2)
+                                    };
+                                    this.seq.chord_seq.lock().unwrap().octave_offsets[i] = new_off;
+                                }
+                            }
+
+                            // ── Voicing row ──────────────────────────────────────
+                            // Click left = prev inversion, right = next inversion.
+                            // Voice-lead-active variant uses chord_major (green hue)
+                            // for the label; non-VL uses the velocity-bar color so
+                            // the row reads as a velocity sibling.
+                            let voicing_h = 12.0;
+                            let voicing = this.seq.chord_seq.lock().unwrap().voicings[i];
+                            let voice_lead = this.seq.chord_seq.lock().unwrap().voice_lead;
+                            let (v_resp, painter) =
+                                ui.allocate_painter(Vec2::new(step_w, voicing_h), Sense::click());
+                            let v_rect = v_resp.rect;
+                            painter.rect_filled(
+                                v_rect,
+                                CornerRadius::same(this.theme.rounding_xs as u8),
+                                this.theme.c(&this.theme.bg_sunken),
+                            );
+                            let vcolor = if voice_lead {
+                                this.theme.c(&this.theme.seq_chord_major)
+                            } else {
+                                this.theme.c(&this.theme.seq_velocity_bar)
+                            };
+                            let vlabel = if voice_lead { "VL" } else { voicing.short() };
+                            painter.text(
+                                v_rect.center(),
+                                egui::Align2::CENTER_CENTER,
+                                vlabel,
+                                this.theme.font_micro(),
+                                vcolor,
+                            );
+                            if v_resp.clicked() && !voice_lead {
+                                if let Some(pos) = v_resp.interact_pointer_pos() {
+                                    let next = if pos.x > v_rect.center().x {
+                                        voicing.next()
+                                    } else {
+                                        voicing.prev()
+                                    };
+                                    this.seq.chord_seq.lock().unwrap().voicings[i] = next;
+                                }
+                            }
+                        });
+                    });
+                }
+            });
         };
 
         if needs_scroll {

@@ -232,16 +232,36 @@ fn default_rounding_xs() -> f32 {
 fn default_rounding_full() -> f32 {
     999.0
 }
-fn default_key_white_default() -> [u8; 3] { [245, 245, 245] }
-fn default_key_black_default() -> [u8; 3] { [25, 25, 25] }
-fn default_key_white_range() -> [u8; 3] { [230, 240, 245] }
-fn default_key_black_range() -> [u8; 3] { [40, 40, 50] }
-fn default_key_scale_root() -> [u8; 3] { [255, 210, 80] }
-fn default_key_scale_root_dark() -> [u8; 3] { [120, 80, 10] }
-fn default_key_scale_in() -> [u8; 3] { [200, 240, 210] }
-fn default_key_scale_in_dark() -> [u8; 3] { [30, 70, 40] }
-fn default_key_stroke() -> [u8; 3] { [180, 180, 180] }
-fn default_key_label() -> [u8; 3] { [140, 140, 140] }
+fn default_key_white_default() -> [u8; 3] {
+    [245, 245, 245]
+}
+fn default_key_black_default() -> [u8; 3] {
+    [25, 25, 25]
+}
+fn default_key_white_range() -> [u8; 3] {
+    [230, 240, 245]
+}
+fn default_key_black_range() -> [u8; 3] {
+    [40, 40, 50]
+}
+fn default_key_scale_root() -> [u8; 3] {
+    [255, 210, 80]
+}
+fn default_key_scale_root_dark() -> [u8; 3] {
+    [120, 80, 10]
+}
+fn default_key_scale_in() -> [u8; 3] {
+    [200, 240, 210]
+}
+fn default_key_scale_in_dark() -> [u8; 3] {
+    [30, 70, 40]
+}
+fn default_key_stroke() -> [u8; 3] {
+    [180, 180, 180]
+}
+fn default_key_label() -> [u8; 3] {
+    [140, 140, 140]
+}
 
 impl SynthTheme {
     // ── Color helpers ────────────────────────────────────────────────────────
@@ -261,7 +281,11 @@ impl SynthTheme {
         let [r, g, b] = self.bg_app;
         let lin = |c: u8| {
             let c = c as f32 / 255.0;
-            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055_f32).powf(2.4) }
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055_f32).powf(2.4)
+            }
         };
         0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.3
     }
@@ -562,10 +586,10 @@ pub fn midnight() -> SynthTheme {
         meter_green: [0, 200, 80],
         meter_clip: [255, 50, 30],
 
-        osc_preview_line:   [0, 210, 140],
+        osc_preview_line: [0, 210, 140],
 
-        filter_curve_line:  [0, 210, 140],
-        filter_curve_grid:  [0, 140, 90, 80],
+        filter_curve_line: [0, 210, 140],
+        filter_curve_grid: [0, 140, 90, 80],
         filter_curve_label: [0, 200, 130, 160],
 
         adsr_fill: [0, 160, 100, 30],
@@ -573,9 +597,9 @@ pub fn midnight() -> SynthTheme {
         adsr_label: [80, 160, 110, 180],
         adsr_cursor: [0, 255, 160],
 
-        accent_beat:    [ 80, 155, 215], // steel blue — sub-beat pulse dot
-        transport_stop: [220,  70,  55], // vivid red — stop / panic
-        transport_rec:  [220,  60,  50], // slightly deeper red — recording active
+        accent_beat: [80, 155, 215],   // steel blue — sub-beat pulse dot
+        transport_stop: [220, 70, 55], // vivid red — stop / panic
+        transport_rec: [220, 60, 50],  // slightly deeper red — recording active
 
         latency_ok: [0, 180, 120],
         latency_warn: [200, 180, 0],
@@ -696,9 +720,9 @@ pub fn winamp_classic() -> SynthTheme {
         adsr_label: [80, 160, 80, 180],
         adsr_cursor: [0, 255, 0],
 
-        accent_beat:    [ 90, 165, 225], // bright steel blue
-        transport_stop: [255,  90,  70], // hot red — passes AA on dark Winamp bar
-        transport_rec:  [255,  80,  60],
+        accent_beat: [90, 165, 225],   // bright steel blue
+        transport_stop: [255, 90, 70], // hot red — passes AA on dark Winamp bar
+        transport_rec: [255, 80, 60],
 
         latency_ok: [0, 200, 0],
         latency_warn: [220, 200, 0],
@@ -707,10 +731,10 @@ pub fn winamp_classic() -> SynthTheme {
         patch_browser_model: [150, 200, 60],
         patch_load_fx_on: [255, 200, 0],
 
-        osc_preview_line:   [0, 220, 0],
+        osc_preview_line: [0, 220, 0],
 
-        filter_curve_line:  [0, 220, 0],
-        filter_curve_grid:  [0, 140, 0, 80],
+        filter_curve_line: [0, 220, 0],
+        filter_curve_grid: [0, 140, 0, 80],
         filter_curve_label: [0, 200, 0, 160],
 
         midi_connected: [0, 230, 0],
@@ -749,124 +773,124 @@ pub fn classic() -> SynthTheme {
         name: "Mars Sand".into(),
 
         // ── Surfaces — neutral warm sand, enough contrast between layers ─────
-        bg_app:     [198, 192, 178], // room walls — grey-sand, not orange
+        bg_app: [198, 192, 178],     // room walls — grey-sand, not orange
         bg_surface: [215, 210, 196], // instrument panel face (raised, lighter)
-        bg_sunken:  [178, 172, 158], // recessed inputs — clearly darker
-        bg_bar:     [192, 186, 172], // toolbars / transport strips
+        bg_sunken: [178, 172, 158],  // recessed inputs — clearly darker
+        bg_bar: [192, 186, 172],     // toolbars / transport strips
 
-        border:       [152, 142, 125], // machined seam — visible but not harsh
-        border_focus: [120,  81,  28], // amber-brown lit edge — 3.63:1 on bg_bar (WCAG non-text 3:1)
+        border: [152, 142, 125],     // machined seam — visible but not harsh
+        border_focus: [120, 81, 28], // amber-brown lit edge — 3.63:1 on bg_bar (WCAG non-text 3:1)
 
         // ── Text — strong contrast on sand panels ────────────────────────────
-        text_primary:   [ 22,  16,   9], // near-black warm ink (maximum contrast)
-        text_secondary: [ 62,  50,  34], // dark warm brown — readable secondary
-        text_disabled:  [125, 110,  88], // muted but legible
+        text_primary: [22, 16, 9], // near-black warm ink (maximum contrast)
+        text_secondary: [62, 50, 34], // dark warm brown — readable secondary
+        text_disabled: [125, 110, 88], // muted but legible
         text_on_accent: [235, 220, 190], // light cream on dark amber fill — 6.73:1 WCAG AA
 
         // ── Main accent — deep amber; WCAG AA on bg_bar/bg_app/bg_surface ──────
         // Knob arcs use separate brighter tokens so decorative indicators stay vivid.
-        accent:     [ 98,  66,  16], // deep amber — 4.71:1 on bg_bar, 6.03:1 on bg_surface
-        accent_dim: [ 72,  48,  11], // dimmed (proportional, 6.38:1 on bg_bar)
+        accent: [98, 66, 16], // deep amber — 4.71:1 on bg_bar, 6.03:1 on bg_surface
+        accent_dim: [72, 48, 11], // dimmed (proportional, 6.38:1 on bg_bar)
 
-        knob_tier1_arc: [220, 155,  45], // bright amber arc — decorator, no text contrast req.
-        knob_tier2_arc: [178, 125,  35],
-        knob_tier3_arc: [135,  96,  30],
+        knob_tier1_arc: [220, 155, 45], // bright amber arc — decorator, no text contrast req.
+        knob_tier2_arc: [178, 125, 35],
+        knob_tier3_arc: [135, 96, 30],
 
         // ── Secondary accents — muted tape-label hues ────────────────────────
-        accent_hard_sync: [142,  90, 162], // dusty violet
-        accent_fm:        [ 82, 132, 158], // muted steel blue
-        accent_ring:      [162, 132,  78], // warm tan-gold
-        accent_hold:      [172, 102,  78], // terracotta
-        accent_walker:    [118, 152,  90], // dusty sage
-        accent_limiter:   [178,  95,  68], // burnt orange
+        accent_hard_sync: [142, 90, 162], // dusty violet
+        accent_fm: [82, 132, 158],        // muted steel blue
+        accent_ring: [162, 132, 78],      // warm tan-gold
+        accent_hold: [172, 102, 78],      // terracotta
+        accent_walker: [118, 152, 90],    // dusty sage
+        accent_limiter: [178, 95, 68],    // burnt orange
 
         // ── FX — desaturated, colour-coded panel labels ──────────────────────
-        fx_overdrive:    [185, 118,  55], // warm orange
-        fx_distortion:   [178,  82,  65], // muted red
-        fx_chorus:       [142, 112,  72], // warm olive
-        fx_delay:        [115, 142,  80], // muted sage
-        fx_reverb:       [ 78, 118, 145], // steel blue
-        fx_shimmer:      [ 95, 142, 158], // powder blue
-        fx_crystallizer: [158, 125,  78], // warm sand-gold
+        fx_overdrive: [185, 118, 55],    // warm orange
+        fx_distortion: [178, 82, 65],    // muted red
+        fx_chorus: [142, 112, 72],       // warm olive
+        fx_delay: [115, 142, 80],        // muted sage
+        fx_reverb: [78, 118, 145],       // steel blue
+        fx_shimmer: [95, 142, 158],      // powder blue
+        fx_crystallizer: [158, 125, 78], // warm sand-gold
 
         // ── Sequencer — amber lit on warm mid-tan off ────────────────────────
-        seq_step_on:      [212, 152,  45], // amber lit step
-        seq_step_off:     [168, 158, 140], // warm mid-tan button
-        seq_current:      [225, 175,  58], // bright amber playhead
-        seq_note_bar_on:  [132, 102,  38], // dark amber bar
+        seq_step_on: [212, 152, 45],       // amber lit step
+        seq_step_off: [168, 158, 140],     // warm mid-tan button
+        seq_current: [225, 175, 58],       // bright amber playhead
+        seq_note_bar_on: [132, 102, 38],   // dark amber bar
         seq_note_bar_off: [152, 142, 122], // warm mid-tone off
-        seq_chord_major:  [100,  80,  28], // deep amber
-        seq_chord_minor:  [ 60,  82, 112], // muted slate blue
-        seq_chord_dim:    [102,  58,  45], // muted rust
-        seq_kb_major:     [ 68,  55,  25], // very dark amber
-        seq_kb_minor:     [ 42,  56,  80], // dark slate
-        seq_kb_dim:       [ 72,  42,  32], // dark rust
-        seq_velocity_bar: [182, 142,  48], // amber velocity
-        seq_prob_low:     [138, 112,  78], // warm tan low
-        seq_prob_mid:     [178, 142,  50], // amber mid
-        seq_prob_high:    [212, 162,  44], // bright amber high
-        seq_rec_cursor:   [188,  82,  68], // muted red-orange record
-        seq_octave_bar:   [155, 115,  44], // amber octave
+        seq_chord_major: [100, 80, 28],    // deep amber
+        seq_chord_minor: [60, 82, 112],    // muted slate blue
+        seq_chord_dim: [102, 58, 45],      // muted rust
+        seq_kb_major: [68, 55, 25],        // very dark amber
+        seq_kb_minor: [42, 56, 80],        // dark slate
+        seq_kb_dim: [72, 42, 32],          // dark rust
+        seq_velocity_bar: [182, 142, 48],  // amber velocity
+        seq_prob_low: [138, 112, 78],      // warm tan low
+        seq_prob_mid: [178, 142, 50],      // amber mid
+        seq_prob_high: [212, 162, 44],     // bright amber high
+        seq_rec_cursor: [188, 82, 68],     // muted red-orange record
+        seq_octave_bar: [155, 115, 44],    // amber octave
 
         // ── Piano keys — clean ivory and ebony ───────────────────────────────
-        key_white_pressed:   [212, 152,  44], // amber glow (= accent)
-        key_black_pressed:   [132,  98,  28], // dark amber
-        key_white_default:   [238, 230, 215], // clean ivory
-        key_black_default:   [ 35,  26,  16], // dark ebony
-        key_white_range:     [215, 205, 188], // ivory in range
-        key_black_range:     [ 55,  43,  26], // ebony in range
-        key_scale_root:      [212, 152,  44], // amber root
-        key_scale_root_dark: [105,  78,  25], // dark amber root
-        key_scale_in:        [195, 180, 155], // warm tan in-scale
-        key_scale_in_dark:   [ 65,  50,  30], // dark tan in-scale
-        key_stroke:          [160, 140, 115], // warm separator
-        key_label:           [118,  96,  70], // warm label text
+        key_white_pressed: [212, 152, 44],  // amber glow (= accent)
+        key_black_pressed: [132, 98, 28],   // dark amber
+        key_white_default: [238, 230, 215], // clean ivory
+        key_black_default: [35, 26, 16],    // dark ebony
+        key_white_range: [215, 205, 188],   // ivory in range
+        key_black_range: [55, 43, 26],      // ebony in range
+        key_scale_root: [212, 152, 44],     // amber root
+        key_scale_root_dark: [105, 78, 25], // dark amber root
+        key_scale_in: [195, 180, 155],      // warm tan in-scale
+        key_scale_in_dark: [65, 50, 30],    // dark tan in-scale
+        key_stroke: [160, 140, 115],        // warm separator
+        key_label: [118, 96, 70],           // warm label text
 
         // ── Scope/OSC/EQ/Filter — all CRT surfaces use the icon palette ──────
         // Dark blue-grey bg [14,18,28] + mint beam, matching the pixel-art icon.
-        scope_bg:         [ 14,  18,  28], // icon screen bg
-        scope_zero:       [ 26,  30,  46], // slightly lighter zero line
-        scope_glow_outer: [ 75, 180, 130,  12], // barely-there mint haze
-        scope_glow_mid:   [142, 222, 170,  50], // aqua mid-glow
-        scope_glow_core:  [195, 245, 208, 240], // near-white mint beam core
-        scope_label:      [ 80, 148, 108],       // muted mint label
+        scope_bg: [14, 18, 28],                // icon screen bg
+        scope_zero: [26, 30, 46],              // slightly lighter zero line
+        scope_glow_outer: [75, 180, 130, 12],  // barely-there mint haze
+        scope_glow_mid: [142, 222, 170, 50],   // aqua mid-glow
+        scope_glow_core: [195, 245, 208, 240], // near-white mint beam core
+        scope_label: [80, 148, 108],           // muted mint label
 
         // ── Meters — dark olive face, warm sage bar (panel instrument, not CRT)
-        meter_bg:    [ 45,  38,  28], // dark olive
-        meter_green: [140, 178,  82], // warm sage
-        meter_clip:  [192,  78,  58], // coral red
+        meter_bg: [45, 38, 28],      // dark olive
+        meter_green: [140, 178, 82], // warm sage
+        meter_clip: [192, 78, 58],   // coral red
 
         // ── ADSR — icon mint on dark CRT bg (same palette as scope) ──────────
-        adsr_fill:    [152, 102,  25,  45], // amber fill, semi-transparent
-        adsr_outline: [220, 155,  45      ], // bright amber outline
-        adsr_label:   [220, 155,  45, 160], // amber labels, soft
-        adsr_cursor:  [220, 155,  45      ], // amber cursor
+        adsr_fill: [152, 102, 25, 45],   // amber fill, semi-transparent
+        adsr_outline: [220, 155, 45],    // bright amber outline
+        adsr_label: [220, 155, 45, 160], // amber labels, soft
+        adsr_cursor: [220, 155, 45],     // amber cursor
 
         // ── Transport / global bar ───────────────────────────────────────────
-        accent_beat:    [ 35,  68, 128], // dark ink blue — 4.91:1 on sandy bg_bar
-        transport_stop: [140,  28,  22], // dark red — 4.74:1 on bg_bar
-        transport_rec:  [140,  28,  22], // same — recording uses same danger red
+        accent_beat: [35, 68, 128], // dark ink blue — 4.91:1 on sandy bg_bar
+        transport_stop: [140, 28, 22], // dark red — 4.74:1 on bg_bar
+        transport_rec: [140, 28, 22], // same — recording uses same danger red
 
         // ── Status ───────────────────────────────────────────────────────────
-        latency_ok:   [ 42,  80,  25], // dark sage green — 4.81:1 on bg_bar
-        latency_warn: [ 98,  66,  16], // dark amber (= accent) — 4.71:1 on bg_bar
-        latency_bad:  [130,  40,  30], // dark red — 4.78:1 on bg_bar
+        latency_ok: [42, 80, 25],   // dark sage green — 4.81:1 on bg_bar
+        latency_warn: [98, 66, 16], // dark amber (= accent) — 4.71:1 on bg_bar
+        latency_bad: [130, 40, 30], // dark red — 4.78:1 on bg_bar
 
-        patch_browser_model: [ 82, 132, 158], // muted steel blue
-        patch_load_fx_on:    [212, 145,  38], // amber
+        patch_browser_model: [82, 132, 158], // muted steel blue
+        patch_load_fx_on: [212, 145, 38],    // amber
 
-        osc_preview_line:   [220, 155,  45],       // amber — matches filter curve
+        osc_preview_line: [220, 155, 45], // amber — matches filter curve
 
-        filter_curve_line:  [220, 155,  45],       // bright amber — filter curve
-        filter_curve_grid:  [152, 102,  25,  80],  // dark amber grid, translucent
-        filter_curve_label: [220, 155,  45, 160],  // amber labels, soft
+        filter_curve_line: [220, 155, 45], // bright amber — filter curve
+        filter_curve_grid: [152, 102, 25, 80], // dark amber grid, translucent
+        filter_curve_label: [220, 155, 45, 160], // amber labels, soft
 
         midi_connected: [142, 220, 168], // icon mint (signal dot = screen)
 
         // ── Legacy panel bg tokens ───────────────────────────────────────────
-        bg_panel:   [188, 180, 165], // mid-sand panel
+        bg_panel: [188, 180, 165],   // mid-sand panel
         bg_seq_bar: [208, 202, 188], // lighter sand seq bar
-        bg_adsr:    [ 14,  18,  28], // dark CRT bg — same as scope_bg
+        bg_adsr: [14, 18, 28],       // dark CRT bg — same as scope_bg
 
         sp_xxs: g.sp_xxs,
         sp_xs: g.sp_xs,
@@ -973,9 +997,9 @@ pub fn phosphor() -> SynthTheme {
         adsr_label: [60, 180, 100, 180],
         adsr_cursor: [40, 255, 140],
 
-        accent_beat:    [ 80, 155, 215], // steel blue — sub-beat dot on dark green bg
-        transport_stop: [220,  70,  55], // vivid red
-        transport_rec:  [220,  60,  50],
+        accent_beat: [80, 155, 215], // steel blue — sub-beat dot on dark green bg
+        transport_stop: [220, 70, 55], // vivid red
+        transport_rec: [220, 60, 50],
 
         latency_ok: [20, 220, 100],
         latency_warn: [200, 220, 40],
@@ -984,10 +1008,10 @@ pub fn phosphor() -> SynthTheme {
         patch_browser_model: [80, 255, 180],
         patch_load_fx_on: [220, 255, 60],
 
-        osc_preview_line:   [30, 255, 120],
+        osc_preview_line: [30, 255, 120],
 
-        filter_curve_line:  [30, 255, 120],
-        filter_curve_grid:  [20, 160,  70,  80],
+        filter_curve_line: [30, 255, 120],
+        filter_curve_grid: [20, 160, 70, 80],
         filter_curve_label: [30, 220, 100, 160],
 
         midi_connected: [30, 255, 120],

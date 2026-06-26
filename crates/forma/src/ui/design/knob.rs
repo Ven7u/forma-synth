@@ -25,9 +25,9 @@ fn label_font(size: KnobSize, theme: &SynthTheme) -> FontId {
 
 fn value_font(size: KnobSize, theme: &SynthTheme) -> FontId {
     match size {
-        KnobSize::Large => theme.font_value(),         // 11 pt mono
-        KnobSize::Standard => FontId::monospace(9.0),  // 9 pt mono
-        KnobSize::Small => FontId::monospace(8.0),     // 8 pt mono — below font_micro by design
+        KnobSize::Large => theme.font_value(),        // 11 pt mono
+        KnobSize::Standard => FontId::monospace(9.0), // 9 pt mono
+        KnobSize::Small => FontId::monospace(8.0),    // 8 pt mono — below font_micro by design
     }
 }
 
@@ -82,10 +82,7 @@ pub fn knob(
     let (rect, mut response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
 
     let knob_radius = size.radius();
-    let center = Pos2::new(
-        rect.center().x,
-        rect.top() + knob_center_y_offset(size),
-    );
+    let center = Pos2::new(rect.center().x, rect.top() + knob_center_y_offset(size));
 
     let old_value = *value;
 

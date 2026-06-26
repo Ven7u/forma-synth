@@ -59,9 +59,11 @@ pub fn toggle_button(
     let min = size.min_rect();
     // Content-driven width: widen if the label needs it, but never shrink.
     let font = size.font(theme);
-    let galley =
-        ui.painter()
-            .layout_no_wrap(label.to_string(), font.clone(), theme.c(&theme.text_primary));
+    let galley = ui.painter().layout_no_wrap(
+        label.to_string(),
+        font.clone(),
+        theme.c(&theme.text_primary),
+    );
     let desired_w = (galley.size().x + theme.sp_md * 2.0).max(min.x);
     let desired = Vec2::new(desired_w, min.y);
 

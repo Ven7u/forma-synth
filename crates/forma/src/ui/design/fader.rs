@@ -99,12 +99,8 @@ pub fn fader(
     let pointer_to_value = |p: Pos2| -> f32 {
         let t = match orientation {
             // Vertical: bottom = min, top = max.
-            FaderOrientation::Vertical => {
-                ((rect.bottom() - p.y) / axis_len).clamp(0.0, 1.0)
-            }
-            FaderOrientation::Horizontal => {
-                ((p.x - rect.left()) / axis_len).clamp(0.0, 1.0)
-            }
+            FaderOrientation::Vertical => ((rect.bottom() - p.y) / axis_len).clamp(0.0, 1.0),
+            FaderOrientation::Horizontal => ((p.x - rect.left()) / axis_len).clamp(0.0, 1.0),
         };
         *range.start() + t * span
     };
@@ -193,7 +189,10 @@ pub fn fader(
             FaderOrientation::Vertical => {
                 let cy = rect.bottom() - axis_len * t;
                 // Clamp so thumb stays inside the rect at extremes.
-                let cy = cy.clamp(rect.top() + thumb_extent * 0.5, rect.bottom() - thumb_extent * 0.5);
+                let cy = cy.clamp(
+                    rect.top() + thumb_extent * 0.5,
+                    rect.bottom() - thumb_extent * 0.5,
+                );
                 Rect::from_center_size(
                     Pos2::new(rect.center().x, cy),
                     Vec2::new(TRACK_WIDTH + 4.0, thumb_extent),
@@ -201,7 +200,10 @@ pub fn fader(
             }
             FaderOrientation::Horizontal => {
                 let cx = rect.left() + axis_len * t;
-                let cx = cx.clamp(rect.left() + thumb_extent * 0.5, rect.right() - thumb_extent * 0.5);
+                let cx = cx.clamp(
+                    rect.left() + thumb_extent * 0.5,
+                    rect.right() - thumb_extent * 0.5,
+                );
                 Rect::from_center_size(
                     Pos2::new(cx, rect.center().y),
                     Vec2::new(thumb_extent, TRACK_WIDTH + 4.0),

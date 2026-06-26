@@ -175,8 +175,8 @@ impl<'a> MiniBar<'a> {
                                 ((rect.bottom() - p.y) / rect.height()).clamp(0.0, 1.0)
                             }
                         };
-                        *self.value =
-                            (*self.range.start() + t * span).clamp(*self.range.start(), *self.range.end());
+                        *self.value = (*self.range.start() + t * span)
+                            .clamp(*self.range.start(), *self.range.end());
                     }
                 }
             }

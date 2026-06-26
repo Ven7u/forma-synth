@@ -26,7 +26,7 @@ pub enum PianoSize {
 impl PianoSize {
     pub fn white_key_height(self) -> f32 {
         match self {
-            Self::Full    => 64.0,
+            Self::Full => 64.0,
             Self::Preview => 36.0,
         }
     }
@@ -127,23 +127,22 @@ pub fn piano(
     key_state: &dyn Fn(u8) -> KeyVisualState,
     theme: &SynthTheme,
 ) -> PianoResult {
-    let white_h  = config.size.white_key_height();
-    let black_h  = white_h * 0.60;
+    let white_h = config.size.white_key_height();
+    let black_h = white_h * 0.60;
     let num_white = count_white_keys_in(config.first_midi, config.last_midi);
-    let avail_w   = ui.available_width();
-    let white_w   = (avail_w / num_white as f32).max(6.0);
-    let black_w   = white_w * 0.62;
-    let total_w   = white_w * num_white as f32;
+    let avail_w = ui.available_width();
+    let white_w = (avail_w / num_white as f32).max(6.0);
+    let black_w = white_w * 0.62;
+    let total_w = white_w * num_white as f32;
 
     let sense = if config.interactive {
         Sense::click_and_drag()
     } else {
         Sense::hover()
     };
-    let (resp, painter) =
-        ui.allocate_painter(Vec2::new(total_w, white_h + 4.0), sense);
-    let origin       = resp.rect.left_top();
-    let pointer_pos  = resp.interact_pointer_pos();
+    let (resp, painter) = ui.allocate_painter(Vec2::new(total_w, white_h + 4.0), sense);
+    let origin = resp.rect.left_top();
+    let pointer_pos = resp.interact_pointer_pos();
     let mut pointer_midi: Option<u8> = None;
 
     let rounding_white = CornerRadius::same(theme.rounding_xs as u8);
@@ -151,11 +150,14 @@ pub fn piano(
     let rounding_black = CornerRadius::same((theme.rounding_xs * 0.5) as u8);
     // Hairline dividers between adjacent white keys — intentionally thinner
     // than stroke_ui to avoid visual clutter at narrow key widths.
-    let sep_stroke  = Stroke::new(theme.stroke_ui * 0.5, theme.c(&theme.key_stroke));
-    let accent      = theme.c(&theme.accent);
-    let label_col   = theme.c(&theme.key_label);
-    let label_size  = if white_w > 12.0 {
-        match config.size { PianoSize::Full => 8.0, PianoSize::Preview => 7.0 }
+    let sep_stroke = Stroke::new(theme.stroke_ui * 0.5, theme.c(&theme.key_stroke));
+    let accent = theme.c(&theme.accent);
+    let label_col = theme.c(&theme.key_label);
+    let label_size = if white_w > 12.0 {
+        match config.size {
+            PianoSize::Full => 8.0,
+            PianoSize::Preview => 7.0,
+        }
     } else {
         6.0
     };
@@ -203,11 +205,8 @@ pub fn piano(
         if is_white_key(midi) || midi == 0 || !is_white_key(midi - 1) {
             continue;
         }
-        let x    = white_key_x[(midi - 1) as usize] + white_w * 0.6;
-        let rect = Rect::from_min_size(
-            origin + Vec2::new(x, 1.0),
-            Vec2::new(black_w, black_h),
-        );
+        let x = white_key_x[(midi - 1) as usize] + white_w * 0.6;
+        let rect = Rect::from_min_size(origin + Vec2::new(x, 1.0), Vec2::new(black_w, black_h));
 
         let state = key_state(midi);
         painter.rect_filled(rect, rounding_black, state.black_fill(theme));
@@ -221,7 +220,7 @@ pub fn piano(
 
     // ── Pass 3: range bracket bar ────────────────────────────────────────────
     if let Some((bar_start, bar_end)) = config.range_bar {
-        let mut range_left  = f32::MAX;
+        let mut range_left = f32::MAX;
         let mut range_right = 0.0_f32;
         for midi in bar_start..bar_end.min(config.last_midi + 1) {
             if midi < config.first_midi {
@@ -229,11 +228,11 @@ pub fn piano(
             }
             if is_white_key(midi) {
                 let x = white_key_x[midi as usize];
-                range_left  = range_left.min(x);
+                range_left = range_left.min(x);
                 range_right = range_right.max(x + white_w);
             } else if midi > 0 && is_white_key(midi - 1) {
                 let x = white_key_x[(midi - 1) as usize] + white_w * 0.6;
-                range_left  = range_left.min(x);
+                range_left = range_left.min(x);
                 range_right = range_right.max(x + black_w);
             }
         }
@@ -246,5 +245,8 @@ pub fn piano(
         }
     }
 
-    PianoResult { response: resp, pointer_midi }
+    PianoResult {
+        response: resp,
+        pointer_midi,
+    }
 }

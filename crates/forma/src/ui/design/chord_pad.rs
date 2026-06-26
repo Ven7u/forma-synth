@@ -23,12 +23,12 @@ pub enum ChordQuality {
 
 /// Visual state borrowed for a single render call.
 pub struct ChordPadState<'a> {
-    pub quality:    ChordQuality,
+    pub quality: ChordQuality,
     pub chord_name: &'a str,
-    pub degree:     &'a str,
-    pub key_hint:   &'a str,
-    pub held:       bool,
-    pub editing:    bool,
+    pub degree: &'a str,
+    pub key_hint: &'a str,
+    pub held: bool,
+    pub editing: bool,
 }
 
 /// Map the suffix returned by `chord_quality()` to a `ChordQuality`.
@@ -37,15 +37,15 @@ pub fn parse_quality(s: &str) -> ChordQuality {
     match s {
         "m" => ChordQuality::Minor,
         "°" => ChordQuality::Diminished,
-        _   => ChordQuality::Major,
+        _ => ChordQuality::Major,
     }
 }
 
 /// Return the theme color that represents a chord quality.
 pub fn quality_color(quality: ChordQuality, theme: &SynthTheme) -> Color32 {
     match quality {
-        ChordQuality::Major      => theme.c(&theme.accent),
-        ChordQuality::Minor      => theme.c(&theme.accent_fm),
+        ChordQuality::Major => theme.c(&theme.accent),
+        ChordQuality::Minor => theme.c(&theme.accent_fm),
         ChordQuality::Diminished => theme.c(&theme.seq_rec_cursor),
     }
 }
@@ -96,7 +96,12 @@ pub fn chord_pad(
     } else {
         (t.stroke_ui, qcol)
     };
-    painter.rect_stroke(r, rounding, Stroke::new(stroke_w, stroke_col), StrokeKind::Middle);
+    painter.rect_stroke(
+        r,
+        rounding,
+        Stroke::new(stroke_w, stroke_col),
+        StrokeKind::Middle,
+    );
 
     // ── Text ────────────────────────────────────────────────────────────────
     painter.text(

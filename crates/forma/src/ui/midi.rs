@@ -7,8 +7,8 @@ impl SynthApp {
     pub fn ui_midi_panel(&mut self, ui: &mut egui::Ui) {
         let text_sec = self.theme.c(&self.theme.text_secondary);
         let text_dis = self.theme.c(&self.theme.text_disabled);
-        let accent   = self.theme.c(&self.theme.accent);
-        let sp_xxs   = self.theme.sp_xxs;
+        let accent = self.theme.c(&self.theme.accent);
+        let sp_xxs = self.theme.sp_xxs;
 
         SynthFrame::section(&self.theme).show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -70,9 +70,7 @@ impl SynthApp {
                     };
                     ui.label(egui::RichText::new(dot).color(dot_col).small());
                 } else {
-                    ui.label(
-                        egui::RichText::new("No MIDI devices found").weak().small(),
-                    );
+                    ui.label(egui::RichText::new("No MIDI devices found").weak().small());
                 }
             });
         });

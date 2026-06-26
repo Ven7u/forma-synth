@@ -45,17 +45,17 @@ impl Group {
 
     fn label(self) -> &'static str {
         match self {
-            Group::Surfaces  => "Surfaces",
-            Group::Text      => "Text",
-            Group::Accent    => "Accent",
-            Group::FxColors  => "FX Colors",
+            Group::Surfaces => "Surfaces",
+            Group::Text => "Text",
+            Group::Accent => "Accent",
+            Group::FxColors => "FX Colors",
             Group::Sequencer => "Sequencer",
             Group::PianoKeys => "Piano Keys",
-            Group::Scope     => "Scope",
-            Group::Meters    => "Meters",
-            Group::Adsr      => "ADSR",
-            Group::Status    => "Status",
-            Group::Geometry  => "Geometry",
+            Group::Scope => "Scope",
+            Group::Meters => "Meters",
+            Group::Adsr => "ADSR",
+            Group::Status => "Status",
+            Group::Geometry => "Geometry",
         }
     }
 }
@@ -71,7 +71,10 @@ struct EditorState {
 
 impl Default for EditorState {
     fn default() -> Self {
-        Self { group: Group::Surfaces, copy_from_idx: 0 }
+        Self {
+            group: Group::Surfaces,
+            copy_from_idx: 0,
+        }
     }
 }
 
@@ -92,7 +95,11 @@ fn save_state(ctx: &Context, s: EditorState) {
 fn color_row(ui: &mut Ui, label: &str, token: &mut [u8; 3]) {
     ui.horizontal(|ui| {
         ui.color_edit_button_srgb(token);
-        ui.label(RichText::new(label).size(11.0).color(Color32::from_gray(200)));
+        ui.label(
+            RichText::new(label)
+                .size(11.0)
+                .color(Color32::from_gray(200)),
+        );
     });
 }
 
@@ -100,14 +107,22 @@ fn color_row(ui: &mut Ui, label: &str, token: &mut [u8; 3]) {
 fn color_row_rgba(ui: &mut Ui, label: &str, token: &mut [u8; 4]) {
     ui.horizontal(|ui| {
         ui.color_edit_button_srgba_unmultiplied(token);
-        ui.label(RichText::new(label).size(11.0).color(Color32::from_gray(200)));
+        ui.label(
+            RichText::new(label)
+                .size(11.0)
+                .color(Color32::from_gray(200)),
+        );
     });
 }
 
 /// Render a sub-section label styled as a dim separator.
 fn sub_label(ui: &mut Ui, text: &str) {
     ui.add_space(6.0);
-    ui.label(RichText::new(text).size(10.0).color(Color32::from_gray(100)));
+    ui.label(
+        RichText::new(text)
+            .size(10.0)
+            .color(Color32::from_gray(100)),
+    );
     ui.add_space(2.0);
 }
 
@@ -241,30 +256,124 @@ fn group_status(ui: &mut Ui, t: &mut SynthTheme) {
 
 fn group_geometry(ui: &mut Ui, t: &mut SynthTheme) {
     sub_label(ui, "Spacing");
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_xxs, 0.0..=8.0).text("sp_xxs").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_xs,  0.0..=12.0).text("sp_xs").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_sm,  0.0..=16.0).text("sp_sm").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_md,  0.0..=24.0).text("sp_md").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_lg,  0.0..=32.0).text("sp_lg").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_xl,  0.0..=48.0).text("sp_xl").step_by(1.0)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.sp_xxl, 0.0..=80.0).text("sp_xxl").step_by(1.0)); });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_xxs, 0.0..=8.0)
+                .text("sp_xxs")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_xs, 0.0..=12.0)
+                .text("sp_xs")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_sm, 0.0..=16.0)
+                .text("sp_sm")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_md, 0.0..=24.0)
+                .text("sp_md")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_lg, 0.0..=32.0)
+                .text("sp_lg")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_xl, 0.0..=48.0)
+                .text("sp_xl")
+                .step_by(1.0),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.sp_xxl, 0.0..=80.0)
+                .text("sp_xxl")
+                .step_by(1.0),
+        );
+    });
     sub_label(ui, "Rounding");
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.rounding_xs,   0.0..=8.0).text("rounding_xs").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.rounding_sm,   0.0..=12.0).text("rounding_sm").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.rounding_md,   0.0..=16.0).text("rounding_md").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.rounding_lg,   0.0..=24.0).text("rounding_lg").step_by(0.5)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.rounding_full, 0.0..=64.0).text("rounding_full").step_by(1.0)); });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.rounding_xs, 0.0..=8.0)
+                .text("rounding_xs")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.rounding_sm, 0.0..=12.0)
+                .text("rounding_sm")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.rounding_md, 0.0..=16.0)
+                .text("rounding_md")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.rounding_lg, 0.0..=24.0)
+                .text("rounding_lg")
+                .step_by(0.5),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.rounding_full, 0.0..=64.0)
+                .text("rounding_full")
+                .step_by(1.0),
+        );
+    });
     sub_label(ui, "Strokes");
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.stroke_ui,     0.0..=4.0).text("stroke_ui").step_by(0.25)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.stroke_focus,  0.0..=4.0).text("stroke_focus").step_by(0.25)); });
-    ui.horizontal(|ui| { ui.add(egui::Slider::new(&mut t.stroke_active, 0.0..=4.0).text("stroke_active").step_by(0.25)); });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.stroke_ui, 0.0..=4.0)
+                .text("stroke_ui")
+                .step_by(0.25),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.stroke_focus, 0.0..=4.0)
+                .text("stroke_focus")
+                .step_by(0.25),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::Slider::new(&mut t.stroke_active, 0.0..=4.0)
+                .text("stroke_active")
+                .step_by(0.25),
+        );
+    });
 }
 
 // ─── Top bar ─────────────────────────────────────────────────────────────────
 
 fn top_bar(ui: &mut Ui, theme: &mut SynthTheme, state: &mut EditorState) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Name").size(11.0).color(Color32::from_gray(160)));
+        ui.label(
+            RichText::new("Name")
+                .size(11.0)
+                .color(Color32::from_gray(160)),
+        );
         ui.add(
             egui::TextEdit::singleline(&mut theme.name)
                 .desired_width(120.0)
@@ -275,7 +384,11 @@ fn top_bar(ui: &mut Ui, theme: &mut SynthTheme, state: &mut EditorState) {
 
         // Copy from built-in
         let themes = builtin_themes();
-        ui.label(RichText::new("Copy from").size(11.0).color(Color32::from_gray(160)));
+        ui.label(
+            RichText::new("Copy from")
+                .size(11.0)
+                .color(Color32::from_gray(160)),
+        );
         egui::ComboBox::from_id_salt("theme_editor_copy_from")
             .selected_text(&themes[state.copy_from_idx].name)
             .width(100.0)
@@ -297,7 +410,10 @@ fn top_bar(ui: &mut Ui, theme: &mut SynthTheme, state: &mut EditorState) {
             let json = serde_json::to_string_pretty(theme).unwrap_or_default();
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("JSON theme", &["json"])
-                .set_file_name(format!("{}.json", theme.name.to_lowercase().replace(' ', "_")))
+                .set_file_name(format!(
+                    "{}.json",
+                    theme.name.to_lowercase().replace(' ', "_")
+                ))
                 .save_file()
             {
                 let _ = std::fs::write(path, json);
@@ -362,17 +478,17 @@ pub fn show(ctx: &Context, open: &mut bool, theme: &mut SynthTheme) {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.add_space(4.0);
                 match state.group {
-                    Group::Surfaces  => group_surfaces(ui, theme),
-                    Group::Text      => group_text(ui, theme),
-                    Group::Accent    => group_accent(ui, theme),
-                    Group::FxColors  => group_fx(ui, theme),
+                    Group::Surfaces => group_surfaces(ui, theme),
+                    Group::Text => group_text(ui, theme),
+                    Group::Accent => group_accent(ui, theme),
+                    Group::FxColors => group_fx(ui, theme),
                     Group::Sequencer => group_sequencer(ui, theme),
                     Group::PianoKeys => group_piano(ui, theme),
-                    Group::Scope     => group_scope(ui, theme),
-                    Group::Meters    => group_meters(ui, theme),
-                    Group::Adsr      => group_adsr(ui, theme),
-                    Group::Status    => group_status(ui, theme),
-                    Group::Geometry  => group_geometry(ui, theme),
+                    Group::Scope => group_scope(ui, theme),
+                    Group::Meters => group_meters(ui, theme),
+                    Group::Adsr => group_adsr(ui, theme),
+                    Group::Status => group_status(ui, theme),
+                    Group::Geometry => group_geometry(ui, theme),
                 }
                 ui.add_space(8.0);
             });
