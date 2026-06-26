@@ -68,6 +68,7 @@ fn normal_speed(size: KnobSize) -> f32 {
 const FINE_FACTOR: f32 = 0.2;
 
 /// Render an arc knob.
+#[allow(clippy::too_many_arguments)]
 pub fn knob(
     ui: &mut Ui,
     value: &mut f32,

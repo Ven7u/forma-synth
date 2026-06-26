@@ -198,11 +198,7 @@ fn sidebar(ui: &mut Ui, theme: &SynthTheme, state: &mut GalleryState) {
         for cat in Category::ALL {
             let active = state.category == *cat;
             let label = RichText::new(cat.label())
-                .font(if active {
-                    theme.font_body()
-                } else {
-                    theme.font_body()
-                })
+                .font(theme.font_body())
                 .color(if active {
                     theme.c(&theme.text_primary)
                 } else {

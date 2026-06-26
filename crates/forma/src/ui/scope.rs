@@ -722,6 +722,7 @@ fn draw_spectrum(
 }
 
 /// Draw the ADSR envelope curve with live voice cursor dots.
+#[allow(clippy::too_many_arguments)]
 fn draw_envelope(
     painter: &egui::Painter,
     rect: Rect,

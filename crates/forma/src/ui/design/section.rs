@@ -17,21 +17,19 @@ pub fn section_header<R>(
     theme: &SynthTheme,
     right_slot: Option<impl FnOnce(&mut Ui) -> R>,
 ) -> Response {
-    let resp = ui
-        .horizontal(|ui| {
-            ui.add_space(theme.sp_md);
-            ui.label(
-                egui::RichText::new(title)
-                    .font(theme.font_heading())
-                    .color(theme.c(&theme.text_primary)),
-            );
-            if let Some(slot) = right_slot {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(theme.sp_md);
-                    slot(ui);
-                });
-            }
-        })
-        .response;
-    resp
+    ui.horizontal(|ui| {
+        ui.add_space(theme.sp_md);
+        ui.label(
+            egui::RichText::new(title)
+                .font(theme.font_heading())
+                .color(theme.c(&theme.text_primary)),
+        );
+        if let Some(slot) = right_slot {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(theme.sp_md);
+                slot(ui);
+            });
+        }
+    })
+    .response
 }

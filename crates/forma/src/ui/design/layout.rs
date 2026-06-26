@@ -27,6 +27,7 @@ use crate::ui::theme::SynthTheme;
 pub trait SynthUi {
     /// Render a tokenized knob. Picks dimensions from `size` and arc color
     /// from `tier`.
+    #[allow(clippy::too_many_arguments)]
     fn synth_knob(
         &mut self,
         value: &mut f32,
@@ -428,6 +429,7 @@ pub fn header_sidebar_left(
 /// Magazine layout: left column spans full height, right is split into
 /// `right_rows` stacked vertical sections separated by `theme.sp_xs`.
 /// `left_ratio` controls how much width the left column takes (0..1).
+#[allow(clippy::type_complexity)]
 pub fn left_tall_right_stacked<'a>(
     ui: &mut Ui,
     theme: &SynthTheme,
@@ -455,6 +457,7 @@ pub fn left_tall_right_stacked<'a>(
 
 /// Mirror of `left_tall_right_stacked` — right column spans height, left
 /// is split into stacked rows.
+#[allow(clippy::type_complexity)]
 pub fn right_tall_left_stacked<'a>(
     ui: &mut Ui,
     theme: &SynthTheme,
@@ -554,6 +557,7 @@ pub fn fx_module<R>(
 ///
 /// `enabled` controls the label color only — pass `false` to dim it
 /// (e.g. for an oscillator that's been toggled off).
+#[allow(clippy::too_many_arguments)]
 pub fn fader_column(
     ui: &mut Ui,
     label: &str,
