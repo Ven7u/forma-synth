@@ -176,13 +176,13 @@ pub fn fader(
             painter.rect_filled(filled_rect, rounding, fill_color);
         }
 
-        // Thumb.
+        // Thumb — uses knob arc tokens (same tier as knob indicators, not text).
         let thumb_color = if response.dragged() || response.is_pointer_button_down_on() {
             theme.c(&theme.accent)
         } else if response.hovered() {
-            theme.c(&theme.text_primary)
+            theme.c(&theme.knob_tier1_arc)
         } else {
-            theme.c(&theme.text_secondary)
+            theme.c(&theme.knob_tier2_arc)
         };
         let thumb_stroke = if response.dragged() {
             Stroke::new(theme.stroke_active, theme.c(&theme.accent))
