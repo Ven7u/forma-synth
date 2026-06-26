@@ -162,6 +162,12 @@ pub(crate) struct SynthApp {
     pub(crate) panels: PanelVisibility,
     pub(crate) reset_layout_pending: bool,
     pub(crate) dock_state: egui_dock::DockState<ui::dock::Tab>,
+    /// Measured OSC tab content height from the previous frame.
+    /// Used to calibrate the OSC/Modulation split ratio dynamically.
+    pub(crate) osc_tab_content_h: f32,
+    /// False until the first successful split calibration fires (frame 1+).
+    /// Reset to false whenever the dock layout is rebuilt.
+    pub(crate) osc_split_calibrated: bool,
 
     // Layout B state
     pub(crate) app_mode: AppMode,
@@ -624,6 +630,8 @@ impl SynthApp {
             panels,
             reset_layout_pending: true,
             dock_state: ui::dock::default_dock_state(),
+            osc_tab_content_h: 0.0,
+            osc_split_calibrated: false,
             app_mode,
             studio_tab,
             mode_change_gen: 0,

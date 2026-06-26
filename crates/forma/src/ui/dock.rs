@@ -47,6 +47,10 @@ impl Tab {
     ];
 }
 
+/// Height of the egui_dock tab bar — used when computing split fractions
+/// so the fraction accounts for the chrome consumed by the tab strip.
+const TAB_BAR_H: f32 = 28.0;
+
 /// Build the default dock layout.
 ///
 /// ```text
@@ -59,6 +63,20 @@ impl Tab {
 /// │  Keyboard  │  Sequencer    (tabbed)              │
 /// └─────────────────────────────────────────────────┘
 /// ```
+/// Compute the OSC/Modulation split fraction for a given total dock height
+/// and measured OSC content height.  Falls back to 0.55 before the first
+/// measurement is available (osc_content_h == 0.0).
+pub fn osc_split_fraction(dock_available_h: f32, osc_content_h: f32) -> f32 {
+    if osc_content_h <= 0.0 || dock_available_h <= 0.0 {
+        return 0.55;
+    }
+    // The top area is 75% of the total dock height (bottom 25% = sequencer).
+    // Inside that, the OSC pane needs: measured content + tab bar chrome.
+    let top_area_h = dock_available_h * 0.75;
+    let osc_pane_h = osc_content_h + TAB_BAR_H;
+    (osc_pane_h / top_area_h).clamp(0.35, 0.80)
+}
+
 pub fn default_dock_state() -> DockState<Tab> {
     // Oscillators + Mixer share the root node as sibling tabs. Click between
     // them; both get the same full width of the upper-left dock column.
@@ -75,8 +93,10 @@ pub fn default_dock_state() -> DockState<Tab> {
     // 2. In top area, split right: Oscilloscope — right takes 40%.
     let [top_left, top_right] = surface.split_right(top, 0.60, vec![Tab::Scope]);
 
-    // 3. Split top-left vertically: Oscillators/Mixer top 50%, Filter & Envelopes bottom 50%.
-    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.50, vec![Tab::Modulation, Tab::Filter]);
+    // 3. Split top-left vertically: Oscillators/Mixer top, Modulation/Filter bottom.
+    // Fraction is overridden by ui_synth_dock() using the measured OSC content height;
+    // 0.55 is the fallback used only on the very first launch (before measurement).
+    let [_osc_mixer, _mod] = surface.split_below(top_left, 0.55, vec![Tab::Modulation, Tab::Filter]);
 
     // 4. Split top-right vertically: FX Chain + Equalizer tabbed below Oscilloscope.
     let [_scope, _fx] = surface.split_below(top_right, 0.50, vec![Tab::Equalizer, Tab::FxChain]);
@@ -89,7 +109,25 @@ impl crate::SynthApp {
     pub fn ui_synth_dock(&mut self, ui: &mut egui::Ui) {
         if self.reset_layout_pending {
             self.dock_state = default_dock_state();
+            self.osc_split_calibrated = false; // allow re-calibration on next frame
             self.reset_layout_pending = false;
+        }
+
+        // One-shot calibration: frame 0 renders with the 0.55 fallback and
+        // measures actual OSC content height; frame 1 applies the precise
+        // fraction before the dock renders again.
+        // NodeIndex(3) is the Vertical split OSC/Mixer ↔ Modulation/Filter.
+        if !self.osc_split_calibrated && self.osc_tab_content_h > 0.0 {
+            let frac = osc_split_fraction(ui.available_height(), self.osc_tab_content_h);
+            if let Some(tree) = self.dock_state
+                .get_surface_mut(egui_dock::SurfaceIndex::main())
+                .and_then(|s| s.node_tree_mut())
+            {
+                if let egui_dock::Node::Vertical(split) = &mut tree[egui_dock::NodeIndex(3)] {
+                    split.fraction = frac;
+                }
+            }
+            self.osc_split_calibrated = true;
         }
         let mut dock_state =
             std::mem::replace(&mut self.dock_state, egui_dock::DockState::new(vec![]));
@@ -177,11 +215,15 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Tab) {
         match tab {
             Tab::Oscillators => {
+                let top = ui.min_rect().top();
                 ui.columns(3, |cols| {
                     self.app.ui_osc_panel(&mut cols[0], 0);
                     self.app.ui_osc_panel(&mut cols[1], 1);
                     self.app.ui_osc_panel(&mut cols[2], 2);
                 });
+                // Record actual content height so layout reset can set the
+                // split fraction to exactly fit the OSC panel.
+                self.app.osc_tab_content_h = ui.min_rect().bottom() - top;
             }
             Tab::Mixer => {
                 self.app.ui_mixer_panel(ui);

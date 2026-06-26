@@ -1137,74 +1137,96 @@ impl SynthApp {
             let stage_label_h = theme.font_body().size + sp_xs;
             let total_h = stage_label_h + fader_h + val_label_h;
 
+            // Column width: fader thumb (22 px) + sp_xs breathing room each side.
+            // Fixed column boundaries prevent value-label text from shifting
+            // adjacent faders when the readout length changes ("10ms" → "1000ms").
+            let col_w = 22.0_f32 + 2.0 * sp_xs;
+
             ui.horizontal(|ui| {
-                for i in 0..4 {
-                    ui.vertical(|ui| {
-                        // Stage label
-                        ui.label(
-                            RichText::new(labels[i])
-                                .font(theme.font_body())
-                                .color(theme.c(&theme.text_secondary)),
-                        );
+                // Fixed-width fader section — 4 equal columns via ui.columns().
+                ui.vertical(|ui| {
+                    ui.set_width(4.0 * col_w);
+                    ui.columns(4, |cols| {
+                        for i in 0..4 {
+                            let col = &mut cols[i];
+                            col.with_layout(
+                                egui::Layout::top_down(egui::Align::Center),
+                                |col| {
+                                    // Stage label
+                                    col.add_sized(
+                                        [col_w, stage_label_h],
+                                        egui::Label::new(
+                                            RichText::new(labels[i])
+                                                .font(theme.font_body())
+                                                .color(theme.c(&theme.text_secondary)),
+                                        ),
+                                    );
 
-                        // A/D/R: log scale → normalize to 0..1 for fader
-                        let log = i != 2;
-                        let (lo, hi) = (*ranges[i].start(), *ranges[i].end());
-                        let mut norm = if log {
-                            (adsr[i].max(lo).ln() - lo.ln()) / (hi.ln() - lo.ln())
-                        } else {
-                            (adsr[i] - lo) / (hi - lo)
-                        };
-                        norm = norm.clamp(0.0, 1.0);
-                        let resp = fader(
-                            ui,
-                            &mut norm,
-                            0.0..=1.0,
-                            FaderOrientation::Vertical,
-                            FaderSize::Large,
-                            &theme,
-                        )
-                        .on_hover_text(tips[i]);
-                        if resp.changed() {
-                            let v = if log {
-                                (lo.ln() + norm * (hi.ln() - lo.ln())).exp()
-                            } else {
-                                lo + norm * (hi - lo)
-                            }
-                            .clamp(lo, hi);
-                            adsr[i] = v;
-                            if is_filter {
-                                match i {
-                                    0 => self.engine.set_fenv_attack(v),
-                                    1 => self.engine.set_fenv_decay(v),
-                                    2 => self.engine.set_fenv_sustain(v),
-                                    _ => self.engine.set_fenv_release(v),
-                                }
-                            } else {
-                                match i {
-                                    0 => self.engine.set_amp_attack(v),
-                                    1 => self.engine.set_amp_decay(v),
-                                    2 => self.engine.set_amp_sustain(v),
-                                    _ => self.engine.set_amp_release(v),
-                                }
-                            }
+                                    // A/D/R: log scale → normalize to 0..1 for fader
+                                    let log = i != 2;
+                                    let (lo, hi) = (*ranges[i].start(), *ranges[i].end());
+                                    let mut norm = if log {
+                                        (adsr[i].max(lo).ln() - lo.ln()) / (hi.ln() - lo.ln())
+                                    } else {
+                                        (adsr[i] - lo) / (hi - lo)
+                                    };
+                                    norm = norm.clamp(0.0, 1.0);
+                                    let resp = fader(
+                                        col,
+                                        &mut norm,
+                                        0.0..=1.0,
+                                        FaderOrientation::Vertical,
+                                        FaderSize::Large,
+                                        &theme,
+                                    )
+                                    .on_hover_text(tips[i]);
+                                    if resp.changed() {
+                                        let v = if log {
+                                            (lo.ln() + norm * (hi.ln() - lo.ln())).exp()
+                                        } else {
+                                            lo + norm * (hi - lo)
+                                        }
+                                        .clamp(lo, hi);
+                                        adsr[i] = v;
+                                        if is_filter {
+                                            match i {
+                                                0 => self.engine.set_fenv_attack(v),
+                                                1 => self.engine.set_fenv_decay(v),
+                                                2 => self.engine.set_fenv_sustain(v),
+                                                _ => self.engine.set_fenv_release(v),
+                                            }
+                                        } else {
+                                            match i {
+                                                0 => self.engine.set_amp_attack(v),
+                                                1 => self.engine.set_amp_decay(v),
+                                                2 => self.engine.set_amp_sustain(v),
+                                                _ => self.engine.set_amp_release(v),
+                                            }
+                                        }
+                                    }
+
+                                    // Value readout — fixed-size slot keeps width
+                                    // stable regardless of displayed text length.
+                                    let val_str = if i == 2 {
+                                        format!("{:.2}", adsr[i])
+                                    } else if adsr[i] < 1.0 {
+                                        format!("{:.0}ms", adsr[i] * 1000.0)
+                                    } else {
+                                        format!("{:.1}s", adsr[i])
+                                    };
+                                    col.add_sized(
+                                        [col_w, val_label_h],
+                                        egui::Label::new(
+                                            RichText::new(val_str)
+                                                .font(theme.font_small())
+                                                .color(theme.c(&theme.text_secondary)),
+                                        ),
+                                    );
+                                },
+                            );
                         }
-
-                        // Value readout below fader
-                        let val_str = if i == 2 {
-                            format!("{:.2}", adsr[i])
-                        } else if adsr[i] < 1.0 {
-                            format!("{:.0}ms", adsr[i] * 1000.0)
-                        } else {
-                            format!("{:.1}s", adsr[i])
-                        };
-                        ui.label(
-                            RichText::new(val_str)
-                                .font(theme.font_small())
-                                .color(theme.c(&theme.text_secondary)),
-                        );
                     });
-                }
+                });
 
                 ui.add_space(sp_sm);
                 // Envelope plot fills remaining width at full fader column height

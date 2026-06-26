@@ -120,123 +120,170 @@ impl SynthApp {
 
             ui.add_space(theme.sp_sm);
 
-            // ── Knob row: OCT · DET · PW (Tier 2/3 — sound design + config) ─
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = theme.sp_md;
+            // ── Knob row: OCT · DET · PW — 3 equal columns ───────────────
+            // col3 keeps controls evenly distributed across the full card
+            // width and centered in each slot. Locals extracted so the
+            // closure can reference them without capturing self.
+            let mut octave = self.osc_octave[i];
+            let mut detune = self.osc_detune[i];
+            let mut pw = self.osc_pulse_width[i];
+            let pw_enabled = self.osc_wave[i] == 2;
+            let (mut oct_changed, mut det_changed, mut pw_changed) = (false, false, false);
 
-                // OCT — integer DragValue. Tier 3 (rarely touched mid-perf).
-                ui.vertical(|ui| {
-                    let col_w = KnobSize::Standard.rect().x;
-                    ui.set_width(col_w);
-                    ui.add_space(theme.sp_xs);
-                    if ui
+            ui.columns(3, |cols| {
+                // OCT — DragValue styled to knob-column height.
+                cols[0].with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                    col.add_space(theme.sp_xs);
+                    if col
                         .add_sized(
-                            [col_w, 28.0],
-                            egui::DragValue::new(&mut self.osc_octave[i])
+                            [KnobSize::Standard.rect().x, 28.0],
+                            egui::DragValue::new(&mut octave)
                                 .range(-2..=2)
                                 .prefix("Oct "),
                         )
                         .on_hover_text("Octave shift (−2 … +2)")
                         .changed()
                     {
-                        self.update_freq_mult(i);
+                        oct_changed = true;
                     }
-                    ui.add_space(theme.sp_xxs);
-                    ui.label(
+                    col.add_space(theme.sp_xxs);
+                    col.label(
                         RichText::new("OCT")
                             .font(theme.font_body())
                             .color(theme.c(&theme.text_secondary)),
                     );
                 });
 
-                // DET knob (±100 ¢) — Tier 2.
-                if ui
-                    .synth_knob(
-                        &mut self.osc_detune[i],
-                        -100.0..=100.0,
-                        "DET",
-                        &theme,
-                        false,
-                        KnobSize::Standard,
-                        Tier::Secondary,
-                    )
-                    .on_hover_text("Detune ±100 ¢. Shift+drag for fine control.")
-                    .changed()
-                {
-                    self.update_freq_mult(i);
-                }
-
-                // PW knob — Tier 2, only active for square waveform.
-                let pw_enabled = self.osc_wave[i] == 2;
-                ui.add_enabled_ui(pw_enabled, |ui| {
-                    if ui
+                // DET knob (±100 ¢).
+                cols[1].with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                    if col
                         .synth_knob(
-                            &mut self.osc_pulse_width[i],
-                            0.01..=0.99,
-                            "PW",
+                            &mut detune,
+                            -100.0..=100.0,
+                            "DET",
                             &theme,
                             false,
                             KnobSize::Standard,
                             Tier::Secondary,
                         )
-                        .on_hover_text("Pulse Width — duty cycle of the square wave.\n0.5 = symmetric square (hollow/woody).\nLower or higher = thin, nasal tone.\nModulate with LFO for classic PWM sweep.\nOnly active on Sqr waveform.")
+                        .on_hover_text("Detune ±100 ¢. Shift+drag for fine control.")
                         .changed()
                     {
-                        self.engine.set_osc_pulse_width(i as u8, self.osc_pulse_width[i]);
+                        det_changed = true;
                     }
+                });
+
+                // PW knob — active only for square waveform.
+                cols[2].add_enabled_ui(pw_enabled, |col| {
+                    col.with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                        if col
+                            .synth_knob(
+                                &mut pw,
+                                0.01..=0.99,
+                                "PW",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Secondary,
+                            )
+                            .on_hover_text("Pulse Width — duty cycle of the square wave.\n0.5 = symmetric square (hollow/woody).\nLower or higher = thin, nasal tone.\nModulate with LFO for classic PWM sweep.\nOnly active on Sqr waveform.")
+                            .changed()
+                        {
+                            pw_changed = true;
+                        }
+                    });
                 });
             });
 
+            if oct_changed {
+                self.osc_octave[i] = octave;
+                self.update_freq_mult(i);
+            }
+            if det_changed {
+                self.osc_detune[i] = detune;
+                self.update_freq_mult(i);
+            }
+            if pw_changed {
+                self.osc_pulse_width[i] = pw;
+                self.engine.set_osc_pulse_width(i as u8, pw);
+            }
+
             ui.add_space(theme.sp_xs);
 
-            // ── Unison row (Tier 2) ───────────────────────────────────────
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = theme.sp_xs;
-                let mut uni_on = self.osc_unison_enabled[i];
-                if ui
-                    .synth_toggle(
-                        &mut uni_on,
-                        "UNI",
-                        ToggleSize::Standard,
-                        Tier::Secondary,
-                        &theme,
-                        None,
-                    )
-                    .on_hover_text("Stack detuned voices for a thick, wide sound")
-                    .clicked()
-                {
-                    self.osc_unison_enabled[i] = uni_on;
-                    self.update_unison(i);
-                }
+            // ── Unison row — 3 equal columns: UNI · ×N · SPRD ───────────
+            // Fixed columns prevent the layout from jumping when UNI is
+            // toggled (the voice-count and spread slots are always present,
+            // just disabled). Same local-extract pattern as above.
+            let mut uni_on = self.osc_unison_enabled[i];
+            let mut uni_count = self.osc_unison_count[i];
+            let mut uni_spread = self.osc_unison_spread[i];
+            let (mut uni_changed, mut uni_params_changed) = (false, false);
 
-                if uni_on {
-                    let mut changed = false;
-                    changed |= ui
-                        .add_sized(
-                            [40.0, 24.0],
-                            egui::DragValue::new(&mut self.osc_unison_count[i])
-                                .range(2..=5)
-                                .prefix("×"),
-                        )
-                        .on_hover_text("Number of unison voices (2–5)")
-                        .changed();
-                    changed |= ui
-                        .synth_knob(
-                            &mut self.osc_unison_spread[i],
-                            0.0..=50.0,
-                            "SPRD",
-                            &theme,
-                            false,
-                            KnobSize::Standard,
+            ui.columns(3, |cols| {
+                cols[0].with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                    if col
+                        .synth_toggle(
+                            &mut uni_on,
+                            "UNI",
+                            ToggleSize::Standard,
                             Tier::Secondary,
+                            &theme,
+                            None,
                         )
-                        .on_hover_text("Total pitch spread across unison voices (cents)")
-                        .changed();
-                    if changed {
-                        self.update_unison(i);
+                        .on_hover_text("Stack detuned voices for a thick, wide sound")
+                        .clicked()
+                    {
+                        uni_changed = true;
                     }
-                }
+                });
+
+                cols[1].add_enabled_ui(uni_on, |col| {
+                    col.with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                        if col
+                            .add_sized(
+                                [40.0, 24.0],
+                                egui::DragValue::new(&mut uni_count)
+                                    .range(2..=5)
+                                    .prefix("×"),
+                            )
+                            .on_hover_text("Number of unison voices (2–5)")
+                            .changed()
+                        {
+                            uni_params_changed = true;
+                        }
+                    });
+                });
+
+                cols[2].add_enabled_ui(uni_on, |col| {
+                    col.with_layout(egui::Layout::top_down(egui::Align::Center), |col| {
+                        if col
+                            .synth_knob(
+                                &mut uni_spread,
+                                0.0..=50.0,
+                                "SPRD",
+                                &theme,
+                                false,
+                                KnobSize::Standard,
+                                Tier::Secondary,
+                            )
+                            .on_hover_text("Total pitch spread across unison voices (cents)")
+                            .changed()
+                        {
+                            uni_params_changed = true;
+                        }
+                    });
+                });
             });
+
+            if uni_changed {
+                self.osc_unison_enabled[i] = uni_on;
+                self.update_unison(i);
+            }
+            if uni_params_changed {
+                self.osc_unison_count[i] = uni_count;
+                self.osc_unison_spread[i] = uni_spread;
+                self.update_unison(i);
+            }
 
             ui.add_space(theme.sp_sm);
 
