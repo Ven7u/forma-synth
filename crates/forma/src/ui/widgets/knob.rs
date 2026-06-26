@@ -110,11 +110,11 @@ pub fn knob(
         );
         painter.circle_filled(dot_pos, 3.5, accent);
 
-        // Center dot.
+        // Center dot — theme tokens so legacy callers respect the theme.
         let center_color = if response.hovered() || response.dragged() {
-            Color32::from_rgb(200, 200, 200)
+            theme.c(&theme.text_primary)
         } else {
-            Color32::from_rgb(80, 80, 80)
+            theme.c(&theme.text_secondary)
         };
         painter.circle_filled(center, 4.0, center_color);
 
@@ -130,8 +130,8 @@ pub fn knob(
             Pos2::new(center.x, center.y + knob_radius + 5.0),
             egui::Align2::CENTER_TOP,
             &value_text,
-            egui::FontId::proportional(9.0),
-            Color32::from_rgb(180, 180, 180),
+            theme.font_value(),
+            theme.c(&theme.text_secondary),
         );
 
         // Label below value.
@@ -139,8 +139,8 @@ pub fn knob(
             Pos2::new(center.x, rect.bottom() - 1.0),
             egui::Align2::CENTER_BOTTOM,
             label,
-            egui::FontId::proportional(9.0),
-            Color32::from_rgb(140, 140, 140),
+            theme.font_body(),
+            theme.c(&theme.text_secondary),
         );
     }
 

@@ -63,6 +63,19 @@ impl SynthFrame {
             .inner_margin(Margin::same(theme.sp_xs as i8))
     }
 
+    /// Tier 1 section — same visual style as `section`. The tier distinction
+    /// is expressed through control arc colors and stroke widths, not the card
+    /// border, so all cards share a consistent neutral border.
+    #[allow(dead_code)]
+    pub fn tier1(theme: &SynthTheme) -> Frame {
+        Frame::new()
+            .fill(theme.c(&theme.bg_surface))
+            .corner_radius(CornerRadius::same(theme.rounding_md as u8))
+            .stroke(Stroke::new(theme.stroke_ui, theme.c(&theme.border)))
+            .inner_margin(Margin::same(theme.sp_sm as i8))
+            .outer_margin(Margin::same(theme.sp_xs as i8))
+    }
+
     /// App background — transparent fill used on CentralPanel and side panels
     /// so that the app-level `bg_app` shows through without adding a border.
     pub fn app_bg(theme: &SynthTheme) -> Frame {

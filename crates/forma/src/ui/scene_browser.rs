@@ -28,7 +28,11 @@ impl SynthApp {
             )
             .show(ctx, |ui| {
                 // ── Save section ──────────────────────────────────────────────
-                ui.label(egui::RichText::new("SAVE SCENE").size(10.0).color(accent));
+                ui.label(
+                    egui::RichText::new("SAVE SCENE")
+                        .font(self.theme.font_body())
+                        .color(accent),
+                );
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     ui.add(
@@ -38,8 +42,12 @@ impl SynthApp {
                     );
                     if ui
                         .add(
-                            egui::Button::new(egui::RichText::new("SAVE").size(11.0).color(accent))
-                                .min_size(egui::Vec2::new(50.0, 0.0)),
+                            egui::Button::new(
+                                egui::RichText::new("SAVE")
+                                    .font(self.theme.font_heading())
+                                    .color(accent),
+                            )
+                            .min_size(egui::Vec2::new(50.0, 0.0)),
                         )
                         .on_hover_text("Save current rig state as a scene")
                         .clicked()
@@ -64,13 +72,18 @@ impl SynthApp {
                 if self.scene_library.is_empty() {
                     ui.label(
                         egui::RichText::new("No scenes saved yet.")
-                            .size(11.0)
+                            .font(self.theme.font_heading())
                             .color(text_dis),
                     );
                 } else {
-                    ui.label(egui::RichText::new("SCENES").size(10.0).color(text_sec));
+                    ui.label(
+                        egui::RichText::new("SCENES")
+                            .font(self.theme.font_body())
+                            .color(text_sec),
+                    );
                     ui.add_space(4.0);
 
+                    // Data-driven: scene library grows with user content.
                     egui::ScrollArea::vertical()
                         .id_salt("scene_list")
                         .max_height(180.0)
@@ -83,7 +96,9 @@ impl SynthApp {
                                 let in_chain = self.scene_chain.contains(&i);
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new(&scene.name).size(11.0).color(text_pri),
+                                        egui::RichText::new(&scene.name)
+                                            .font(self.theme.font_heading())
+                                            .color(text_pri),
                                     );
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
@@ -92,7 +107,7 @@ impl SynthApp {
                                                 .add(
                                                     egui::Button::new(
                                                         egui::RichText::new("✕")
-                                                            .size(10.0)
+                                                            .font(self.theme.font_body())
                                                             .color(text_dis),
                                                     )
                                                     .frame(false),
@@ -106,7 +121,7 @@ impl SynthApp {
                                                 .add(
                                                     egui::Button::new(
                                                         egui::RichText::new("LOAD")
-                                                            .size(10.0)
+                                                            .font(self.theme.font_body())
                                                             .color(accent),
                                                     )
                                                     .min_size(egui::Vec2::new(40.0, 0.0)),
@@ -122,7 +137,7 @@ impl SynthApp {
                                                 .add(
                                                     egui::Button::new(
                                                         egui::RichText::new("+CHAIN")
-                                                            .size(9.0)
+                                                            .font(self.theme.font_body())
                                                             .color(chain_col),
                                                     )
                                                     .frame(false),
@@ -165,11 +180,19 @@ impl SynthApp {
 
                 // ── Scene chain ───────────────────────────────────────────────
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("CHAIN").size(10.0).color(accent));
+                    ui.label(
+                        egui::RichText::new("CHAIN")
+                            .font(self.theme.font_body())
+                            .color(accent),
+                    );
                     ui.add_space(8.0);
 
                     // Bars-per-step control.
-                    ui.label(egui::RichText::new("Bars/step:").size(9.0).color(text_dis));
+                    ui.label(
+                        egui::RichText::new("Bars/step:")
+                            .font(self.theme.font_body())
+                            .color(text_dis),
+                    );
                     let mut bars = self.scene_chain_bars as i32;
                     if ui
                         .add(egui::DragValue::new(&mut bars).range(1..=64).speed(1.0))
@@ -189,7 +212,9 @@ impl SynthApp {
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new(play_label).size(10.0).color(play_col),
+                                egui::RichText::new(play_label)
+                                    .font(self.theme.font_body())
+                                    .color(play_col),
                             )
                             .min_size(egui::Vec2::new(60.0, 0.0)),
                         )
@@ -214,11 +239,12 @@ impl SynthApp {
                     ui.add_space(4.0);
                     ui.label(
                         egui::RichText::new("Add scenes above with +CHAIN.")
-                            .size(10.0)
+                            .font(self.theme.font_body())
                             .color(text_dis),
                     );
                 } else {
                     ui.add_space(4.0);
+                    // Data-driven: scene chain is user-built and unbounded.
                     egui::ScrollArea::vertical()
                         .id_salt("chain_list")
                         .max_height(120.0)
@@ -244,7 +270,7 @@ impl SynthApp {
                                             step + 1,
                                             name,
                                         ))
-                                        .size(10.0)
+                                        .font(self.theme.font_body())
                                         .color(row_col),
                                     );
                                     ui.with_layout(
@@ -254,7 +280,7 @@ impl SynthApp {
                                                 .add(
                                                     egui::Button::new(
                                                         egui::RichText::new("✕")
-                                                            .size(9.0)
+                                                            .font(self.theme.font_body())
                                                             .color(text_dis),
                                                     )
                                                     .frame(false),
@@ -268,7 +294,7 @@ impl SynthApp {
                                                     .add(
                                                         egui::Button::new(
                                                             egui::RichText::new("↑")
-                                                                .size(9.0)
+                                                                .font(self.theme.font_body())
                                                                 .color(text_dis),
                                                         )
                                                         .frame(false),

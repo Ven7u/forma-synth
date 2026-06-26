@@ -118,13 +118,17 @@ impl SynthApp {
                         // Row 1: dot + track label (click to focus) + seq indicator.
                         ui.horizontal(|ui| {
                             let dot_col = if muted { Color32::from_gray(40) } else { tint };
-                            ui.label(egui::RichText::new("●").size(7.0).color(dot_col));
+                            ui.label(
+                                egui::RichText::new("●")
+                                    .font(self.theme.font_micro())
+                                    .color(dot_col),
+                            );
 
                             let label_col = if focused { tint } else { text_sec };
                             let label_resp = ui.add(
                                 egui::Label::new(
                                     egui::RichText::new(format!("T{}  {}", t + 1, track_name))
-                                        .size(10.0)
+                                        .font(self.theme.font_body())
                                         .color(label_col),
                                 )
                                 .sense(Sense::click()),
@@ -137,14 +141,22 @@ impl SynthApp {
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     if seq_playing {
-                                        ui.label(egui::RichText::new("▶").size(8.0).color(tint));
+                                        ui.label(
+                                            egui::RichText::new("▶")
+                                                .font(self.theme.font_small())
+                                                .color(tint),
+                                        );
                                     }
                                 },
                             );
                         });
 
                         // Row 2: patch name.
-                        ui.label(egui::RichText::new(&patch_name).size(8.0).color(text_dis));
+                        ui.label(
+                            egui::RichText::new(&patch_name)
+                                .font(self.theme.font_small())
+                                .color(text_dis),
+                        );
 
                         ui.add_space(3.0);
 
@@ -182,7 +194,9 @@ impl SynthApp {
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        egui::RichText::new("M").size(8.0).color(m_col),
+                                        egui::RichText::new("M")
+                                            .font(self.theme.font_small())
+                                            .color(m_col),
                                     )
                                     .frame(muted)
                                     .min_size(Vec2::new(16.0, 12.0)),
@@ -198,7 +212,9 @@ impl SynthApp {
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        egui::RichText::new("S").size(8.0).color(s_col),
+                                        egui::RichText::new("S")
+                                            .font(self.theme.font_small())
+                                            .color(s_col),
                                     )
                                     .frame(solo)
                                     .min_size(Vec2::new(16.0, 12.0)),
@@ -263,12 +279,18 @@ impl SynthApp {
                         } else {
                             Color32::from_gray(40)
                         };
-                        ui.label(egui::RichText::new("●").size(7.0).color(dot_col));
+                        ui.label(
+                            egui::RichText::new("●")
+                                .font(self.theme.font_micro())
+                                .color(dot_col),
+                        );
                         let label_col = if drums_active { drum_tint } else { text_sec };
                         if ui
                             .add(
                                 egui::Label::new(
-                                    egui::RichText::new("DRUMS").size(10.0).color(label_col),
+                                    egui::RichText::new("DRUMS")
+                                        .font(self.theme.font_body())
+                                        .color(label_col),
                                 )
                                 .sense(Sense::click()),
                             )
@@ -278,7 +300,11 @@ impl SynthApp {
                         }
                     });
 
-                    ui.label(egui::RichText::new("Step seq").size(8.0).color(text_dis));
+                    ui.label(
+                        egui::RichText::new("Step seq")
+                            .font(self.theme.font_small())
+                            .color(text_dis),
+                    );
                     ui.add_space(3.0);
 
                     ui.horizontal(|ui| {
@@ -309,9 +335,13 @@ impl SynthApp {
                         };
                         if ui
                             .add(
-                                egui::Button::new(egui::RichText::new("M").size(8.0).color(m_col))
-                                    .frame(drum_muted)
-                                    .min_size(Vec2::new(16.0, 12.0)),
+                                egui::Button::new(
+                                    egui::RichText::new("M")
+                                        .font(self.theme.font_small())
+                                        .color(m_col),
+                                )
+                                .frame(drum_muted)
+                                .min_size(Vec2::new(16.0, 12.0)),
                             )
                             .on_hover_text("Mute drums")
                             .clicked()
@@ -332,8 +362,12 @@ impl SynthApp {
                 let mix_col = if self.show_mixer { accent } else { text_dis };
                 if ui
                     .add(
-                        egui::Label::new(egui::RichText::new("MIX▸").size(10.0).color(mix_col))
-                            .sense(Sense::click()),
+                        egui::Label::new(
+                            egui::RichText::new("MIX▸")
+                                .font(self.theme.font_body())
+                                .color(mix_col),
+                        )
+                        .sense(Sense::click()),
                     )
                     .on_hover_text("Toggle mixer panel")
                     .clicked()
@@ -350,11 +384,19 @@ impl SynthApp {
                     ui.vertical(|ui| {
                         ui.add_space(4.0);
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("SPLIT").size(8.0).color(text_dis));
+                            ui.label(
+                                egui::RichText::new("SPLIT")
+                                    .font(self.theme.font_small())
+                                    .color(text_dis),
+                            );
                             ui.add_space(4.0);
                             self.ui_live_split_bar(ui, t, tint, text_dis);
                             ui.add_space(8.0);
-                            ui.label(egui::RichText::new("CH").size(8.0).color(text_dis));
+                            ui.label(
+                                egui::RichText::new("CH")
+                                    .font(self.theme.font_small())
+                                    .color(text_dis),
+                            );
                             let mut ch = self.track_midi_ch[t] as i32;
                             if ui
                                 .add(
@@ -461,7 +503,7 @@ impl SynthApp {
         let hi = crate::ui::midi_note_full(self.track_key_hi[focused]);
         ui.label(
             egui::RichText::new(format!("{} – {}", lo, hi))
-                .size(8.0)
+                .font(self.theme.font_small())
                 .color(text_dis),
         );
     }

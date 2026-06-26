@@ -29,10 +29,25 @@ pub struct SynthTheme {
     pub text_primary: [u8; 3],
     pub text_secondary: [u8; 3],
     pub text_disabled: [u8; 3],
+    /// Text color for use on top of an accent fill — must contrast clearly
+    /// against the bright accent. Typically a very dark color.
+    #[serde(default)]
+    pub text_on_accent: [u8; 3],
 
     // ── Accent ─────────────────────────────────────────────────────────────
     pub accent: [u8; 3],
     pub accent_dim: [u8; 3],
+
+    // ── Knob arc colors by tier ────────────────────────────────────────────
+    /// Tier 1 (performance) — full accent.
+    #[serde(default)]
+    pub knob_tier1_arc: [u8; 3],
+    /// Tier 2 (sound design) — dimmed accent.
+    #[serde(default)]
+    pub knob_tier2_arc: [u8; 3],
+    /// Tier 3 (config) — nearly neutral.
+    #[serde(default)]
+    pub knob_tier3_arc: [u8; 3],
 
     // ── Special accents ─────────────────────────────────────────────────────
     pub accent_hard_sync: [u8; 3],
@@ -63,10 +78,58 @@ pub struct SynthTheme {
     pub seq_kb_major: [u8; 3],
     pub seq_kb_minor: [u8; 3],
     pub seq_kb_dim: [u8; 3],
+    /// Velocity-bar fill color in the note sequencer step grid.
+    #[serde(default)]
+    pub seq_velocity_bar: [u8; 3],
+    /// Probability-bar low zone (< 50%).
+    #[serde(default)]
+    pub seq_prob_low: [u8; 3],
+    /// Probability-bar mid zone (50% – 99%).
+    #[serde(default)]
+    pub seq_prob_mid: [u8; 3],
+    /// Probability-bar high zone (100%).
+    #[serde(default)]
+    pub seq_prob_high: [u8; 3],
+    /// Step-entry record cursor border.
+    #[serde(default)]
+    pub seq_rec_cursor: [u8; 3],
+    /// Chord-sequencer octave-offset bar fill.
+    #[serde(default)]
+    pub seq_octave_bar: [u8; 3],
 
     // ── Keyboard ────────────────────────────────────────────────────────────
     pub key_white_pressed: [u8; 3],
     pub key_black_pressed: [u8; 3],
+    /// Default (unlit) white key fill — natural ivory.
+    #[serde(default = "default_key_white_default")]
+    pub key_white_default: [u8; 3],
+    /// Default (unlit) black key fill — natural ebony.
+    #[serde(default = "default_key_black_default")]
+    pub key_black_default: [u8; 3],
+    /// White key within the computer-keyboard octave range (subtle tint).
+    #[serde(default = "default_key_white_range")]
+    pub key_white_range: [u8; 3],
+    /// Black key within the computer-keyboard octave range (subtle tint).
+    #[serde(default = "default_key_black_range")]
+    pub key_black_range: [u8; 3],
+    /// Root note highlight on a white key.
+    #[serde(default = "default_key_scale_root")]
+    pub key_scale_root: [u8; 3],
+    /// Root note highlight on a black key.
+    #[serde(default = "default_key_scale_root_dark")]
+    pub key_scale_root_dark: [u8; 3],
+    /// In-scale highlight on a white key.
+    #[serde(default = "default_key_scale_in")]
+    pub key_scale_in: [u8; 3],
+    /// In-scale highlight on a black key.
+    #[serde(default = "default_key_scale_in_dark")]
+    pub key_scale_in_dark: [u8; 3],
+    /// White key separator / outline stroke color.
+    #[serde(default = "default_key_stroke")]
+    pub key_stroke: [u8; 3],
+    /// Octave label text (C3, C4, …) painted on white C keys.
+    #[serde(default = "default_key_label")]
+    pub key_label: [u8; 3],
 
     // ── Scope / visualizer ──────────────────────────────────────────────────
     pub scope_bg: [u8; 3],
@@ -81,11 +144,27 @@ pub struct SynthTheme {
     pub meter_green: [u8; 3],
     pub meter_clip: [u8; 3],
 
+    // ── OSC mini-waveform preview ────────────────────────────────────────────
+    pub osc_preview_line: [u8; 3],
+
+    // ── Filter response curve ────────────────────────────────────────────────
+    pub filter_curve_line: [u8; 3],
+    pub filter_curve_grid: [u8; 4],
+    pub filter_curve_label: [u8; 4],
+
     // ── ADSR visualizer ─────────────────────────────────────────────────────
     pub adsr_fill: [u8; 4],
     pub adsr_outline: [u8; 3],
     pub adsr_label: [u8; 4],
     pub adsr_cursor: [u8; 3],
+
+    // ── Transport / global bar ──────────────────────────────────────────────
+    /// Sub-beat pulse dot (beats 2+). Distinct from accent — typically a blue.
+    pub accent_beat: [u8; 3],
+    /// Stop / panic button color. Also used for recording indicator fill.
+    pub transport_stop: [u8; 3],
+    /// Recording-active state (pulsing). Can match transport_stop.
+    pub transport_rec: [u8; 3],
 
     // ── Latency indicator ───────────────────────────────────────────────────
     pub latency_ok: [u8; 3],
@@ -105,6 +184,9 @@ pub struct SynthTheme {
     pub bg_adsr: [u8; 3],
 
     // ── Geometry tokens (spacing, rounding, stroke) ─────────────────────────
+    /// 2 px — internal widget micro-gaps (step-pad gaps, knob arc padding).
+    #[serde(default = "default_sp_xxs")]
+    pub sp_xxs: f32,
     /// 4 px — tightest gap; used between related controls.
     pub sp_xs: f32,
     /// 8 px — standard item spacing.
@@ -115,18 +197,70 @@ pub struct SynthTheme {
     pub sp_lg: f32,
     /// 24 px — section-to-section gap.
     pub sp_xl: f32,
+    /// 40 px — major panel separation.
+    #[serde(default = "default_sp_xxl")]
+    pub sp_xxl: f32,
+    /// 2 px — tiny corner radius (step buttons, micro-chips).
+    #[serde(default = "default_rounding_xs")]
+    pub rounding_xs: f32,
     /// Small corner radius — step buttons, chips.
     pub rounding_sm: f32,
     /// Medium corner radius — section cards.
     pub rounding_md: f32,
     /// Large corner radius — windows, popovers.
     pub rounding_lg: f32,
+    /// Pill / badge — fully rounded.
+    #[serde(default = "default_rounding_full")]
+    pub rounding_full: f32,
     /// Default border stroke width.
     pub stroke_ui: f32,
     /// Focused / hovered border stroke width.
     pub stroke_focus: f32,
     /// Active / pressed border stroke width.
     pub stroke_active: f32,
+}
+
+fn default_sp_xxs() -> f32 {
+    2.0
+}
+fn default_sp_xxl() -> f32 {
+    40.0
+}
+fn default_rounding_xs() -> f32 {
+    2.0
+}
+fn default_rounding_full() -> f32 {
+    999.0
+}
+fn default_key_white_default() -> [u8; 3] {
+    [245, 245, 245]
+}
+fn default_key_black_default() -> [u8; 3] {
+    [25, 25, 25]
+}
+fn default_key_white_range() -> [u8; 3] {
+    [230, 240, 245]
+}
+fn default_key_black_range() -> [u8; 3] {
+    [40, 40, 50]
+}
+fn default_key_scale_root() -> [u8; 3] {
+    [255, 210, 80]
+}
+fn default_key_scale_root_dark() -> [u8; 3] {
+    [120, 80, 10]
+}
+fn default_key_scale_in() -> [u8; 3] {
+    [200, 240, 210]
+}
+fn default_key_scale_in_dark() -> [u8; 3] {
+    [30, 70, 40]
+}
+fn default_key_stroke() -> [u8; 3] {
+    [180, 180, 180]
+}
+fn default_key_label() -> [u8; 3] {
+    [140, 140, 140]
 }
 
 impl SynthTheme {
@@ -137,21 +271,29 @@ impl SynthTheme {
     }
 
     pub fn ca(&self, rgba: &[u8; 4]) -> Color32 {
-        Color32::from_rgba_premultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
+        Color32::from_rgba_unmultiplied(rgba[0], rgba[1], rgba[2], rgba[3])
+    }
+
+    /// True when the theme has a light app background (luminance > 0.3).
+    /// Used to invert active-widget fill logic: light themes use accent fill +
+    /// text_on_accent text; dark themes use dim accent glow + accent text.
+    pub fn is_light(&self) -> bool {
+        let [r, g, b] = self.bg_app;
+        let lin = |c: u8| {
+            let c = c as f32 / 255.0;
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055_f32).powf(2.4)
+            }
+        };
+        0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.3
     }
 
     #[allow(dead_code)]
     pub fn active(&self, on: bool) -> Color32 {
         if on {
             self.c(&self.accent)
-        } else {
-            Color32::GRAY
-        }
-    }
-
-    pub fn active_with(&self, on: bool, color: &[u8; 3]) -> Color32 {
-        if on {
-            self.c(color)
         } else {
             Color32::GRAY
         }
@@ -189,6 +331,8 @@ impl SynthTheme {
         };
 
         // Dim accent to use as active widget fill.
+        // Dark themes: dim accent glow as fill, bright accent as text (original behaviour).
+        // Light themes: solid accent fill, text_on_accent as text — matches toggle_button pattern.
         let accent_fill =
             Color32::from_rgba_premultiplied(accent.r() / 5, accent.g() / 5, accent.b() / 5, 200);
 
@@ -240,7 +384,12 @@ impl SynthTheme {
             border_focus,
             self.stroke_focus,
         );
-        vis.widgets.active = wv(accent_fill, accent, accent, self.stroke_focus);
+        let text_on_accent = self.c(&self.text_on_accent);
+        vis.widgets.active = if self.is_light() {
+            wv(accent, text_on_accent, accent, self.stroke_focus)
+        } else {
+            wv(accent_fill, accent, accent, self.stroke_focus)
+        };
         vis.widgets.open = wv(
             lighten(bg_surface, 22),
             text_primary,
@@ -258,35 +407,107 @@ impl SynthTheme {
         style.spacing.menu_margin = Margin::same(self.sp_sm as i8);
         style.spacing.indent = self.sp_lg;
         style.spacing.interact_size = Vec2::new(40.0, 20.0);
+
+        // Bind every egui TextStyle to a token from this theme. This is
+        // what makes `ui.label()`, `RichText::small()`, `.heading()`,
+        // `.monospace()`, button labels, and menu text align to the design
+        // system without per-site `.font(...)` overrides.
+        use egui::TextStyle;
+        let text_styles = std::collections::BTreeMap::from([
+            (TextStyle::Heading, self.font_heading()),
+            (TextStyle::Body, self.font_body()),
+            (TextStyle::Button, self.font_body()),
+            (TextStyle::Small, self.font_small()),
+            (TextStyle::Monospace, self.font_value()),
+        ]);
+        style.text_styles = text_styles;
+
         ctx.set_global_style(style);
+    }
+}
+
+// ── Font tokens ──────────────────────────────────────────────────────────────
+// Base sizes; the global pixels_per_point factor scales them at render time.
+// Theme-independent. Allowed dead_code while panel files still use hardcoded
+// `.size(N)` calls; Phase 3 migrates them.
+
+#[allow(dead_code)]
+impl SynthTheme {
+    /// 14 pt — panel / section title.
+    pub fn font_heading(&self) -> egui::FontId {
+        egui::FontId::proportional(14.0)
+    }
+
+    /// 12 pt — parameter labels, button text.
+    pub fn font_body(&self) -> egui::FontId {
+        egui::FontId::proportional(12.0)
+    }
+
+    /// 11 pt monospace — knob value readouts, numeric displays.
+    pub fn font_value(&self) -> egui::FontId {
+        egui::FontId::monospace(11.0)
+    }
+
+    /// 10 pt — secondary labels, unit suffixes.
+    pub fn font_small(&self) -> egui::FontId {
+        egui::FontId::proportional(10.0)
+    }
+
+    /// 9 pt — sequencer step indices, keyboard note names (absolute floor).
+    pub fn font_micro(&self) -> egui::FontId {
+        egui::FontId::proportional(9.0)
     }
 }
 
 // ── Geometry defaults shared by all themes ───────────────────────────────────
 
-fn geometry() -> (f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32) {
-    (
-        4.0,  // sp_xs
-        8.0,  // sp_sm
-        12.0, // sp_md
-        16.0, // sp_lg
-        24.0, // sp_xl
-        4.0,  // rounding_sm
-        8.0,  // rounding_md
-        12.0, // rounding_lg
-        1.0,  // stroke_ui
-        1.5,  // stroke_focus
-        2.0,  // stroke_active
-    )
+/// All themes share the same geometry scale. Stored as a struct so additions
+/// don't ripple into every theme constructor.
+struct Geometry {
+    sp_xxs: f32,
+    sp_xs: f32,
+    sp_sm: f32,
+    sp_md: f32,
+    sp_lg: f32,
+    sp_xl: f32,
+    sp_xxl: f32,
+    rounding_xs: f32,
+    rounding_sm: f32,
+    rounding_md: f32,
+    rounding_lg: f32,
+    rounding_full: f32,
+    stroke_ui: f32,
+    stroke_focus: f32,
+    stroke_active: f32,
+}
+
+fn geometry() -> Geometry {
+    Geometry {
+        sp_xxs: 2.0,
+        sp_xs: 4.0,
+        sp_sm: 8.0,
+        sp_md: 12.0,
+        sp_lg: 16.0,
+        sp_xl: 24.0,
+        sp_xxl: 40.0,
+        rounding_xs: 2.0,
+        rounding_sm: 4.0,
+        rounding_md: 8.0,
+        rounding_lg: 12.0,
+        rounding_full: 999.0,
+        stroke_ui: 1.0,
+        stroke_focus: 1.5,
+        stroke_active: 2.0,
+    }
 }
 
 // ── Built-in themes ──────────────────────────────────────────────────────────
 
 /// Midnight — dark navy-blue with teal accent.
 pub fn midnight() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+    let g = geometry();
     SynthTheme {
-        name: "Midnight".into(),
+        name: "Void".into(),
 
         bg_app: [6, 8, 12],
         bg_surface: [14, 18, 26],
@@ -297,18 +518,23 @@ pub fn midnight() -> SynthTheme {
         border_focus: [0, 160, 120],
 
         text_primary: [210, 218, 230],
-        text_secondary: [110, 125, 145],
+        text_secondary: [113, 128, 148], // bumped 3 pts — WCAG AA on bg_surface (4.66:1)
         text_disabled: [50, 60, 78],
+        text_on_accent: [6, 8, 12],
 
         accent: [0, 220, 160],
         accent_dim: [0, 180, 130],
+
+        knob_tier1_arc: [0, 220, 160],
+        knob_tier2_arc: [0, 140, 105],
+        knob_tier3_arc: [80, 95, 100],
 
         accent_hard_sync: [255, 180, 0],
         accent_fm: [120, 180, 255],
         accent_ring: [255, 130, 200],
         accent_hold: [255, 200, 0],
         accent_walker: [100, 180, 255],
-        accent_limiter: [0, 255, 0],
+        accent_limiter: [40, 220, 130],
 
         fx_overdrive: [255, 140, 60],
         fx_distortion: [220, 60, 60],
@@ -329,9 +555,25 @@ pub fn midnight() -> SynthTheme {
         seq_kb_major: [30, 80, 55],
         seq_kb_minor: [40, 55, 100],
         seq_kb_dim: [80, 35, 35],
+        seq_velocity_bar: [80, 140, 200],
+        seq_prob_low: [180, 70, 50],
+        seq_prob_mid: [180, 140, 40],
+        seq_prob_high: [60, 160, 80],
+        seq_rec_cursor: [220, 50, 50],
+        seq_octave_bar: [120, 80, 180],
 
         key_white_pressed: [100, 180, 255],
         key_black_pressed: [60, 120, 200],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [230, 240, 245],
+        key_black_range: [40, 40, 50],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [120, 80, 10],
+        key_scale_in: [200, 240, 210],
+        key_scale_in_dark: [30, 70, 40],
+        key_stroke: [180, 180, 180],
+        key_label: [140, 140, 140],
 
         scope_bg: [4, 10, 7],
         scope_zero: [12, 28, 18],
@@ -344,10 +586,20 @@ pub fn midnight() -> SynthTheme {
         meter_green: [0, 200, 80],
         meter_clip: [255, 50, 30],
 
+        osc_preview_line: [0, 210, 140],
+
+        filter_curve_line: [0, 210, 140],
+        filter_curve_grid: [0, 140, 90, 80],
+        filter_curve_label: [0, 200, 130, 160],
+
         adsr_fill: [0, 160, 100, 30],
         adsr_outline: [0, 200, 130],
         adsr_label: [80, 160, 110, 180],
         adsr_cursor: [0, 255, 160],
+
+        accent_beat: [80, 155, 215],   // steel blue — sub-beat pulse dot
+        transport_stop: [220, 70, 55], // vivid red — stop / panic
+        transport_rec: [220, 60, 50],  // slightly deeper red — recording active
 
         latency_ok: [0, 180, 120],
         latency_warn: [200, 180, 0],
@@ -362,25 +614,29 @@ pub fn midnight() -> SynthTheme {
         bg_seq_bar: [25, 25, 35],
         bg_adsr: [8, 14, 10],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
 /// Winamp Classic — dark grey with vivid green.
 pub fn winamp_classic() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+    let g = geometry();
     SynthTheme {
-        name: "Winamp Classic".into(),
+        name: "Vega".into(),
 
         bg_app: [10, 10, 10],
         bg_surface: [22, 22, 22],
@@ -391,11 +647,16 @@ pub fn winamp_classic() -> SynthTheme {
         border_focus: [0, 200, 0],
 
         text_primary: [215, 215, 215],
-        text_secondary: [130, 130, 130],
+        text_secondary: [152, 152, 152], // bumped — WCAG AA on bg_app (5.37:1) and bg_surface (4.50:1)
         text_disabled: [65, 65, 65],
+        text_on_accent: [10, 10, 10],
 
         accent: [0, 230, 0],
         accent_dim: [0, 180, 0],
+
+        knob_tier1_arc: [0, 230, 0],
+        knob_tier2_arc: [0, 140, 0],
+        knob_tier3_arc: [80, 100, 80],
 
         accent_hard_sync: [255, 200, 0],
         accent_fm: [150, 200, 60],
@@ -423,9 +684,25 @@ pub fn winamp_classic() -> SynthTheme {
         seq_kb_major: [20, 70, 20],
         seq_kb_minor: [40, 50, 80],
         seq_kb_dim: [80, 40, 30],
+        seq_velocity_bar: [60, 200, 100],
+        seq_prob_low: [220, 80, 40],
+        seq_prob_mid: [220, 180, 30],
+        seq_prob_high: [40, 220, 60],
+        seq_rec_cursor: [255, 80, 60],
+        seq_octave_bar: [180, 140, 60],
 
         key_white_pressed: [0, 220, 0],
         key_black_pressed: [0, 160, 0],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [220, 240, 225],
+        key_black_range: [35, 55, 40],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [100, 70, 5],
+        key_scale_in: [200, 240, 210],
+        key_scale_in_dark: [25, 65, 35],
+        key_stroke: [180, 180, 180],
+        key_label: [120, 140, 120],
 
         scope_bg: [6, 6, 6],
         scope_zero: [20, 30, 20],
@@ -443,6 +720,10 @@ pub fn winamp_classic() -> SynthTheme {
         adsr_label: [80, 160, 80, 180],
         adsr_cursor: [0, 255, 0],
 
+        accent_beat: [90, 165, 225],   // bright steel blue
+        transport_stop: [255, 90, 70], // hot red — passes AA on dark Winamp bar
+        transport_rec: [255, 80, 60],
+
         latency_ok: [0, 200, 0],
         latency_warn: [220, 200, 0],
         latency_bad: [220, 60, 40],
@@ -450,31 +731,189 @@ pub fn winamp_classic() -> SynthTheme {
         patch_browser_model: [150, 200, 60],
         patch_load_fx_on: [255, 200, 0],
 
+        osc_preview_line: [0, 220, 0],
+
+        filter_curve_line: [0, 220, 0],
+        filter_curve_grid: [0, 140, 0, 80],
+        filter_curve_label: [0, 200, 0, 160],
+
         midi_connected: [0, 230, 0],
 
         bg_panel: [18, 18, 18],
         bg_seq_bar: [30, 30, 30],
         bg_adsr: [12, 12, 12],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
 /// Phosphor — CRT green-on-black.
-pub fn phosphor() -> SynthTheme {
-    let (sp_xs, sp_sm, sp_md, sp_lg, sp_xl, r_sm, r_md, r_lg, s_ui, s_foc, s_act) = geometry();
+pub fn classic() -> SynthTheme {
+    let g = geometry();
     SynthTheme {
-        name: "Phosphor".into(),
+        // Vintage spaceship cockpit. Sandy linen panel faces, dark silk-screened
+        // labels, bold amber-gold for every control that glows or moves.
+        // "Screen" surfaces (scope, filter curve, EQ, OSC wave, ADSR) use the
+        // icon's dark blue-grey bg [14,18,28] + mint beam — the tinted-glass CRT
+        // look from the pixel-art icon. Non-screen instruments use warm sage.
+        name: "Mars Sand".into(),
+
+        // ── Surfaces — neutral warm sand, enough contrast between layers ─────
+        bg_app: [198, 192, 178],     // room walls — grey-sand, not orange
+        bg_surface: [215, 210, 196], // instrument panel face (raised, lighter)
+        bg_sunken: [178, 172, 158],  // recessed inputs — clearly darker
+        bg_bar: [192, 186, 172],     // toolbars / transport strips
+
+        border: [152, 142, 125],     // machined seam — visible but not harsh
+        border_focus: [120, 81, 28], // amber-brown lit edge — 3.63:1 on bg_bar (WCAG non-text 3:1)
+
+        // ── Text — strong contrast on sand panels ────────────────────────────
+        text_primary: [22, 16, 9], // near-black warm ink (maximum contrast)
+        text_secondary: [62, 50, 34], // dark warm brown — readable secondary
+        text_disabled: [125, 110, 88], // muted but legible
+        text_on_accent: [235, 220, 190], // light cream on dark amber fill — 6.73:1 WCAG AA
+
+        // ── Main accent — deep amber; WCAG AA on bg_bar/bg_app/bg_surface ──────
+        // Knob arcs use separate brighter tokens so decorative indicators stay vivid.
+        accent: [98, 66, 16], // deep amber — 4.71:1 on bg_bar, 6.03:1 on bg_surface
+        accent_dim: [72, 48, 11], // dimmed (proportional, 6.38:1 on bg_bar)
+
+        knob_tier1_arc: [220, 155, 45], // bright amber arc — decorator, no text contrast req.
+        knob_tier2_arc: [178, 125, 35],
+        knob_tier3_arc: [135, 96, 30],
+
+        // ── Secondary accents — muted tape-label hues ────────────────────────
+        accent_hard_sync: [142, 90, 162], // dusty violet
+        accent_fm: [82, 132, 158],        // muted steel blue
+        accent_ring: [162, 132, 78],      // warm tan-gold
+        accent_hold: [172, 102, 78],      // terracotta
+        accent_walker: [118, 152, 90],    // dusty sage
+        accent_limiter: [178, 95, 68],    // burnt orange
+
+        // ── FX — desaturated, colour-coded panel labels ──────────────────────
+        fx_overdrive: [185, 118, 55],    // warm orange
+        fx_distortion: [178, 82, 65],    // muted red
+        fx_chorus: [142, 112, 72],       // warm olive
+        fx_delay: [115, 142, 80],        // muted sage
+        fx_reverb: [78, 118, 145],       // steel blue
+        fx_shimmer: [95, 142, 158],      // powder blue
+        fx_crystallizer: [158, 125, 78], // warm sand-gold
+
+        // ── Sequencer — amber lit on warm mid-tan off ────────────────────────
+        seq_step_on: [212, 152, 45],       // amber lit step
+        seq_step_off: [168, 158, 140],     // warm mid-tan button
+        seq_current: [225, 175, 58],       // bright amber playhead
+        seq_note_bar_on: [132, 102, 38],   // dark amber bar
+        seq_note_bar_off: [152, 142, 122], // warm mid-tone off
+        seq_chord_major: [100, 80, 28],    // deep amber
+        seq_chord_minor: [60, 82, 112],    // muted slate blue
+        seq_chord_dim: [102, 58, 45],      // muted rust
+        seq_kb_major: [68, 55, 25],        // very dark amber
+        seq_kb_minor: [42, 56, 80],        // dark slate
+        seq_kb_dim: [72, 42, 32],          // dark rust
+        seq_velocity_bar: [182, 142, 48],  // amber velocity
+        seq_prob_low: [138, 112, 78],      // warm tan low
+        seq_prob_mid: [178, 142, 50],      // amber mid
+        seq_prob_high: [212, 162, 44],     // bright amber high
+        seq_rec_cursor: [188, 82, 68],     // muted red-orange record
+        seq_octave_bar: [155, 115, 44],    // amber octave
+
+        // ── Piano keys — clean ivory and ebony ───────────────────────────────
+        key_white_pressed: [212, 152, 44],  // amber glow (= accent)
+        key_black_pressed: [132, 98, 28],   // dark amber
+        key_white_default: [238, 230, 215], // clean ivory
+        key_black_default: [35, 26, 16],    // dark ebony
+        key_white_range: [215, 205, 188],   // ivory in range
+        key_black_range: [55, 43, 26],      // ebony in range
+        key_scale_root: [212, 152, 44],     // amber root
+        key_scale_root_dark: [105, 78, 25], // dark amber root
+        key_scale_in: [195, 180, 155],      // warm tan in-scale
+        key_scale_in_dark: [65, 50, 30],    // dark tan in-scale
+        key_stroke: [160, 140, 115],        // warm separator
+        key_label: [118, 96, 70],           // warm label text
+
+        // ── Scope/OSC/EQ/Filter — all CRT surfaces use the icon palette ──────
+        // Dark blue-grey bg [14,18,28] + mint beam, matching the pixel-art icon.
+        scope_bg: [14, 18, 28],                // icon screen bg
+        scope_zero: [26, 30, 46],              // slightly lighter zero line
+        scope_glow_outer: [75, 180, 130, 12],  // barely-there mint haze
+        scope_glow_mid: [142, 222, 170, 50],   // aqua mid-glow
+        scope_glow_core: [195, 245, 208, 240], // near-white mint beam core
+        scope_label: [80, 148, 108],           // muted mint label
+
+        // ── Meters — dark olive face, warm sage bar (panel instrument, not CRT)
+        meter_bg: [45, 38, 28],      // dark olive
+        meter_green: [140, 178, 82], // warm sage
+        meter_clip: [192, 78, 58],   // coral red
+
+        // ── ADSR — icon mint on dark CRT bg (same palette as scope) ──────────
+        adsr_fill: [152, 102, 25, 45],   // amber fill, semi-transparent
+        adsr_outline: [220, 155, 45],    // bright amber outline
+        adsr_label: [220, 155, 45, 160], // amber labels, soft
+        adsr_cursor: [220, 155, 45],     // amber cursor
+
+        // ── Transport / global bar ───────────────────────────────────────────
+        accent_beat: [35, 68, 128], // dark ink blue — 4.91:1 on sandy bg_bar
+        transport_stop: [140, 28, 22], // dark red — 4.74:1 on bg_bar
+        transport_rec: [140, 28, 22], // same — recording uses same danger red
+
+        // ── Status ───────────────────────────────────────────────────────────
+        latency_ok: [42, 80, 25],   // dark sage green — 4.81:1 on bg_bar
+        latency_warn: [98, 66, 16], // dark amber (= accent) — 4.71:1 on bg_bar
+        latency_bad: [130, 40, 30], // dark red — 4.78:1 on bg_bar
+
+        patch_browser_model: [82, 132, 158], // muted steel blue
+        patch_load_fx_on: [212, 145, 38],    // amber
+
+        osc_preview_line: [220, 155, 45], // amber — matches filter curve
+
+        filter_curve_line: [220, 155, 45], // bright amber — filter curve
+        filter_curve_grid: [152, 102, 25, 80], // dark amber grid, translucent
+        filter_curve_label: [220, 155, 45, 160], // amber labels, soft
+
+        midi_connected: [142, 220, 168], // icon mint (signal dot = screen)
+
+        // ── Legacy panel bg tokens ───────────────────────────────────────────
+        bg_panel: [188, 180, 165],   // mid-sand panel
+        bg_seq_bar: [208, 202, 188], // lighter sand seq bar
+        bg_adsr: [14, 18, 28],       // dark CRT bg — same as scope_bg
+
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
+    }
+}
+
+pub fn phosphor() -> SynthTheme {
+    let g = geometry();
+    SynthTheme {
+        name: "Sonar".into(),
 
         bg_app: [1, 5, 2],
         bg_surface: [3, 11, 5],
@@ -487,24 +926,29 @@ pub fn phosphor() -> SynthTheme {
         text_primary: [170, 235, 190],
         text_secondary: [70, 140, 88],
         text_disabled: [28, 65, 38],
+        text_on_accent: [4, 10, 7],
 
         accent: [30, 255, 120],
         accent_dim: [20, 200, 90],
+
+        knob_tier1_arc: [30, 255, 120],
+        knob_tier2_arc: [20, 160, 75],
+        knob_tier3_arc: [55, 95, 65],
 
         accent_hard_sync: [200, 255, 80],
         accent_fm: [80, 255, 180],
         accent_ring: [160, 255, 100],
         accent_hold: [220, 255, 60],
-        accent_walker: [80, 255, 180],
-        accent_limiter: [30, 255, 120],
+        accent_walker: [180, 255, 100],
+        accent_limiter: [120, 255, 80],
 
-        fx_overdrive: [200, 255, 60],
-        fx_distortion: [255, 160, 60],
-        fx_chorus: [40, 255, 160],
-        fx_delay: [60, 200, 255],
-        fx_reverb: [140, 180, 255],
-        fx_shimmer: [80, 240, 255],
-        fx_crystallizer: [200, 255, 100],
+        fx_overdrive: [255, 220, 80],
+        fx_distortion: [255, 100, 60],
+        fx_chorus: [80, 255, 180],
+        fx_delay: [80, 220, 180],
+        fx_reverb: [150, 220, 200],
+        fx_shimmer: [180, 255, 220],
+        fx_crystallizer: [240, 255, 100],
 
         seq_step_on: [20, 220, 100],
         seq_step_off: [10, 30, 18],
@@ -517,9 +961,25 @@ pub fn phosphor() -> SynthTheme {
         seq_kb_major: [10, 60, 30],
         seq_kb_minor: [20, 40, 60],
         seq_kb_dim: [50, 30, 20],
+        seq_velocity_bar: [120, 255, 180],
+        seq_prob_low: [220, 100, 80],
+        seq_prob_mid: [220, 200, 80],
+        seq_prob_high: [100, 255, 120],
+        seq_rec_cursor: [255, 120, 100],
+        seq_octave_bar: [200, 230, 100],
 
         key_white_pressed: [40, 255, 140],
         key_black_pressed: [20, 180, 90],
+        key_white_default: [245, 245, 245],
+        key_black_default: [25, 25, 25],
+        key_white_range: [225, 245, 240],
+        key_black_range: [35, 50, 45],
+        key_scale_root: [255, 210, 80],
+        key_scale_root_dark: [110, 75, 8],
+        key_scale_in: [195, 245, 220],
+        key_scale_in_dark: [25, 70, 45],
+        key_stroke: [175, 175, 175],
+        key_label: [130, 140, 135],
 
         scope_bg: [2, 6, 3],
         scope_zero: [8, 24, 12],
@@ -537,6 +997,10 @@ pub fn phosphor() -> SynthTheme {
         adsr_label: [60, 180, 100, 180],
         adsr_cursor: [40, 255, 140],
 
+        accent_beat: [80, 155, 215], // steel blue — sub-beat dot on dark green bg
+        transport_stop: [220, 70, 55], // vivid red
+        transport_rec: [220, 60, 50],
+
         latency_ok: [20, 220, 100],
         latency_warn: [200, 220, 40],
         latency_bad: [220, 80, 40],
@@ -544,26 +1008,36 @@ pub fn phosphor() -> SynthTheme {
         patch_browser_model: [80, 255, 180],
         patch_load_fx_on: [220, 255, 60],
 
+        osc_preview_line: [30, 255, 120],
+
+        filter_curve_line: [30, 255, 120],
+        filter_curve_grid: [20, 160, 70, 80],
+        filter_curve_label: [30, 220, 100, 160],
+
         midi_connected: [30, 255, 120],
 
         bg_panel: [2, 8, 4],
         bg_seq_bar: [8, 20, 12],
         bg_adsr: [4, 12, 6],
 
-        sp_xs,
-        sp_sm,
-        sp_md,
-        sp_lg,
-        sp_xl,
-        rounding_sm: r_sm,
-        rounding_md: r_md,
-        rounding_lg: r_lg,
-        stroke_ui: s_ui,
-        stroke_focus: s_foc,
-        stroke_active: s_act,
+        sp_xxs: g.sp_xxs,
+        sp_xs: g.sp_xs,
+        sp_sm: g.sp_sm,
+        sp_md: g.sp_md,
+        sp_lg: g.sp_lg,
+        sp_xl: g.sp_xl,
+        sp_xxl: g.sp_xxl,
+        rounding_xs: g.rounding_xs,
+        rounding_sm: g.rounding_sm,
+        rounding_md: g.rounding_md,
+        rounding_lg: g.rounding_lg,
+        rounding_full: g.rounding_full,
+        stroke_ui: g.stroke_ui,
+        stroke_focus: g.stroke_focus,
+        stroke_active: g.stroke_active,
     }
 }
 
 pub fn builtin_themes() -> Vec<SynthTheme> {
-    vec![midnight(), winamp_classic(), phosphor()]
+    vec![classic(), midnight(), winamp_classic(), phosphor()]
 }

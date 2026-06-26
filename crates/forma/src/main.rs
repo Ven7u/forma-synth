@@ -26,11 +26,19 @@ use patch::{default_patches, Patch};
 use sequencer::{spawn_sequencer, ChordKbState, SequencerHandle};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use ui::design::beat_indicator::{draw_beat_indicator, BeatState};
 use ui::drum_machine_ui::DrumMachineState;
 use ui::frame::SynthFrame;
 use ui::layout::{AppMode, StudioTab};
 
 fn main() -> eframe::Result {
+    // Logger backend for egui / eframe / wgpu (all use the `log` facade).
+    // Nothing prints unless RUST_LOG is set, e.g.:
+    //   RUST_LOG=egui=debug cargo run -p forma
+    //   RUST_LOG=warn,egui=trace,eframe=debug cargo run -p forma
+    // NB: egui paints id-clashes (red 🔥 overlay) — it does NOT log them.
+    env_logger::init();
+
     let recorder_sink = Arc::new(Mutex::new(None));
     let audio = AudioEngine::new(Arc::clone(&recorder_sink)).expect("Failed to start audio");
 
@@ -47,11 +55,22 @@ fn main() -> eframe::Result {
         }
     };
 
+    // Load persisted layout once up front so window geometry can be applied
+    // to NativeOptions before the viewport is built.
+    let saved_layout = ui::layout::load_layout();
+    let preferred_size = saved_layout.window_size.unwrap_or([1400.0, 860.0]);
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size(preferred_size)
+        .with_min_inner_size([720.0, 480.0])
+        .with_title("Forma")
+        .with_icon(icon);
+    if let Some(pos) = saved_layout.window_pos {
+        viewport = viewport.with_position(pos);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1400.0, 860.0])
-            .with_title("Forma")
-            .with_icon(icon),
+        viewport,
         ..Default::default()
     };
 
@@ -70,7 +89,7 @@ fn main() -> eframe::Result {
                     .callback_resources
                     .insert(resources);
             }
-            Ok(Box::new(SynthApp::new(audio, recorder_sink)))
+            Ok(Box::new(SynthApp::new(audio, recorder_sink, saved_layout)))
         }),
     )
 }
@@ -143,10 +162,18 @@ pub(crate) struct SynthApp {
     pub(crate) panels: PanelVisibility,
     pub(crate) reset_layout_pending: bool,
     pub(crate) dock_state: egui_dock::DockState<ui::dock::Tab>,
+    /// Measured OSC tab content height from the previous frame.
+    /// Used to calibrate the OSC/Modulation split ratio dynamically.
+    pub(crate) osc_tab_content_h: f32,
+    /// False until the first successful split calibration fires (frame 1+).
+    /// Reset to false whenever the dock layout is rebuilt.
+    pub(crate) osc_split_calibrated: bool,
 
     // Layout B state
     pub(crate) app_mode: AppMode,
     pub(crate) studio_tab: StudioTab,
+    /// Incremented each time app_mode changes; drives the panel fade-in animation.
+    pub(crate) mode_change_gen: u32,
 
     // OSC bank
     pub(crate) osc_wave: [usize; 3], // 0=sine 1=saw 2=square 3=triangle
@@ -260,6 +287,21 @@ pub(crate) struct SynthApp {
     // Limiter — threshold lives in engine; only the UI toggle is mirrored.
     pub(crate) limiter_enabled: bool,
     pub(crate) window_focused: bool,
+
+    // Design-system gallery (debug window — Ctrl/Cmd+Shift+G).
+    pub(crate) show_design_gallery: bool,
+    // Theme editor (Ctrl/Cmd+Shift+T).
+    pub(crate) show_theme_editor: bool,
+
+    // ── UI scaling / window geometry persistence ─────────────────────────────
+    pub(crate) zoom_factor: f32,
+    /// True until the first `ui()` tick — used for one-shot monitor clamp.
+    first_frame: bool,
+    /// Last value passed to `set_pixels_per_point` (avoid redundant calls).
+    last_applied_ppp: f32,
+    /// Cached each frame so `on_exit` (which has no `ctx`) can persist it.
+    last_window_size: Option<[f32; 2]>,
+    last_window_pos: Option<[f32; 2]>,
 
     // Global tempo / sync
     pub(crate) global_bpm: u32, // master tempo — source of truth when components are synced
@@ -482,14 +524,17 @@ pub(crate) struct SynthApp {
 }
 
 impl SynthApp {
-    fn new(audio: AudioEngine, recorder_sink: Arc<Mutex<Option<recorder::Recorder>>>) -> Self {
+    fn new(
+        audio: AudioEngine,
+        recorder_sink: Arc<Mutex<Option<recorder::Recorder>>>,
+        saved: ui::layout::LayoutState,
+    ) -> Self {
         let mut midi = MidiEngine::new();
         midi.list_ports();
 
         // Auto-connect: try the saved port name first, then fall back to the
         // first available device so the keyboard just works on launch.
         {
-            let saved = ui::layout::load_layout();
             let target_idx = if let Some(ref saved_name) = saved.midi_port_name {
                 // Prefer exact match on saved name.
                 midi.port_names
@@ -559,11 +604,10 @@ impl SynthApp {
         ];
 
         // Restore persisted layout (theme + panel visibility).
-        let saved = ui::layout::load_layout();
         let theme = ui::theme::builtin_themes()
             .into_iter()
             .find(|t| t.name == saved.theme_name)
-            .unwrap_or_else(ui::theme::midnight);
+            .unwrap_or_else(ui::theme::classic);
         let panels = PanelVisibility::from_state(&saved.panels);
         let app_mode = saved.app_mode;
         let studio_tab = saved.studio_tab;
@@ -586,8 +630,11 @@ impl SynthApp {
             panels,
             reset_layout_pending: true,
             dock_state: ui::dock::default_dock_state(),
+            osc_tab_content_h: 0.0,
+            osc_split_calibrated: false,
             app_mode,
             studio_tab,
+            mode_change_gen: 0,
             osc_wave: [1, 0, 0], // OSC1=saw, OSC2=sine, OSC3=sine
             osc_octave: [0, 0, 0],
             osc_detune: [0.0, 0.0, 0.0],
@@ -663,6 +710,13 @@ impl SynthApp {
             peak_hold_timer: 0.0,
             limiter_enabled: true,
             window_focused: true,
+            show_design_gallery: false,
+            show_theme_editor: false,
+            zoom_factor: saved.zoom_factor.clamp(0.7, 1.4),
+            first_frame: true,
+            last_applied_ppp: 0.0,
+            last_window_size: saved.window_size,
+            last_window_pos: saved.window_pos,
             global_bpm: 120,
             global_sync: false,
             arp_sync: true,
@@ -1601,6 +1655,9 @@ impl SynthApp {
                 .midi
                 .connected_port
                 .and_then(|i| self.midi.port_names.get(i).cloned()),
+            window_size: self.last_window_size,
+            window_pos: self.last_window_pos,
+            zoom_factor: self.zoom_factor,
         }
     }
 
@@ -1631,6 +1688,91 @@ impl eframe::App for SynthApp {
     fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = _ui.ctx().clone();
         let ctx = &ctx;
+
+        // ── Window geometry + zoom ────────────────────────────────────────
+        // Cache window geometry every frame so on_exit (which has no ctx)
+        // can persist it.
+        ctx.input(|i| {
+            let vp = i.viewport();
+            if let Some(r) = vp.inner_rect {
+                self.last_window_size = Some([r.width(), r.height()]);
+            }
+            if let Some(r) = vp.outer_rect {
+                self.last_window_pos = Some([r.min.x, r.min.y]);
+            }
+        });
+
+        // First-frame monitor clamp: shrink to 90% of monitor if larger.
+        if self.first_frame {
+            self.first_frame = false;
+            if let Some(mon) = ctx.input(|i| i.viewport().monitor_size) {
+                let max_w = mon.x * 0.9;
+                let max_h = mon.y * 0.9;
+                let cur = self.last_window_size.unwrap_or([1400.0, 860.0]);
+                if cur[0] > max_w || cur[1] > max_h {
+                    let clamped = egui::vec2(cur[0].min(max_w), cur[1].min(max_h));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(clamped));
+                }
+            }
+        }
+
+        // Cmd/Ctrl +/-/0 zoom shortcuts. egui::Modifiers::COMMAND maps to ⌘
+        // on macOS, Ctrl elsewhere.
+        let zoom_action = ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            let plus = KeyboardShortcut::new(Modifiers::COMMAND, Key::Plus);
+            let equ = KeyboardShortcut::new(Modifiers::COMMAND, Key::Equals);
+            let minus = KeyboardShortcut::new(Modifiers::COMMAND, Key::Minus);
+            let zero = KeyboardShortcut::new(Modifiers::COMMAND, Key::Num0);
+            if i.consume_shortcut(&zero) {
+                return 2; // reset
+            }
+            if i.consume_shortcut(&plus) || i.consume_shortcut(&equ) {
+                return 1; // zoom in
+            }
+            if i.consume_shortcut(&minus) {
+                return -1; // zoom out
+            }
+            0
+        });
+        match zoom_action {
+            1 => self.zoom_factor = (self.zoom_factor + 0.05).min(1.4),
+            -1 => self.zoom_factor = (self.zoom_factor - 0.05).max(0.7),
+            2 => self.zoom_factor = 0.9,
+            _ => {}
+        }
+
+        // Ctrl/Cmd+Shift+G toggles the design-system gallery window.
+        if ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            i.consume_shortcut(&KeyboardShortcut::new(
+                Modifiers::COMMAND | Modifiers::SHIFT,
+                Key::G,
+            ))
+        }) {
+            self.show_design_gallery = !self.show_design_gallery;
+        }
+
+        // Ctrl/Cmd+Shift+T toggles the theme editor window.
+        if ctx.input_mut(|i| {
+            use egui::{Key, KeyboardShortcut, Modifiers};
+            i.consume_shortcut(&KeyboardShortcut::new(
+                Modifiers::COMMAND | Modifiers::SHIFT,
+                Key::T,
+            ))
+        }) {
+            self.show_theme_editor = !self.show_theme_editor;
+        }
+
+        // Apply pixels_per_point. NOTE: if text appears doubled on HiDPI,
+        // the native_ppp multiplier double-applies — drop it and re-test.
+        let native_ppp = ctx.native_pixels_per_point().unwrap_or(1.0);
+        let target_ppp = self.zoom_factor * native_ppp;
+        if (self.last_applied_ppp - target_ppp).abs() > 0.001 {
+            ctx.set_pixels_per_point(target_ppp);
+            self.last_applied_ppp = target_ppp;
+        }
+
         // Apply theme to egui Visuals + Style every frame — cheap struct copies.
         self.theme.apply_to_egui(ctx);
 
@@ -1672,6 +1814,8 @@ impl eframe::App for SynthApp {
         self.ui_scope_fullscreen(ctx);
         self.ui_scene_browser(ctx);
         self.ui_midi_learn_window(ctx);
+        ui::design::gallery::show(ctx, &mut self.show_design_gallery, &self.theme);
+        ui::design::theme_editor::show(ctx, &mut self.show_theme_editor, &mut self.theme);
 
         // ── Zone 1: global bar (top, always visible) ──────────────────────────
         egui::TopBottomPanel::top("global_bar")
@@ -1697,20 +1841,40 @@ impl eframe::App for SynthApp {
         // ── Zones 2 + 3: central editing area (dock in Studio, placeholder in Live) ──
         egui::CentralPanel::default()
             .frame(SynthFrame::app_bg(&self.theme))
-            .show(ctx, |ui| match self.app_mode {
-                AppMode::Studio => {
-                    self.ui_synth_dock(ui);
+            .show(ctx, |ui| {
+                match self.app_mode {
+                    AppMode::Studio => {
+                        self.ui_synth_dock(ui);
+                    }
+                    AppMode::DrumMachine => {
+                        self.ui_drum_machine(ui);
+                    }
+                    #[cfg(feature = "live_rig")]
+                    AppMode::Live => {
+                        self.ui_live_view(ui);
+                    }
+                    #[cfg(not(feature = "live_rig"))]
+                    AppMode::Live => {
+                        self.ui_synth_dock(ui);
+                    }
                 }
-                AppMode::DrumMachine => {
-                    self.ui_drum_machine(ui);
-                }
-                #[cfg(feature = "live_rig")]
-                AppMode::Live => {
-                    self.ui_live_view(ui);
-                }
-                #[cfg(not(feature = "live_rig"))]
-                AppMode::Live => {
-                    self.ui_synth_dock(ui);
+
+                // Fade-in overlay: flashes a dark rect that fades out over 220ms
+                // each time the mode changes, masking the layout snap.
+                let fade = ctx.animate_value_with_time(
+                    egui::Id::new("mode_fade").with(self.mode_change_gen),
+                    1.0_f32,
+                    0.22,
+                );
+                if fade < 1.0 {
+                    let bg = self.theme.c(&self.theme.bg_app);
+                    let alpha = ((1.0 - fade) * 210.0) as u8;
+                    ui.painter().rect_filled(
+                        ui.clip_rect(),
+                        egui::CornerRadius::ZERO,
+                        egui::Color32::from_rgba_unmultiplied(bg.r(), bg.g(), bg.b(), alpha),
+                    );
+                    ctx.request_repaint();
                 }
             });
 
@@ -2460,11 +2624,26 @@ impl SynthApp {
             ];
             for (mode, label, hover) in mode_entries.iter().copied() {
                 let active = self.app_mode == mode;
-                let col = if active {
-                    self.theme.c(&self.theme.accent)
+                // Smooth color fade between inactive and active state (180ms).
+                let t = ui.ctx().animate_bool_with_time(
+                    egui::Id::new("mode_btn").with(label),
+                    active,
+                    0.18,
+                );
+                let fg_off = self.theme.c(&self.theme.text_primary);
+                // Light themes: active button has solid accent fill, so text must be
+                // text_on_accent (cream) to be readable. Dark themes: text is the accent color.
+                let fg_on = if self.theme.is_light() {
+                    self.theme.c(&self.theme.text_on_accent)
                 } else {
-                    self.theme.c(&self.theme.text_secondary)
+                    self.theme.c(&self.theme.accent)
                 };
+                let col = egui::Color32::from_rgba_unmultiplied(
+                    (fg_off.r() as f32 + (fg_on.r() as f32 - fg_off.r() as f32) * t) as u8,
+                    (fg_off.g() as f32 + (fg_on.g() as f32 - fg_off.g() as f32) * t) as u8,
+                    (fg_off.b() as f32 + (fg_on.b() as f32 - fg_off.b() as f32) * t) as u8,
+                    255,
+                );
                 if ui
                     .add(egui::Button::selectable(
                         active,
@@ -2473,6 +2652,9 @@ impl SynthApp {
                     .on_hover_text(hover)
                     .clicked()
                 {
+                    if self.app_mode != mode {
+                        self.mode_change_gen = self.mode_change_gen.wrapping_add(1);
+                    }
                     self.app_mode = mode;
                 }
             }
@@ -2483,19 +2665,21 @@ impl SynthApp {
             ui.label(
                 egui::RichText::new("BPM")
                     .size(11.0)
-                    .color(self.theme.c(&self.theme.text_secondary)),
+                    .color(self.theme.c(&self.theme.text_primary)),
             );
-            if ui
-                .add(
-                    egui::DragValue::new(&mut self.global_bpm)
-                        .range(40..=600)
-                        .speed(0.5),
-                )
-                .on_hover_text("Master tempo (40–600 BPM). Drag or scroll.")
-                .changed()
-            {
-                self.apply_clock_sync();
-            }
+            ui.push_id("bpm_dragvalue", |ui| {
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut self.global_bpm)
+                            .range(40..=600)
+                            .speed(0.5),
+                    )
+                    .on_hover_text("Master tempo (40–600 BPM). Drag or scroll.")
+                    .changed()
+                {
+                    self.apply_clock_sync();
+                }
+            });
 
             // ── Sync controls ─────────────────────────────────────────────
             let sync_col = if self.global_sync {
@@ -2544,36 +2728,24 @@ impl SynthApp {
             });
 
             // ── BPM display + beat indicator ──────────────────────────────
-            // Clicking opens/closes the metronome window.
             {
                 let seq_playing = self.seq.playing.load(Ordering::Relaxed);
                 let drums_running = self.drum_engine.enabled.load(Ordering::Relaxed);
-                let metro_active = self.metro_enabled
-                    || self.seq_pending_start
-                    || self.arp_pending_start
-                    || seq_playing
-                    || drums_running;
-                let beat_idx = self.metro_phase as usize;
-                let beat_frac = self.metro_phase.fract() as f32;
-
-                // Accent dot pulses on beat 1; beat dot pulses on beats 2+.
-                let accent_t = if metro_active && beat_idx == 0 {
-                    (1.0_f32 - beat_frac).powf(2.2)
-                } else {
-                    0.0
-                };
-                let beat_t = if metro_active && beat_idx > 0 {
-                    (1.0_f32 - beat_frac).powf(2.2)
-                } else {
-                    0.0
-                };
-
-                const DOT_R: f32 = 3.5;
-                // Fixed layout: 30px BPM text + 5px gap + dot + 4px gap + dot
-                let total_w = 30.0 + 5.0 + DOT_R * 2.0 + 4.0 + DOT_R * 2.0;
-                let (rect, resp) = ui.allocate_exact_size(
-                    egui::Vec2::new(total_w, ui.available_height()),
-                    egui::Sense::click(),
+                let resp = draw_beat_indicator(
+                    ui,
+                    &BeatState {
+                        active: self.metro_enabled
+                            || self.seq_pending_start
+                            || self.arp_pending_start
+                            || seq_playing
+                            || drums_running,
+                        beat_idx: self.metro_phase as usize,
+                        beat_frac: self.metro_phase.fract() as f32,
+                        beats: self.metro_beats,
+                        denom: self.metro_denom,
+                        show_metronome: self.show_metronome,
+                    },
+                    &self.theme,
                 );
                 if resp.clicked() {
                     self.show_metronome = !self.show_metronome;
@@ -2582,59 +2754,6 @@ impl SynthApp {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
                 resp.on_hover_text("Click to open metronome / time signature settings.");
-
-                if ui.is_rect_visible(rect) {
-                    let painter = ui.painter();
-                    let cy = rect.center().y;
-
-                    // Time signature label (e.g. "4/4")
-                    let sig_col = if self.show_metronome {
-                        self.theme.c(&self.theme.accent)
-                    } else {
-                        self.theme.c(&self.theme.text_secondary)
-                    };
-                    painter.text(
-                        egui::Pos2::new(rect.left() + 15.0, cy),
-                        egui::Align2::CENTER_CENTER,
-                        format!("{}/{}", self.metro_beats, self.metro_denom),
-                        egui::FontId::monospace(10.0),
-                        sig_col,
-                    );
-
-                    // Helper: lerp between two Color32s
-                    let lerp_col = |a: egui::Color32, b: egui::Color32, t: f32| {
-                        let t = t.clamp(0.0, 1.0);
-                        egui::Color32::from_rgb(
-                            (a.r() as f32 + (b.r() as f32 - a.r() as f32) * t) as u8,
-                            (a.g() as f32 + (b.g() as f32 - a.g() as f32) * t) as u8,
-                            (a.b() as f32 + (b.b() as f32 - a.b() as f32) * t) as u8,
-                        )
-                    };
-
-                    // Accent dot (beat 1) — accent colour
-                    let accent_full = self.theme.c(&self.theme.accent);
-                    let accent_dim = egui::Color32::from_rgb(
-                        (accent_full.r() as f32 * 0.18) as u8,
-                        (accent_full.g() as f32 * 0.18) as u8,
-                        (accent_full.b() as f32 * 0.18) as u8,
-                    );
-                    let dot1_x = rect.left() + 30.0 + 5.0 + DOT_R;
-                    painter.circle_filled(
-                        egui::Pos2::new(dot1_x, cy),
-                        DOT_R,
-                        lerp_col(accent_dim, accent_full, accent_t),
-                    );
-
-                    // Beat dot (beats 2+) — cool blue
-                    let beat_full = egui::Color32::from_rgb(100, 170, 220);
-                    let beat_dim = egui::Color32::from_rgb(15, 30, 45);
-                    let dot2_x = dot1_x + DOT_R * 2.0 + 4.0;
-                    painter.circle_filled(
-                        egui::Pos2::new(dot2_x, cy),
-                        DOT_R,
-                        lerp_col(beat_dim, beat_full, beat_t),
-                    );
-                }
             }
 
             // ── STOP ─────────────────────────────────────────────────────
@@ -2642,7 +2761,7 @@ impl SynthApp {
                 .add(egui::Button::new(
                     egui::RichText::new("■")
                         .size(13.0)
-                        .color(egui::Color32::from_rgb(220, 80, 70)),
+                        .color(self.theme.c(&self.theme.transport_stop)),
                 ))
                 .on_hover_text(
                     "Panic stop — silence all voices, stop sequencer / arp / walker / drums, clear frozen notes and flush FX tails.",
@@ -2655,30 +2774,57 @@ impl SynthApp {
             ui.separator();
 
             // ── Track breadcrumb ──────────────────────────────────────────
-            if self.app_mode != AppMode::DrumMachine {
-                let crumb = format!(
+            // Always allocate the label (empty in Drum mode) so the bar's
+            // auto-id counter is IDENTICAL in both modes. The right-section
+            // widget ids are seeded from this counter; if the breadcrumb only
+            // existed in Studio, those ids would shift between modes. During a
+            // switch egui runs the frame in two passes whose breadcrumb state
+            // differs, which makes every right-side widget "change id between
+            // passes" — egui then outlines them (the red borders).
+            let crumb = if self.app_mode != AppMode::DrumMachine {
+                format!(
                     "T{}  {}  ·  {}",
                     self.focused_track + 1,
                     self.track_names[self.focused_track],
                     self.patch_name,
-                );
-                ui.label(
-                    egui::RichText::new(crumb)
-                        .size(11.0)
-                        .color(self.theme.c(&self.theme.text_secondary)),
-                );
-            }
+                )
+            } else {
+                String::new()
+            };
+            ui.label(
+                egui::RichText::new(crumb)
+                    .size(11.0)
+                    .color(self.theme.c(&self.theme.text_primary)),
+            );
 
             // ── Right-aligned items ───────────────────────────────────────
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // Use scope_builder with an explicit id_salt so this section's widget
+            // IDs are stable even when the conditional breadcrumb above changes the
+            // parent auto-ID counter between Studio and Drum modes.
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .layout(egui::Layout::right_to_left(egui::Align::Center))
+                    .id_salt("bar_right_controls"),
+                |ui| {
                 // Settings menu — flat single-level list to avoid submenu overlap issues.
                 ui.menu_button(egui::RichText::new("⚙").size(14.0), |ui| {
-                    ui.set_min_width(160.0);
+                    let theme = self.theme.clone();
+                    let txt = |s: &str| {
+                        egui::RichText::new(s)
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_primary))
+                    };
+                    let section = |s: &str| {
+                        egui::RichText::new(s)
+                            .font(theme.font_micro())
+                            .color(theme.c(&theme.text_secondary))
+                    };
+                    ui.set_min_width(180.0);
 
                     // ── Patch ──────────────────────────────────────────────
-                    ui.label(egui::RichText::new("PATCH").small().weak());
+                    ui.label(section("PATCH"));
                     if ui
-                        .button("Randomize Patch")
+                        .button(txt("Randomize Patch"))
                         .on_hover_text("Generate a random patch and apply it immediately.")
                         .clicked()
                     {
@@ -2687,7 +2833,7 @@ impl SynthApp {
                         ui.close();
                     }
                     if ui
-                        .button("Init Patch")
+                        .button(txt("Init Patch"))
                         .on_hover_text("Reset all parameters to the default Init state.")
                         .clicked()
                     {
@@ -2699,11 +2845,11 @@ impl SynthApp {
                         ui.close();
                     }
                     ui.separator();
-                    if ui.button("New Patch").clicked() {
+                    if ui.button(txt("New Patch")).clicked() {
                         self.patch_name = "Init".into();
                         ui.close();
                     }
-                    if ui.button("Save Patch…").clicked() {
+                    if ui.button(txt("Save Patch…")).clicked() {
                         let p = self.capture_patch();
                         if let Some(path) = rfd::FileDialog::new()
                             .set_file_name(format!("{}.json", p.name))
@@ -2716,7 +2862,7 @@ impl SynthApp {
                         }
                         ui.close();
                     }
-                    if ui.button("Load Patch…").clicked() {
+                    if ui.button(txt("Load Patch…")).clicked() {
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter("Patch", &["json"])
                             .pick_file()
@@ -2733,12 +2879,17 @@ impl SynthApp {
                     ui.separator();
 
                     // ── Theme ──────────────────────────────────────────────
-                    ui.label(egui::RichText::new("THEME").small().weak());
+                    ui.label(section("THEME"));
                     for t in ui::theme::builtin_themes() {
-                        if ui
-                            .selectable_label(self.theme.name == t.name, &t.name)
-                            .clicked()
-                        {
+                        let selected = self.theme.name == t.name;
+                        let label = egui::RichText::new(&t.name)
+                            .font(theme.font_body())
+                            .color(if selected {
+                                theme.c(&theme.accent)
+                            } else {
+                                theme.c(&theme.text_primary)
+                            });
+                        if ui.selectable_label(selected, label).clicked() {
                             self.theme = t;
                             ui.close();
                         }
@@ -2747,10 +2898,17 @@ impl SynthApp {
                     ui.separator();
 
                     // ── View ───────────────────────────────────────────────
-                    ui.label(egui::RichText::new("VIEW").small().weak());
+                    ui.label(section("VIEW"));
                     for &tab in ui::dock::Tab::ALL {
                         let open = self.dock_state.find_tab(&tab).is_some();
-                        if ui.selectable_label(open, tab.title()).clicked() {
+                        let label = egui::RichText::new(tab.title())
+                            .font(theme.font_body())
+                            .color(if open {
+                                theme.c(&theme.accent)
+                            } else {
+                                theme.c(&theme.text_primary)
+                            });
+                        if ui.selectable_label(open, label).clicked() {
                             if open {
                                 self.dock_state
                                     .remove_tab(self.dock_state.find_tab(&tab).unwrap());
@@ -2760,7 +2918,7 @@ impl SynthApp {
                             ui.close();
                         }
                     }
-                    if ui.button("Reset Layout").clicked() {
+                    if ui.button(txt("Reset Layout")).clicked() {
                         self.reset_layout_pending = true;
                         ui.close();
                     }
@@ -2769,7 +2927,7 @@ impl SynthApp {
 
                     // ── Transport ──────────────────────────────────────────
                     if ui
-                        .button("Sync Now")
+                        .button(txt("Sync Now"))
                         .on_hover_text("Reset phases for sequencer, arpeggiator, and walker.")
                         .clicked()
                     {
@@ -2783,7 +2941,7 @@ impl SynthApp {
                 let metro_col = if self.show_metronome {
                     self.theme.c(&self.theme.accent)
                 } else {
-                    self.theme.c(&self.theme.text_secondary)
+                    self.theme.c(&self.theme.text_primary)
                 };
                 if ui
                     .button(egui::RichText::new("♩").size(11.0).color(metro_col))
@@ -2805,7 +2963,7 @@ impl SynthApp {
                     let bar_col = if self.ab_active > 0 {
                         self.theme.c(&self.theme.accent)
                     } else {
-                        self.theme.c(&self.theme.text_secondary)
+                        self.theme.c(&self.theme.text_primary)
                     };
                     ui.menu_button(
                         egui::RichText::new(bar_label).size(11.0).color(bar_col),
@@ -2903,7 +3061,7 @@ impl SynthApp {
                     let learn_col = if active {
                         self.theme.c(&self.theme.accent)
                     } else {
-                        self.theme.c(&self.theme.text_secondary)
+                        self.theme.c(&self.theme.text_primary)
                     };
                     if ui
                         .add(egui::Button::selectable(
@@ -2921,7 +3079,7 @@ impl SynthApp {
                 let lib_col = if self.patch_browser_open {
                     self.theme.c(&self.theme.accent)
                 } else {
-                    self.theme.c(&self.theme.text_secondary)
+                    self.theme.c(&self.theme.text_primary)
                 };
                 if ui
                     .button(egui::RichText::new("PATCH").size(11.0).color(lib_col))
@@ -2935,7 +3093,7 @@ impl SynthApp {
                 let hist_col = if self.history_open {
                     self.theme.c(&self.theme.accent)
                 } else {
-                    self.theme.c(&self.theme.text_secondary)
+                    self.theme.c(&self.theme.text_primary)
                 };
                 if ui
                     .button(egui::RichText::new("HIST").size(11.0).color(hist_col))
@@ -2949,7 +3107,7 @@ impl SynthApp {
                 let scene_col = if self.scene_browser_open {
                     self.theme.c(&self.theme.accent)
                 } else {
-                    self.theme.c(&self.theme.text_secondary)
+                    self.theme.c(&self.theme.text_primary)
                 };
                 if ui
                     .button(egui::RichText::new("SCENE").size(11.0).color(scene_col))
@@ -2980,7 +3138,7 @@ impl SynthApp {
                 if is_recording {
                     let stop_label = egui::RichText::new("■ REC")
                         .size(11.0)
-                        .color(egui::Color32::from_rgb(220, 60, 60));
+                        .color(self.theme.c(&self.theme.transport_rec));
                     if ui
                         .button(stop_label)
                         .on_hover_text("Stop recording and save WAV file.")
@@ -2999,7 +3157,7 @@ impl SynthApp {
                 } else {
                     let rec_label = egui::RichText::new("⏺ REC")
                         .size(11.0)
-                        .color(self.theme.c(&self.theme.text_secondary));
+                        .color(self.theme.c(&self.theme.transport_rec));
                     if ui
                         .button(rec_label)
                         .on_hover_text("Record stereo output to WAV.")
@@ -3034,24 +3192,27 @@ impl SynthApp {
                         .color(self.theme.c(&self.theme.text_disabled)),
                 );
                 let mut global_vol = self.engine.global_volume();
-                if ui
-                    .add(
-                        egui::DragValue::new(&mut global_vol)
-                            .range(0.0_f32..=1.0)
-                            .speed(0.005)
-                            .fixed_decimals(2),
-                    )
-                    .on_hover_text("Global output volume — applied after all FX.")
-                    .changed()
-                {
-                    self.engine.set_global_volume(global_vol);
-                }
+                ui.push_id("vol_dragvalue", |ui| {
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut global_vol)
+                                .range(0.0_f32..=1.0)
+                                .speed(0.005)
+                                .fixed_decimals(2),
+                        )
+                        .on_hover_text("Global output volume — applied after all FX.")
+                        .changed()
+                    {
+                        self.engine.set_global_volume(global_vol);
+                    }
+                });
 
                 ui.separator();
 
                 // Patch name
                 ui.add(
                     egui::TextEdit::singleline(&mut self.patch_name)
+                        .id_salt("patch_name_input")
                         .desired_width(100.0)
                         .font(egui::TextStyle::Monospace),
                 );

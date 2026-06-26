@@ -2,10 +2,15 @@ use crate::sequencer::{
     apply_voicing, chord_name, chord_quality, scale_pitch_classes, ChordType, ScaleType, SeqMode,
     VoicingType, CHORD_KB_COLS, CHORD_KB_ROWS, DEGREE_LABELS, NOTE_NAMES,
 };
+use crate::ui::design::chip::chip_selector;
+use crate::ui::design::chord_pad::{chord_pad, parse_quality, ChordPadState};
+use crate::ui::design::piano::{piano, KeyVisualState, PianoConfig, PianoSize};
+use crate::ui::design::toggle::{toggle_button, ToggleSize};
+use crate::ui::design::Tier;
 use crate::ui::layout::AppMode;
 use crate::SynthApp;
 use eframe::egui;
-use egui::{Color32, CornerRadius, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2};
+use egui::Vec2;
 
 #[allow(dead_code)]
 const WHITE_SEMITONES: &[i32] = &[0, 2, 4, 5, 7, 9, 11];
@@ -34,20 +39,8 @@ const KEY_MAP: &[(egui::Key, i32)] = &[
 ];
 
 /// 88-key piano: A0 (MIDI 21) to C8 (MIDI 108).
-const PIANO_FIRST_MIDI: u8 = 21; // A0
-const PIANO_LAST_MIDI: u8 = 108; // C8
-
-/// Returns true if a MIDI note is a white key.
-fn is_white_key(midi: u8) -> bool {
-    matches!(midi % 12, 0 | 2 | 4 | 5 | 7 | 9 | 11)
-}
-
-/// Count white keys in the 88-key range.
-fn count_white_keys() -> usize {
-    (PIANO_FIRST_MIDI..=PIANO_LAST_MIDI)
-        .filter(|&m| is_white_key(m))
-        .count()
-}
+const PIANO_FIRST_MIDI: u8 = 21;
+const PIANO_LAST_MIDI: u8 = 108;
 
 impl SynthApp {
     /// Process keyboard input every frame regardless of which tab is visible.
@@ -405,50 +398,47 @@ impl SynthApp {
 
     /// Render the persistent bottom keyboard strip.
     pub fn ui_keyboard_panel(&mut self, ui: &mut egui::Ui) {
+        // Pre-resolve tokens.
+        let accent = self.theme.c(&self.theme.accent);
+        let accent_fm = self.theme.c(&self.theme.accent_fm);
+        let accent_hold = self.theme.c(&self.theme.accent_hold);
+        let text_dis = self.theme.c(&self.theme.text_disabled);
+
         ui.horizontal(|ui| {
-            // Mode toggle: Piano / Chord KB
-            let piano_label = egui::RichText::new("Piano")
-                .color(if !self.kb_chord_mode { self.theme.c(&self.theme.accent) } else { Color32::GRAY })
-                .strong();
-            if ui.button(piano_label).on_hover_text("Standard piano — play individual notes.").clicked()
-                && self.kb_chord_mode
-            {
-                self.kb_chord_mode = false;
-            }
-            let chord_label = egui::RichText::new("Chord KB")
-                .color(if self.kb_chord_mode { self.theme.c(&self.theme.accent) } else { Color32::GRAY })
-                .strong();
-            if ui.button(chord_label).on_hover_text("Chord Keyboard — A–G trigger diatonic chords I–VII.").clicked()
-                && !self.kb_chord_mode
-            {
-                self.kb_chord_mode = true;
-            }
+            // ── Mode selector: Piano / Chord KB ──────────────────────────
+            let mut mode = self.kb_chord_mode as usize;
+            chip_selector(
+                ui, &mut mode,
+                &[(0, "Piano"), (1, "Chord KB")],
+                &self.theme, None,
+            )
+            .on_hover_text(
+                "Piano — individual notes  |  Chord KB — A–G trigger diatonic chords I–VII.",
+            );
+            self.kb_chord_mode = mode != 0;
 
             ui.separator();
 
-            // Freeze toggle
-            let freeze_color = if self.kb_freeze {
-                Color32::from_rgb(80, 160, 240)
-            } else {
-                Color32::GRAY
-            };
-            let freeze_label = egui::RichText::new("❄ Freeze")
-                .color(freeze_color)
-                .strong();
-            if ui.button(freeze_label)
-                .on_hover_text("Freeze held notes — they keep sounding until a new chord/note is played.\nSpace bar toggles. MIDI CC 64 (sustain pedal) also works.")
-                .clicked()
-            {
-                self.kb_freeze = !self.kb_freeze;
-                if !self.kb_freeze {
-                    let frozen: Vec<u8> = self.frozen_notes.drain().collect();
-                    for n in frozen { self.push_note_off(n); }
+            // ── Freeze toggle ─────────────────────────────────────────────
+            let prev_freeze = self.kb_freeze;
+            toggle_button(
+                ui, &mut self.kb_freeze, "❄ Freeze",
+                ToggleSize::Standard, Tier::Secondary, &self.theme, Some(accent_fm),
+            )
+            .on_hover_text(
+                "Freeze held notes — they keep sounding until a new chord/note is played.\nSpace bar toggles. MIDI CC 64 (sustain pedal) also works.",
+            );
+            if prev_freeze && !self.kb_freeze {
+                let frozen: Vec<u8> = self.frozen_notes.drain().collect();
+                for n in frozen {
+                    self.push_note_off(n);
                 }
             }
 
             ui.separator();
 
             if self.kb_chord_mode {
+                // ── Root note ─────────────────────────────────────────────
                 ui.label("Key:");
                 egui::ComboBox::from_id_salt("chord_kb_root")
                     .selected_text(NOTE_NAMES[self.chord_kb.root as usize])
@@ -457,63 +447,71 @@ impl SynthApp {
                             ui.selectable_value(&mut self.chord_kb.root, i as u8, *name);
                         }
                     });
+
+                // ── Scale selector (Major / Minor) ────────────────────────
                 ui.label("Scale:");
-                for &sc in &[ScaleType::Major, ScaleType::Minor] {
-                    let active = self.chord_kb.scale == sc;
-                    let label = egui::RichText::new(sc.label())
-                        .color(if active { self.theme.c(&self.theme.accent_dim) } else { Color32::GRAY });
-                    if ui.button(label).clicked() { self.chord_kb.scale = sc; }
-                }
+                chip_selector(
+                    ui, &mut self.chord_kb.scale,
+                    &[(ScaleType::Major, "Major"), (ScaleType::Minor, "Minor")],
+                    &self.theme, None,
+                );
+
                 ui.separator();
-                // Edit toggle
-                let edit_color = if self.chord_kb.edit_mode {
-                    Color32::from_rgb(240, 180, 60)
-                } else {
-                    Color32::GRAY
-                };
-                let edit_label = egui::RichText::new("✏ Edit").color(edit_color).strong();
-                if ui.button(edit_label)
-                    .on_hover_text("Edit mode: click any pad to change its chord type.")
-                    .clicked()
-                {
-                    self.chord_kb.edit_mode = !self.chord_kb.edit_mode;
+
+                // ── Edit mode toggle ──────────────────────────────────────
+                let prev_edit = self.chord_kb.edit_mode;
+                toggle_button(
+                    ui, &mut self.chord_kb.edit_mode, "✏ Edit",
+                    ToggleSize::Standard, Tier::Tertiary, &self.theme, Some(accent_hold),
+                )
+                .on_hover_text("Edit mode: click any pad to change its chord type.");
+                if prev_edit && !self.chord_kb.edit_mode {
                     self.chord_kb.editing_pad = None;
                 }
-                let preview_label = egui::RichText::new(
-                    if self.chord_kb.show_piano_preview { "KEYS ▾" } else { "KEYS ▸" }
-                ).small();
-                if ui.button(preview_label).on_hover_text("Toggle piano preview").clicked() {
-                    self.chord_kb.show_piano_preview = !self.chord_kb.show_piano_preview;
-                }
+
+                // ── Piano preview toggle ──────────────────────────────────
+                toggle_button(
+                    ui, &mut self.chord_kb.show_piano_preview, "KEYS",
+                    ToggleSize::Small, Tier::Tertiary, &self.theme, None,
+                )
+                .on_hover_text("Toggle piano preview");
+
                 ui.separator();
-                // Voicing selector (also controlled by ↑/↓ arrow keys)
-                // Voicing indicator — arrows are the control, this just shows what's active.
+
+                // Voicing indicator (controlled by arrow keys)
                 ui.label(egui::RichText::new("Voicing:").weak().small());
                 for &v in VoicingType::all() {
-                    let active = self.kb_voicing == v;
-                    let color = if active {
-                        self.theme.c(&self.theme.accent)
-                    } else {
-                        Color32::GRAY
-                    };
-                    ui.label(egui::RichText::new(v.label()).small().color(color))
-                        .on_hover_text("Hold arrow keys: no arrow = Root  ↑ = 1st  ↓ = 2nd  → = Open  ← = Full");
+                    let col = if self.kb_voicing == v { accent } else { text_dis };
+                    ui.label(egui::RichText::new(v.label()).small().color(col))
+                        .on_hover_text(
+                            "Hold arrow keys: no arrow = Root  ↑ = 1st  ↓ = 2nd  → = Open  ← = Full",
+                        );
                 }
                 ui.label(egui::RichText::new("  A–J / Q–U / Z–M = rows 1–3").weak().small());
             } else {
-                // Octave controls
+                // ── Octave controls ───────────────────────────────────────
                 ui.label("Oct:").on_hover_text("Keyboard octave (1–7).  Z = down, X = up");
-                if ui.button("−").on_hover_text("One octave down  [Z]").clicked() && self.piano_octave > 1 {
+                if ui
+                    .button("−")
+                    .on_hover_text("One octave down  [Z]")
+                    .clicked()
+                    && self.piano_octave > 1
+                {
                     self.piano_octave -= 1;
                 }
                 ui.label(format!("C{}", self.piano_octave));
-                if ui.button("+").on_hover_text("One octave up  [X]").clicked() && self.piano_octave < 7 {
+                if ui
+                    .button("+")
+                    .on_hover_text("One octave up  [X]")
+                    .clicked()
+                    && self.piano_octave < 7
+                {
                     self.piano_octave += 1;
                 }
 
                 ui.separator();
 
-                // Velocity controls
+                // ── Velocity controls ─────────────────────────────────────
                 ui.label("Vel:").on_hover_text("Note velocity (10–127).  C = down, V = up");
                 if ui.button("−").on_hover_text("Velocity −10  [C]").clicked() {
                     self.piano_velocity = self.piano_velocity.saturating_sub(10).max(10);
@@ -526,57 +524,55 @@ impl SynthApp {
                 ui.separator();
 
                 // Pitch bend indicator (keys 1/2)
-                let bend_color = if self.piano_pitch_bend != 0 {
-                    Color32::from_rgb(100, 180, 255)
+                let bend_col = if self.piano_pitch_bend != 0 {
+                    self.theme.c(&self.theme.accent_fm)
                 } else {
-                    Color32::GRAY
+                    text_dis
                 };
                 let bend_text = match self.piano_pitch_bend {
                     -2 => "Bend ▼",
                     2  => "Bend ▲",
                     _  => "Bend",
                 };
-                ui.label(egui::RichText::new(bend_text).color(bend_color))
+                ui.label(egui::RichText::new(bend_text).color(bend_col))
                     .on_hover_text("Pitch bend ±2 semitones.  Hold 1 = down,  Hold 2 = up");
 
                 ui.separator();
 
                 // Mod wheel indicator (keys 3–8 → filter cutoff offset)
-                let mod_color = if self.piano_mod_wheel > 0 {
-                    Color32::from_rgb(180, 120, 255)
+                let mod_col = if self.piano_mod_wheel > 0 {
+                    self.theme.c(&self.theme.fx_reverb)
                 } else {
-                    Color32::GRAY
+                    text_dis
                 };
                 let mod_bars = ["▁", "▃", "▅", "▆", "█"];
                 let mod_label = if self.piano_mod_wheel == 0 {
                     "Mod: off".to_string()
                 } else {
-                    format!("Mod: {}", mod_bars[(self.piano_mod_wheel as usize).saturating_sub(1).min(4)])
+                    format!(
+                        "Mod: {}",
+                        mod_bars[(self.piano_mod_wheel as usize).saturating_sub(1).min(4)]
+                    )
                 };
-                ui.label(egui::RichText::new(mod_label).color(mod_color))
-                    .on_hover_text("Modulation wheel → filter cutoff.  3=off, 4–8=levels  (up to +8 kHz)");
+                ui.label(egui::RichText::new(mod_label).color(mod_col))
+                    .on_hover_text(
+                        "Modulation wheel → filter cutoff.  3=off, 4–8=levels  (up to +8 kHz)",
+                    );
 
                 ui.separator();
 
-                // Scale highlight controls
+                // ── Scale highlight selector ──────────────────────────────
                 ui.label(egui::RichText::new("Scale:").weak().small());
-                // "Off" button
-                let off_active = self.piano_scale_highlight.is_none();
-                let off_label = egui::RichText::new("Off")
-                    .small()
-                    .color(if off_active { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
-                if ui.button(off_label).clicked() {
-                    self.piano_scale_highlight = None;
-                }
+                let mut scale_opts: Vec<(Option<ScaleType>, &str)> =
+                    vec![(None, "Off")];
                 for &sc in ScaleType::all_highlight() {
-                    let active = self.piano_scale_highlight == Some(sc);
-                    let label = egui::RichText::new(sc.label())
-                        .small()
-                        .color(if active { self.theme.c(&self.theme.accent) } else { Color32::GRAY });
-                    if ui.button(label).clicked() {
-                        self.piano_scale_highlight = Some(sc);
-                    }
+                    scale_opts.push((Some(sc), sc.label()));
                 }
+                chip_selector(
+                    ui, &mut self.piano_scale_highlight,
+                    &scale_opts, &self.theme, None,
+                );
+
                 if self.piano_scale_highlight.is_some() {
                     ui.label(egui::RichText::new("Root:").weak().small());
                     egui::ComboBox::from_id_salt("piano_scale_root")
@@ -584,13 +580,18 @@ impl SynthApp {
                         .width(48.0)
                         .show_ui(ui, |ui| {
                             for (i, name) in NOTE_NAMES.iter().enumerate() {
-                                ui.selectable_value(&mut self.piano_scale_root, i as u8, *name);
+                                ui.selectable_value(
+                                    &mut self.piano_scale_root, i as u8, *name,
+                                );
                             }
                         });
                 }
 
-                let hint = if SeqMode::from_u8(self.seq.mode.load(std::sync::atomic::Ordering::Relaxed)) == SeqMode::ChordSeq
-                    && self.seq.playing.load(std::sync::atomic::Ordering::Relaxed) {
+                let hint = if SeqMode::from_u8(
+                    self.seq.mode.load(std::sync::atomic::Ordering::Relaxed),
+                ) == SeqMode::ChordSeq
+                    && self.seq.playing.load(std::sync::atomic::Ordering::Relaxed)
+                {
                     "  any key = set root note (live transpose)"
                 } else {
                     "  a–' = notes  |  z/x = oct  |  c/v = vel  |  1/2 = bend  |  3–8 = mod"
@@ -607,6 +608,8 @@ impl SynthApp {
         } else {
             self.draw_piano_88(ui);
         }
+
+        let _ = (accent, accent_fm, accent_hold, text_dis);
     }
 
     fn draw_chord_pads(&mut self, ui: &mut egui::Ui) {
@@ -617,19 +620,21 @@ impl SynthApp {
         ];
         const ROW_LABELS: [&str; CHORD_KB_ROWS] = ["7ths", "Triads", "Sus/Add"];
 
+        let sp_xxs = self.theme.sp_xxs;
         let label_w = 48.0_f32;
         let spacing = ui.spacing().item_spacing.x;
         let btn_w = ((ui.available_width() - label_w - spacing * 7.0) / 7.0).max(40.0);
         let btn_h = 52.0;
 
-        // Collect held state snapshot before mutable borrows below
+        // Collect held state snapshot before mutable borrows below.
         let held_pad = self.chord_kb.held_pad;
         let edit_mode = self.chord_kb.edit_mode;
         let editing_pad = self.chord_kb.editing_pad;
+        let text_disabled = self.theme.c(&self.theme.text_disabled);
 
         egui::Grid::new("chord_kb_grid")
             .num_columns(CHORD_KB_COLS + 1)
-            .spacing([spacing, 2.0])
+            .spacing([spacing, sp_xxs])
             .show(ui, |ui| {
                 for row in 0..CHORD_KB_ROWS {
                     // Fixed-width row label cell
@@ -641,52 +646,18 @@ impl SynthApp {
                                 egui::RichText::new(ROW_LABELS[row])
                                     .weak()
                                     .small()
-                                    .color(Color32::from_gray(120)),
+                                    .color(text_disabled),
                             );
                         },
                     );
 
                     for col in 0..CHORD_KB_COLS {
-                        let (resp, painter) =
-                            ui.allocate_painter(Vec2::new(btn_w, btn_h), Sense::click_and_drag());
-                        let r = resp.rect;
-
                         let is_held_mouse = held_pad == Some((row, col));
                         let is_held_kb = self.chord_kb.kb_held.contains(&(row, col));
                         let is_held = is_held_mouse || is_held_kb;
                         let is_editing = editing_pad == Some((row, col));
 
-                        let quality = chord_quality(self.chord_kb.scale, col);
-                        let bg = if is_held {
-                            self.theme.c(&self.theme.seq_current)
-                        } else if is_editing {
-                            Color32::from_rgb(80, 60, 20)
-                        } else if quality == "m" {
-                            self.theme.c(&self.theme.seq_kb_minor)
-                        } else if quality == "°" {
-                            self.theme.c(&self.theme.seq_kb_dim)
-                        } else {
-                            self.theme.c(&self.theme.seq_kb_major)
-                        };
-                        painter.rect_filled(r, CornerRadius::same(6), bg);
-                        let stroke_color = if is_held {
-                            Color32::WHITE
-                        } else if is_editing {
-                            Color32::from_rgb(240, 180, 60)
-                        } else {
-                            Color32::from_gray(80)
-                        };
-                        painter.rect_stroke(
-                            r,
-                            CornerRadius::same(6),
-                            Stroke::new(
-                                if is_held || is_editing { 2.0 } else { 1.0 },
-                                stroke_color,
-                            ),
-                            StrokeKind::Middle,
-                        );
-
-                        // Chord name
+                        let quality = parse_quality(chord_quality(self.chord_kb.scale, col));
                         let cname = chord_name(self.chord_kb.root, self.chord_kb.scale, col);
                         let chord_type = self.chord_kb.pads[row][col].chord_type;
                         let display = if chord_type == ChordType::Triad {
@@ -694,30 +665,19 @@ impl SynthApp {
                         } else {
                             format!("{} {}", cname, chord_type.label())
                         };
-                        painter.text(
-                            egui::pos2(r.center().x, r.top() + 14.0),
-                            egui::Align2::CENTER_CENTER,
-                            &display,
-                            egui::FontId::proportional(11.0),
-                            Color32::WHITE,
-                        );
 
-                        // Degree label
-                        painter.text(
-                            egui::pos2(r.center().x, r.top() + 28.0),
-                            egui::Align2::CENTER_CENTER,
-                            DEGREE_LABELS[col],
-                            egui::FontId::monospace(9.0),
-                            Color32::from_gray(160),
-                        );
-
-                        // Key hint (bottom right corner)
-                        painter.text(
-                            egui::pos2(r.right() - 5.0, r.bottom() - 4.0),
-                            egui::Align2::RIGHT_BOTTOM,
-                            KEY_HINTS[row][col],
-                            egui::FontId::monospace(8.0),
-                            Color32::from_gray(110),
+                        let resp = chord_pad(
+                            ui,
+                            ChordPadState {
+                                quality,
+                                chord_name: &display,
+                                degree: DEGREE_LABELS[col],
+                                key_hint: KEY_HINTS[row][col],
+                                held: is_held,
+                                editing: is_editing,
+                            },
+                            Vec2::new(btn_w, btn_h),
+                            &self.theme,
                         );
 
                         // Interaction
@@ -790,6 +750,8 @@ impl SynthApp {
 
         // Edit popover
         if let Some((row, col)) = self.chord_kb.editing_pad {
+            let accent = self.theme.c(&self.theme.accent);
+            let text_dis = self.theme.c(&self.theme.text_disabled);
             egui::Window::new("Chord type")
                 .id(egui::Id::new("chord_kb_edit_popover"))
                 .collapsible(false)
@@ -800,9 +762,9 @@ impl SynthApp {
                     for &ct in ChordType::all() {
                         let active = self.chord_kb.pads[row][col].chord_type == ct;
                         let label = egui::RichText::new(ct.label()).color(if active {
-                            self.theme.c(&self.theme.accent)
+                            accent
                         } else {
-                            Color32::GRAY
+                            text_dis
                         });
                         if ui.button(label).clicked() {
                             self.chord_kb.pads[row][col].chord_type = ct;
@@ -816,11 +778,13 @@ impl SynthApp {
                     }
                 });
         }
+
+        let _ = text_disabled;
     }
 
     /// Read-only piano strip showing which MIDI notes are currently active in chord KB mode.
     fn draw_chord_piano_preview(&mut self, ui: &mut egui::Ui) {
-        // Collect active notes: frozen + currently held pads
+        // Collect active notes: frozen + currently held pads.
         let mut active: std::collections::HashSet<u8> = self.frozen_notes.clone();
         if let Some((row, col)) = self.chord_kb.held_pad {
             for m in apply_voicing(self.chord_kb.chord_notes_for(row, col), self.kb_voicing) {
@@ -833,253 +797,62 @@ impl SynthApp {
             }
         }
 
-        let num_white = count_white_keys();
-        let available_w = ui.available_width();
-        let white_w = (available_w / num_white as f32).max(6.0);
-        let white_h = 36.0_f32;
-        let black_w = white_w * 0.62;
-        let black_h = white_h * 0.60;
-        let total_width = white_w * num_white as f32;
-
-        let (resp, painter) =
-            ui.allocate_painter(Vec2::new(total_width, white_h + 2.0), Sense::hover());
-        let origin = resp.rect.left_top();
-        let accent = self.theme.c(&self.theme.accent);
-
-        let mut white_key_x: [f32; 128] = [0.0; 128];
-        let mut white_x = 0.0_f32;
-
-        // Pass 1: white keys
-        for midi in PIANO_FIRST_MIDI..=PIANO_LAST_MIDI {
-            if !is_white_key(midi) {
-                continue;
-            }
-            let x = white_x;
-            white_key_x[midi as usize] = x;
-            white_x += white_w;
-
-            let rect = Rect::from_min_size(
-                origin + Vec2::new(x + 0.5, 1.0),
-                Vec2::new(white_w - 1.0, white_h - 2.0),
-            );
-            let pressed = active.contains(&midi);
-            let fill = if pressed {
-                accent
-            } else {
-                Color32::from_rgb(230, 230, 230)
-            };
-            painter.rect_filled(rect, CornerRadius::same(2), fill);
-            painter.rect_stroke(
-                rect,
-                CornerRadius::same(2),
-                Stroke::new(0.5, Color32::from_rgb(160, 160, 160)),
-                StrokeKind::Middle,
-            );
-
-            if midi % 12 == 0 {
-                let octave = (midi / 12) as i32 - 1;
-                painter.text(
-                    Pos2::new(rect.center().x, rect.bottom() - 3.0),
-                    egui::Align2::CENTER_BOTTOM,
-                    format!("C{octave}"),
-                    egui::FontId::proportional(if white_w > 12.0 { 7.0 } else { 6.0 }),
-                    Color32::from_rgb(120, 120, 120),
-                );
-            }
-        }
-
-        // Pass 2: black keys
-        for midi in PIANO_FIRST_MIDI..=PIANO_LAST_MIDI {
-            if is_white_key(midi) {
-                continue;
-            }
-            let white_below = midi - 1;
-            if !is_white_key(white_below) {
-                continue;
-            }
-            let x = white_key_x[white_below as usize] + white_w * 0.6;
-            let rect = Rect::from_min_size(origin + Vec2::new(x, 1.0), Vec2::new(black_w, black_h));
-            let pressed = active.contains(&midi);
-            let fill = if pressed {
-                Color32::from_rgba_premultiplied(accent.r(), accent.g(), accent.b(), 220)
-            } else {
-                Color32::from_rgb(25, 25, 25)
-            };
-            painter.rect_filled(rect, CornerRadius::same(1), fill);
-        }
+        piano(
+            ui,
+            &PianoConfig {
+                first_midi: PIANO_FIRST_MIDI,
+                last_midi: PIANO_LAST_MIDI,
+                size: PianoSize::Preview,
+                interactive: false,
+                show_labels: true,
+                range_bar: None,
+            },
+            &|midi| KeyVisualState {
+                pressed: active.contains(&midi),
+                ..Default::default()
+            },
+            &self.theme,
+        );
     }
 
-    /// Draw a full 88-key piano (A0–C8) with the active keyboard range highlighted.
+    /// Draw a full 88-key piano (A0–C8) with active range and scale highlighting.
     fn draw_piano_88(&mut self, ui: &mut egui::Ui) {
         let scale_pcs: Option<[bool; 12]> = self
             .piano_scale_highlight
             .map(|sc| scale_pitch_classes(sc, self.piano_scale_root));
-        let num_white = count_white_keys(); // 52
-        let available_w = ui.available_width();
-        let white_w = (available_w / num_white as f32).max(6.0);
-        let white_h = 64.0_f32;
-        let black_w = white_w * 0.62;
-        let black_h = white_h * 0.60;
-        let total_width = white_w * num_white as f32;
 
-        let (resp, painter) = ui.allocate_painter(
-            Vec2::new(total_width, white_h + 4.0),
-            Sense::click_and_drag(),
-        );
-        let origin = resp.rect.left_top();
-        let pointer_pos = resp.interact_pointer_pos();
-        let mut clicked_midi: Option<u8> = None;
-
-        // The range that the computer keyboard maps to (KEY_MAP: semitones 0–14).
         let kb_max_semitone = KEY_MAP.iter().map(|&(_, s)| s).max().unwrap_or(14);
         let kb_range_start = (self.piano_octave * 12) as u8;
         let kb_range_end = kb_range_start + kb_max_semitone as u8 + 1;
 
-        // --- Pass 1: Draw white keys ---
-        let mut white_x = 0.0_f32;
-        // Store white key positions for black key placement.
-        let mut white_key_x: [f32; 128] = [0.0; 128];
-
-        for midi in PIANO_FIRST_MIDI..=PIANO_LAST_MIDI {
-            if !is_white_key(midi) {
-                continue;
-            }
-
-            let x = white_x;
-            white_key_x[midi as usize] = x;
-            white_x += white_w;
-
-            let rect = Rect::from_min_size(
-                origin + Vec2::new(x + 0.5, 1.0),
-                Vec2::new(white_w - 1.0, white_h - 2.0),
-            );
-
-            let pressed =
-                self.piano_held_midi.contains(&midi) || self.piano_mouse_midi == Some(midi);
-            let in_kb_range = midi >= kb_range_start && midi < kb_range_end;
-            let pitch_class = (midi % 12) as usize;
-            let is_root = scale_pcs.is_some() && pitch_class == self.piano_scale_root as usize;
-            let in_scale = scale_pcs.is_some_and(|pcs| pcs[pitch_class]);
-
-            let fill = if pressed {
-                self.theme.c(&self.theme.key_white_pressed)
-            } else if is_root {
-                Color32::from_rgb(255, 210, 80)
-            } else if in_scale {
-                Color32::from_rgb(200, 240, 210)
-            } else if in_kb_range {
-                Color32::from_rgb(230, 240, 245)
-            } else {
-                Color32::from_rgb(245, 245, 245)
-            };
-
-            painter.rect_filled(rect, CornerRadius::same(2), fill);
-            painter.rect_stroke(
-                rect,
-                CornerRadius::same(2),
-                Stroke::new(0.5, Color32::from_rgb(180, 180, 180)),
-                StrokeKind::Middle,
-            );
-
-            // C note labels at the bottom of each C key.
-            if midi % 12 == 0 {
-                let octave = (midi / 12) as i32 - 1;
-                painter.text(
-                    Pos2::new(rect.center().x, rect.bottom() - 3.0),
-                    egui::Align2::CENTER_BOTTOM,
-                    format!("C{octave}"),
-                    egui::FontId::proportional(if white_w > 12.0 { 8.0 } else { 6.0 }),
-                    Color32::from_rgb(140, 140, 140),
-                );
-            }
-
-            if let Some(pos) = pointer_pos {
-                if rect.contains(pos) {
-                    clicked_midi = Some(midi);
+        let result = piano(
+            ui,
+            &PianoConfig {
+                first_midi: PIANO_FIRST_MIDI,
+                last_midi: PIANO_LAST_MIDI,
+                size: PianoSize::Full,
+                interactive: true,
+                show_labels: true,
+                range_bar: Some((kb_range_start, kb_range_end)),
+            },
+            &|midi| {
+                let pressed =
+                    self.piano_held_midi.contains(&midi) || self.piano_mouse_midi == Some(midi);
+                let pitch_class = (midi % 12) as usize;
+                KeyVisualState {
+                    pressed,
+                    in_kb_range: midi >= kb_range_start && midi < kb_range_end,
+                    is_scale_root: scale_pcs.is_some()
+                        && pitch_class == self.piano_scale_root as usize,
+                    in_scale: scale_pcs.is_some_and(|pcs| pcs[pitch_class]),
                 }
-            }
-        }
+            },
+            &self.theme,
+        );
 
-        // --- Pass 2: Draw black keys (on top) ---
-        for midi in PIANO_FIRST_MIDI..=PIANO_LAST_MIDI {
-            if is_white_key(midi) {
-                continue;
-            }
-
-            // Black key sits between the white key below and above.
-            // Find the white key just below this black key.
-            let white_below = midi - 1;
-            if !is_white_key(white_below) {
-                continue;
-            }
-            let x = white_key_x[white_below as usize] + white_w * 0.6;
-
-            let rect = Rect::from_min_size(origin + Vec2::new(x, 1.0), Vec2::new(black_w, black_h));
-
-            let pressed =
-                self.piano_held_midi.contains(&midi) || self.piano_mouse_midi == Some(midi);
-            let in_kb_range = midi >= kb_range_start && midi < kb_range_end;
-            let pitch_class = (midi % 12) as usize;
-            let is_root = scale_pcs.is_some() && pitch_class == self.piano_scale_root as usize;
-            let in_scale = scale_pcs.is_some_and(|pcs| pcs[pitch_class]);
-
-            let fill = if pressed {
-                self.theme.c(&self.theme.key_black_pressed)
-            } else if is_root {
-                Color32::from_rgb(120, 80, 10)
-            } else if in_scale {
-                Color32::from_rgb(30, 70, 40)
-            } else if in_kb_range {
-                Color32::from_rgb(40, 40, 50)
-            } else {
-                Color32::from_rgb(25, 25, 25)
-            };
-
-            painter.rect_filled(rect, CornerRadius::same(1), fill);
-
-            if let Some(pos) = pointer_pos {
-                if rect.contains(pos) {
-                    clicked_midi = Some(midi);
-                }
-            }
-        }
-
-        // --- Pass 3: Draw keyboard range bracket on top ---
-        // A subtle colored bar above the active range.
-        {
-            // Find pixel x range for the keyboard mapping range.
-            let accent = self.theme.c(&self.theme.accent);
-            let mut range_left = f32::MAX;
-            let mut range_right = 0.0_f32;
-            for midi in kb_range_start..kb_range_end.min(PIANO_LAST_MIDI + 1) {
-                if midi < PIANO_FIRST_MIDI {
-                    continue;
-                }
-                if is_white_key(midi) {
-                    let x = white_key_x[midi as usize];
-                    range_left = range_left.min(x);
-                    range_right = range_right.max(x + white_w);
-                } else {
-                    let wb = midi - 1;
-                    if is_white_key(wb) {
-                        let x = white_key_x[wb as usize] + white_w * 0.6;
-                        range_left = range_left.min(x);
-                        range_right = range_right.max(x + black_w);
-                    }
-                }
-            }
-            if range_left < range_right {
-                let bar = Rect::from_min_size(
-                    origin + Vec2::new(range_left, 0.0),
-                    Vec2::new(range_right - range_left, 2.5),
-                );
-                painter.rect_filled(bar, CornerRadius::same(1), accent);
-            }
-        }
-
-        // --- Mouse interaction ---
-        if resp.is_pointer_button_down_on() {
-            if let Some(midi) = clicked_midi {
+        // Mouse interaction — play the note under the pointer.
+        if result.response.is_pointer_button_down_on() {
+            if let Some(midi) = result.pointer_midi {
                 if self.piano_mouse_midi != Some(midi) {
                     if let Some(old) = self.piano_mouse_midi {
                         self.push_note_off(old);

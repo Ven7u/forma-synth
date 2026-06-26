@@ -80,4 +80,4 @@ pre-commit install
 
 ## License
 
-By submitting a contribution you agree that your code will be licensed under the same **MIT OR Apache-2.0** terms as the rest of the project.
+By submitting a contribution you agree that your code will be licensed under the same **GNU General Public License v3.0** terms as the rest of the project.

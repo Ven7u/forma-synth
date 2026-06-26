@@ -120,7 +120,7 @@ impl SynthApp {
 
         // ── Top bar: search + FX toggle ───────────────────────────────────
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("🔍").size(13.0));
+            ui.label(egui::RichText::new("🔍").font(self.theme.font_heading()));
             ui.add(
                 egui::TextEdit::singleline(&mut self.patch_search)
                     .hint_text("Search patches…")
@@ -211,7 +211,9 @@ impl SynthApp {
                 for &tag in &relevant {
                     let active = self.patch_active_tags.contains(tag);
                     let col = if active { accent } else { text_dim };
-                    let label_text = egui::RichText::new(tag).size(12.0).color(col);
+                    let label_text = egui::RichText::new(tag)
+                        .font(self.theme.font_heading())
+                        .color(col);
                     if ui.selectable_label(active, label_text).clicked() {
                         if active {
                             self.patch_active_tags.remove(tag);
@@ -266,6 +268,8 @@ impl SynthApp {
         let mut load_idx: Option<usize> = None;
         let mut toggle_fav: Option<String> = None;
 
+        // Data-driven: the patch library grows with user content. Scroll
+        // rather than truncate, per the design-system scrollable-vs-bounded rule.
         egui::ScrollArea::vertical().show(ui, |ui| {
             // ── Favourites section ────────────────────────────────────────
             let fav_indices: Vec<usize> = filtered
@@ -281,9 +285,14 @@ impl SynthApp {
                         .color(Color32::from_rgb(220, 185, 60)),
                 );
                 for i in &fav_indices {
-                    if let Some(action) =
-                        Self::patch_row(ui, &self.patch_library[*i], true, accent, text_dim)
-                    {
+                    if let Some(action) = Self::patch_row(
+                        ui,
+                        &self.patch_library[*i],
+                        true,
+                        accent,
+                        text_dim,
+                        &self.theme,
+                    ) {
                         match action {
                             PatchAction::Load => load_idx = Some(*i),
                             PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -310,9 +319,14 @@ impl SynthApp {
                 ui.label(egui::RichText::new("⏱  Recent").small().color(text_dim));
                 for i in &recent_indices {
                     let is_fav = self.patch_favorites.contains(&self.patch_library[*i].name);
-                    if let Some(action) =
-                        Self::patch_row(ui, &self.patch_library[*i], is_fav, accent, text_dim)
-                    {
+                    if let Some(action) = Self::patch_row(
+                        ui,
+                        &self.patch_library[*i],
+                        is_fav,
+                        accent,
+                        text_dim,
+                        &self.theme,
+                    ) {
                         match action {
                             PatchAction::Load => load_idx = Some(*i),
                             PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -325,9 +339,14 @@ impl SynthApp {
             // ── All filtered ──────────────────────────────────────────────
             for i in &filtered {
                 let is_fav = self.patch_favorites.contains(&self.patch_library[*i].name);
-                if let Some(action) =
-                    Self::patch_row(ui, &self.patch_library[*i], is_fav, accent, text_dim)
-                {
+                if let Some(action) = Self::patch_row(
+                    ui,
+                    &self.patch_library[*i],
+                    is_fav,
+                    accent,
+                    text_dim,
+                    &self.theme,
+                ) {
                     match action {
                         PatchAction::Load => load_idx = Some(*i),
                         PatchAction::ToggleFav(name) => toggle_fav = Some(name),
@@ -358,6 +377,7 @@ impl SynthApp {
         is_fav: bool,
         _accent: Color32,
         text_dim: Color32,
+        theme: &super::theme::SynthTheme,
     ) -> Option<PatchAction> {
         let mut action = None;
 
@@ -371,8 +391,12 @@ impl SynthApp {
             };
             if ui
                 .add(
-                    egui::Button::new(egui::RichText::new(star).color(star_col).size(11.0))
-                        .frame(false),
+                    egui::Button::new(
+                        egui::RichText::new(star)
+                            .color(star_col)
+                            .font(theme.font_heading()),
+                    )
+                    .frame(false),
                 )
                 .clicked()
             {
@@ -402,7 +426,7 @@ impl SynthApp {
                 ui.label(
                     egui::RichText::new(tag_str)
                         .weak()
-                        .size(12.0)
+                        .font(theme.font_heading())
                         .color(Color32::from_gray(110))
                         .monospace(),
                 );
