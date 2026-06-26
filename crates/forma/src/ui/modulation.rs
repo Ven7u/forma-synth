@@ -369,48 +369,45 @@ impl SynthApp {
         SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header — PULSE enable toggle.
+            // Row 1: toggle + all controls inline.
             let mut pulse_on = self.pulse_enabled;
-            if ui
-                .synth_toggle(
-                    &mut pulse_on,
-                    "PULSE",
-                    ToggleSize::Standard,
-                    Tier::Secondary,
-                    &theme,
-                    None,
-                )
-                .on_hover_text(
-                    "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
-                )
-                .clicked()
-            {
-                self.pulse_enabled = pulse_on;
-                self.engine.set_gate_aenv_enabled(self.pulse_enabled);
-            }
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.sp_md;
+                if ui
+                    .synth_toggle(
+                        &mut pulse_on,
+                        "PULSE",
+                        ToggleSize::Standard,
+                        Tier::Secondary,
+                        &theme,
+                        None,
+                    )
+                    .on_hover_text(
+                        "Tempo-synced sidechain ducker — every \"on\" step dips the master output",
+                    )
+                    .clicked()
+                {
+                    self.pulse_enabled = pulse_on;
+                    self.engine.set_gate_aenv_enabled(self.pulse_enabled);
+                }
 
-            ui.add_space(theme.sp_xs);
+                ui.add_enabled_ui(self.pulse_enabled, |ui| {
+                    ui.spacing_mut().item_spacing.x = theme.sp_sm;
 
-            ui.add_enabled_ui(self.pulse_enabled, |ui| {
-                // Depth knob + length stepper.
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = theme.sp_md;
+                    ui.label(
+                        RichText::new("DEPTH")
+                            .font(theme.font_body())
+                            .color(theme.c(&theme.text_secondary)),
+                    );
                     if ui
-                        .synth_knob(
-                            &mut self.pulse_depth,
-                            0.0..=1.0,
-                            "DEPTH",
-                            &theme,
-                            false,
-                            KnobSize::Standard,
-                            Tier::Secondary,
-                        )
+                        .add(egui::DragValue::new(&mut self.pulse_depth).range(0.0..=1.0).speed(0.01))
                         .on_hover_text("How hard each step ducks the master output")
                         .changed()
                     {
                         self.engine.set_gate_aenv_depth(self.pulse_depth);
                     }
 
+                    ui.add_space(theme.sp_xs);
                     ui.label(
                         RichText::new("LEN")
                             .font(theme.font_body())
@@ -425,43 +422,36 @@ impl SynthApp {
                         self.pulse_length = len.clamp(1, 16) as u8;
                         self.engine.set_gate_aenv_length(self.pulse_length);
                     }
+
+                    ui.add_space(theme.sp_xs);
+                    let cur_div = forma_common::ClockDivision::from_u8(self.pulse_division as u8);
+                    egui::ComboBox::from_id_salt("pulse_div")
+                        .selected_text(cur_div.label())
+                        .show_ui(ui, |ui| {
+                            for div in forma_common::ClockDivision::ALL {
+                                let div_u8 = div.to_u8();
+                                let rate = div.hz(self.global_bpm as f32);
+                                if ui
+                                    .selectable_label(self.pulse_division as u8 == div_u8, div.label())
+                                    .on_hover_text(format!(
+                                        "{} → {:.3} Hz @ {} BPM",
+                                        div.label(), rate, self.global_bpm
+                                    ))
+                                    .clicked()
+                                {
+                                    self.pulse_division = div_u8 as usize;
+                                    self.engine.set_gate_aenv_division(div_u8);
+                                    self.engine.set_gate_aenv_rate(rate);
+                                }
+                            }
+                        });
                 });
+            });
 
-                ui.add_space(theme.sp_xs);
+            ui.add_space(theme.sp_xs);
 
-                // Division selector — kept as wrapped selectable_label row.
-                ui.horizontal_wrapped(|ui| {
-                    for div in forma_common::ClockDivision::ALL {
-                        let div_u8 = div.to_u8();
-                        let active = self.pulse_division as u8 == div_u8;
-                        let label = div.label();
-                        let rate = div.hz(self.global_bpm as f32);
-                        if ui
-                            .selectable_label(
-                                active,
-                                RichText::new(label).small().color(if active {
-                                    theme.c(&theme.accent)
-                                } else {
-                                    theme.c(&theme.text_secondary)
-                                }),
-                            )
-                            .on_hover_text(format!(
-                                "{} → {:.3} Hz @ {} BPM",
-                                label, rate, self.global_bpm
-                            ))
-                            .clicked()
-                        {
-                            self.pulse_division = div_u8 as usize;
-                            self.engine.set_gate_aenv_division(div_u8);
-                            self.engine.set_gate_aenv_rate(rate);
-                        }
-                    }
-                });
-
-                ui.add_space(theme.sp_xs);
-
-                // 16-cell step row. Same length-aware alpha treatment as
-                // `ui_lfo_gate_row` — see that comment.
+            ui.add_enabled_ui(self.pulse_enabled, |ui| {
+                // Row 2: 16-cell step grid.
                 ui.label(
                     RichText::new("STEPS")
                         .font(theme.font_body())
@@ -907,10 +897,10 @@ impl SynthApp {
             ui.add_space(theme.sp_xs);
 
             egui::Grid::new("mod_matrix_grid")
-                .num_columns(4)
+                .num_columns(3)
                 .spacing([theme.sp_sm, theme.sp_xs])
                 .show(ui, |ui| {
-                    for label in ["#", "SOURCE", "→ DEST", "DEPTH"] {
+                    for label in ["SOURCE", "DEST", "DEPTH"] {
                         ui.label(
                             RichText::new(label)
                                 .font(theme.font_body())
@@ -920,15 +910,9 @@ impl SynthApp {
                     ui.end_row();
 
                     for slot in 0..4 {
-                        ui.label(
-                            RichText::new(format!("{}", slot + 1))
-                                .font(theme.font_body())
-                                .color(theme.c(&theme.text_disabled)),
-                        );
-
                         egui::ComboBox::from_id_salt(format!("mat_src_{slot}"))
                             .selected_text(SOURCES[self.mat_src[slot].min(4)])
-                            .width(90.0)
+                            .width(80.0)
                             .show_ui(ui, |ui| {
                                 for (i, label) in SOURCES.iter().enumerate() {
                                     if ui
@@ -943,7 +927,7 @@ impl SynthApp {
 
                         egui::ComboBox::from_id_salt(format!("mat_dst_{slot}"))
                             .selected_text(DESTS[self.mat_dst[slot].min(3)])
-                            .width(70.0)
+                            .width(60.0)
                             .show_ui(ui, |ui| {
                                 for (i, label) in DESTS.iter().enumerate() {
                                     if ui
@@ -1005,31 +989,28 @@ impl SynthApp {
                     self.mod_wheel_depth = depth;
                     self.engine.set_mod_wheel_depth(depth);
                 }
+                ui.add_space(theme.sp_sm);
                 ui.vertical(|ui| {
-                    ui.label(
-                        RichText::new("→")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    for (d, label, tip) in [
-                        (0usize, "Off", "Mod wheel has no effect."),
-                        (1, "Filter", "Opens the filter as you push the wheel."),
-                        (
-                            2,
-                            "LFO Depth",
-                            "Scales LFO 1 depth — classic vibrato/wah control.",
-                        ),
-                        (3, "Amp", "Reduces amplitude — expression/swell."),
-                    ] {
-                        if ui
-                            .selectable_label(self.mod_wheel_dest == d, label)
-                            .on_hover_text(tip)
-                            .clicked()
-                        {
-                            self.mod_wheel_dest = d;
-                            self.engine.set_mod_wheel_dest(d as u8);
+                    ui.add_space(theme.sp_xs);
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("→")
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_secondary)),
+                        );
+                        let mut dest = self.mod_wheel_dest;
+                        ui.chip_selector(
+                            &mut dest,
+                            &[(0usize, "Off"), (1, "Filter"), (2, "LFO D"), (3, "Amp")],
+                            &theme,
+                            None,
+                        )
+                        .on_hover_text("Off · Filter: opens filter · LFO D: scales LFO 1 depth · Amp: expression swell");
+                        if dest != self.mod_wheel_dest {
+                            self.mod_wheel_dest = dest;
+                            self.engine.set_mod_wheel_dest(dest as u8);
                         }
-                    }
+                    });
                 });
             });
         });
@@ -1066,27 +1047,28 @@ impl SynthApp {
                     self.aftertouch_depth = depth;
                     self.engine.set_aftertouch_depth(depth);
                 }
+                ui.add_space(theme.sp_sm);
                 ui.vertical(|ui| {
-                    ui.label(
-                        RichText::new("→")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    for (d, label, tip) in [
-                        (0usize, "Off", "Aftertouch has no effect."),
-                        (1, "Filter", "Pressing harder opens the filter."),
-                        (2, "LFO Depth", "Pressing harder increases LFO 1 depth."),
-                        (3, "Amp", "Pressing harder reduces volume — swell effect."),
-                    ] {
-                        if ui
-                            .selectable_label(self.aftertouch_dest == d, label)
-                            .on_hover_text(tip)
-                            .clicked()
-                        {
-                            self.aftertouch_dest = d;
-                            self.engine.set_aftertouch_dest(d as u8);
+                    ui.add_space(theme.sp_xs);
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("→")
+                                .font(theme.font_body())
+                                .color(theme.c(&theme.text_secondary)),
+                        );
+                        let mut dest = self.aftertouch_dest;
+                        ui.chip_selector(
+                            &mut dest,
+                            &[(0usize, "Off"), (1, "Filter"), (2, "LFO D"), (3, "Amp")],
+                            &theme,
+                            None,
+                        )
+                        .on_hover_text("Off · Filter: opens filter on pressure · LFO D: scales LFO 1 depth · Amp: volume swell");
+                        if dest != self.aftertouch_dest {
+                            self.aftertouch_dest = dest;
+                            self.engine.set_aftertouch_dest(dest as u8);
                         }
-                    }
+                    });
                 });
             });
         });
