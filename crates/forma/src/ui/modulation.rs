@@ -45,7 +45,7 @@ impl SynthApp {
         SynthFrame::section(&theme).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
 
-            // Header — LFO 1 enable toggle + rate pulse dot.
+            // Header — LFO 1 enable toggle + pulse dot (left), SYNC (right).
             let mut lfo_on = self.lfo_enabled;
             ui.horizontal(|ui| {
                 if ui
@@ -71,49 +71,8 @@ impl SynthApp {
                 }
                 ui.add_space(theme.sp_xs);
                 lfo_pulse_dot(ui, self.lfo_rate, self.lfo_enabled, &theme);
-            });
 
-            ui.add_space(theme.sp_xs);
-
-            ui.add_enabled_ui(self.lfo_enabled, |ui| {
-                // Rate + Depth knobs + SYNC toggle.
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = theme.sp_md;
-                    let sync_on = self.lfo_sync_active();
-                    if !sync_on
-                        && ui
-                            .synth_knob(
-                                &mut self.lfo_rate,
-                                0.1..=20.0,
-                                "RATE",
-                                &theme,
-                                false,
-                                KnobSize::Standard,
-                                Tier::Secondary,
-                            )
-                            .on_hover_text(
-                                "LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.",
-                            )
-                            .changed()
-                    {
-                        self.engine.set_lfo_rate(self.lfo_rate);
-                    }
-                    if ui
-                        .synth_knob(
-                            &mut self.lfo_depth,
-                            0.0..=1.0,
-                            "DEPTH",
-                            &theme,
-                            false,
-                            KnobSize::Standard,
-                            Tier::Secondary,
-                        )
-                        .on_hover_text("Modulation depth. 0 = off, 1 = full.")
-                        .changed()
-                    {
-                        self.engine.set_lfo_depth(self.lfo_depth);
-                    }
-
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_enabled_ui(!self.global_sync, |ui| {
                         let mut sync_on = self.lfo_sync_active();
                         if ui
@@ -130,93 +89,135 @@ impl SynthApp {
                         {
                             self.lfo_sync = !self.lfo_sync;
                             if self.lfo_sync_active() {
-                                let rate =
-                                    lfo_synced_rate(self.global_bpm as f32, self.lfo_division);
+                                let rate = lfo_synced_rate(self.global_bpm as f32, self.lfo_division);
                                 self.lfo_rate = rate;
                                 self.engine.set_lfo_rate(rate);
                             }
                         }
                     });
                 });
+            });
 
-                // Division selector when synced — kept as wrapped
-                // selectable_label row because chip_selector doesn't
-                // currently support `horizontal_wrapped` overflow.
-                if self.lfo_sync_active() {
-                    ui.add_space(theme.sp_xs);
-                    ui.horizontal_wrapped(|ui| {
-                        for (i, &(label, _)) in LFO_SYNC_DIVISIONS.iter().enumerate() {
-                            let active = self.lfo_division == i;
-                            let rate = lfo_synced_rate(self.global_bpm as f32, i);
-                            if ui
-                                .selectable_label(
-                                    active,
-                                    RichText::new(label).small().color(if active {
-                                        theme.c(&theme.accent)
-                                    } else {
-                                        theme.c(&theme.text_secondary)
-                                    }),
-                                )
-                                .on_hover_text(format!(
-                                    "{} → {:.3} Hz @ {} BPM",
-                                    label, rate, self.global_bpm
-                                ))
-                                .clicked()
+            ui.add_space(theme.sp_xs);
+
+            ui.add_enabled_ui(self.lfo_enabled, |ui| {
+                // ── 2-column layout: knobs left, selectors right ──────────
+                ui.horizontal(|ui| {
+                    // Left column — RATE + DEPTH knobs.
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = theme.sp_md;
+                            let sync_on = self.lfo_sync_active();
+                            if !sync_on
+                                && ui
+                                    .synth_knob(
+                                        &mut self.lfo_rate,
+                                        0.1..=20.0,
+                                        "RATE",
+                                        &theme,
+                                        false,
+                                        KnobSize::Standard,
+                                        Tier::Secondary,
+                                    )
+                                    .on_hover_text("LFO speed in Hz. 0.1 = very slow, 5 = fast vibrato, 20 = audio range.")
+                                    .changed()
                             {
-                                self.lfo_division = i;
-                                self.lfo_rate = rate;
-                                self.engine.set_lfo_rate(rate);
+                                self.engine.set_lfo_rate(self.lfo_rate);
                             }
+                            if ui
+                                .synth_knob(
+                                    &mut self.lfo_depth,
+                                    0.0..=1.0,
+                                    "DEPTH",
+                                    &theme,
+                                    false,
+                                    KnobSize::Standard,
+                                    Tier::Secondary,
+                                )
+                                .on_hover_text("Modulation depth. 0 = off, 1 = full.")
+                                .changed()
+                            {
+                                self.engine.set_lfo_depth(self.lfo_depth);
+                            }
+                        });
+                    });
+
+                    ui.add_space(theme.sp_sm);
+
+                    // Right column — SHAPE, destination chips, and sync division when active.
+                    ui.vertical(|ui| {
+                        ui.add_space(theme.sp_xs);
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("SHAPE")
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
+                            );
+                            let mut shape = self.lfo_shape;
+                            let prev = shape;
+                            ui.chip_selector(
+                                &mut shape,
+                                &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                                &theme,
+                                None,
+                            )
+                            .on_hover_text("Sine: smooth · Triangle: linear ramp · Saw: ramp + reset");
+                            if shape != prev {
+                                self.lfo_shape = shape;
+                                self.engine.set_lfo_shape(shape as u8);
+                            }
+                        });
+
+                        ui.add_space(theme.sp_xs);
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("→")
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
+                            );
+                            let mut dest = self.lfo_dest;
+                            let prev = dest;
+                            ui.chip_selector(
+                                &mut dest,
+                                &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                                &theme,
+                                None,
+                            )
+                            .on_hover_text("Pitch: vibrato · Filter: wobble/wah · Amp: tremolo");
+                            if dest != prev {
+                                self.lfo_dest = dest;
+                                self.engine.set_lfo_dest(dest as u8);
+                            }
+                        });
+
+                        // Division picker shown inline when SYNC is active.
+                        if self.lfo_sync_active() {
+                            ui.add_space(theme.sp_xs);
+                            ui.horizontal_wrapped(|ui| {
+                                for (i, &(label, _)) in LFO_SYNC_DIVISIONS.iter().enumerate() {
+                                    let active = self.lfo_division == i;
+                                    let rate = lfo_synced_rate(self.global_bpm as f32, i);
+                                    if ui
+                                        .selectable_label(
+                                            active,
+                                            RichText::new(label).small().color(if active {
+                                                theme.c(&theme.accent)
+                                            } else {
+                                                theme.c(&theme.text_secondary)
+                                            }),
+                                        )
+                                        .on_hover_text(format!("{} → {:.3} Hz @ {} BPM", label, rate, self.global_bpm))
+                                        .clicked()
+                                    {
+                                        self.lfo_division = i;
+                                        self.lfo_rate = rate;
+                                        self.engine.set_lfo_rate(rate);
+                                    }
+                                }
+                            });
                         }
                     });
-                }
-
-                ui.add_space(theme.sp_xs);
-
-                // SHAPE — chip selector for Sin / Tri / Saw.
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("SHAPE")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    let mut shape = self.lfo_shape;
-                    let prev = shape;
-                    ui.chip_selector(
-                        &mut shape,
-                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
-                        &theme,
-                        None,
-                    )
-                    .on_hover_text(
-                        "Sine: smooth · Triangle: linear ramp · Saw: ramp + reset",
-                    );
-                    if shape != prev {
-                        self.lfo_shape = shape;
-                        self.engine.set_lfo_shape(shape as u8);
-                    }
-                });
-
-                // Destination — chip selector for Pitch / Filter / Amp.
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("→")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    let mut dest = self.lfo_dest;
-                    let prev = dest;
-                    ui.chip_selector(
-                        &mut dest,
-                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
-                        &theme,
-                        None,
-                    )
-                    .on_hover_text("Pitch: vibrato · Filter: wobble/wah · Amp: tremolo");
-                    if dest != prev {
-                        self.lfo_dest = dest;
-                        self.engine.set_lfo_dest(dest as u8);
-                    }
                 });
 
                 ui.add_space(theme.sp_xs);
@@ -261,82 +262,94 @@ impl SynthApp {
             ui.add_space(theme.sp_xs);
 
             ui.add_enabled_ui(self.lfo2_enabled, |ui| {
+                // ── 2-column layout: knobs left, selectors right ──────────
                 ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = theme.sp_md;
-                    if ui
-                        .synth_knob(
-                            &mut self.lfo2_rate,
-                            0.01..=20.0,
-                            "RATE",
-                            &theme,
-                            true,
-                            KnobSize::Standard,
-                            Tier::Secondary,
-                        )
-                        .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
-                        .changed()
-                    {
-                        self.engine.set_lfo2_rate(self.lfo2_rate);
-                    }
-                    if ui
-                        .synth_knob(
-                            &mut self.lfo2_depth,
-                            0.0..=1.0,
-                            "DEPTH",
-                            &theme,
-                            false,
-                            KnobSize::Standard,
-                            Tier::Secondary,
-                        )
-                        .on_hover_text("LFO 2 modulation depth")
-                        .changed()
-                    {
-                        self.engine.set_lfo2_depth(self.lfo2_depth);
-                    }
-                });
+                    // Left column — RATE + DEPTH knobs.
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = theme.sp_md;
+                            if ui
+                                .synth_knob(
+                                    &mut self.lfo2_rate,
+                                    0.01..=20.0,
+                                    "RATE",
+                                    &theme,
+                                    true,
+                                    KnobSize::Standard,
+                                    Tier::Secondary,
+                                )
+                                .on_hover_text("LFO 2 rate in Hz — as slow as 0.01 Hz for breathing swells")
+                                .changed()
+                            {
+                                self.engine.set_lfo2_rate(self.lfo2_rate);
+                            }
+                            if ui
+                                .synth_knob(
+                                    &mut self.lfo2_depth,
+                                    0.0..=1.0,
+                                    "DEPTH",
+                                    &theme,
+                                    false,
+                                    KnobSize::Standard,
+                                    Tier::Secondary,
+                                )
+                                .on_hover_text("LFO 2 modulation depth")
+                                .changed()
+                            {
+                                self.engine.set_lfo2_depth(self.lfo2_depth);
+                            }
+                        });
+                    });
 
-                ui.add_space(theme.sp_xs);
+                    ui.add_space(theme.sp_sm);
 
-                // SHAPE — chip selector.
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("SHAPE")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    let mut shape = self.lfo2_shape;
-                    let prev = shape;
-                    ui.chip_selector(
-                        &mut shape,
-                        &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
-                        &theme,
-                        None,
-                    );
-                    if shape != prev {
-                        self.lfo2_shape = shape;
-                        self.engine.set_lfo2_shape(shape as u8);
-                    }
-                });
+                    // Right column — SHAPE and destination chips.
+                    ui.vertical(|ui| {
+                        ui.add_space(theme.sp_xs);
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("SHAPE")
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
+                            );
+                            let mut shape = self.lfo2_shape;
+                            let prev = shape;
+                            ui.chip_selector(
+                                &mut shape,
+                                &[(0usize, "Sin"), (1, "Tri"), (2, "Saw")],
+                                &theme,
+                                None,
+                            )
+                            .on_hover_text("Sine: smooth · Triangle: linear ramp · Saw: ramp + reset");
+                            if shape != prev {
+                                self.lfo2_shape = shape;
+                                self.engine.set_lfo2_shape(shape as u8);
+                            }
+                        });
 
-                // Destination — chip selector.
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("→")
-                            .font(theme.font_body())
-                            .color(theme.c(&theme.text_secondary)),
-                    );
-                    let mut dest = self.lfo2_dest;
-                    let prev = dest;
-                    ui.chip_selector(
-                        &mut dest,
-                        &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
-                        &theme,
-                        None,
-                    );
-                    if dest != prev {
-                        self.lfo2_dest = dest;
-                        self.engine.set_lfo2_dest(dest as u8);
-                    }
+                        ui.add_space(theme.sp_xs);
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("→")
+                                    .font(theme.font_body())
+                                    .color(theme.c(&theme.text_secondary)),
+                            );
+                            let mut dest = self.lfo2_dest;
+                            let prev = dest;
+                            ui.chip_selector(
+                                &mut dest,
+                                &[(0usize, "Pitch"), (1, "Filter"), (2, "Amp")],
+                                &theme,
+                                None,
+                            )
+                            .on_hover_text("Pitch: vibrato · Filter: wobble/wah · Amp: tremolo");
+                            if dest != prev {
+                                self.lfo2_dest = dest;
+                                self.engine.set_lfo2_dest(dest as u8);
+                            }
+                        });
+                    });
                 });
 
                 ui.add_space(theme.sp_xs);
