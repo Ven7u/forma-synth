@@ -94,6 +94,7 @@ impl crate::SynthApp {
         let mut dock_state =
             std::mem::replace(&mut self.dock_state, egui_dock::DockState::new(vec![]));
         let mut s = egui_dock::Style::from_egui(ui.style());
+        s.tab_bar.show_scroll_bar_on_overflow = false;
         s.separator.width = 6.0;
         s.separator.color_idle = egui::Color32::TRANSPARENT;
         s.separator.color_hovered = egui::Color32::from_black_alpha(60);
@@ -164,6 +165,13 @@ impl<'a> TabViewer for SynthTabViewer<'a> {
 
     fn title(&mut self, tab: &mut Tab) -> WidgetText {
         tab.title().into()
+    }
+
+    // Disable horizontal scrolling — all tab content is designed to fit the
+    // panel width. The spurious horizontal scrollbar was appearing because
+    // egui_dock enables both axes by default.
+    fn scroll_bars(&self, _tab: &Tab) -> [bool; 2] {
+        [false, true]
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Tab) {

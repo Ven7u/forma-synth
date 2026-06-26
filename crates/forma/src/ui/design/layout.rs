@@ -267,6 +267,211 @@ impl SynthUi for Ui {
     }
 }
 
+// ── Card layout helpers ───────────────────────────────────────────────────────
+//
+// Named column/row compositions. All helpers use `ui.columns()` internally so
+// every slot gets a *fixed* width regardless of content — this prevents value
+// labels from shifting their neighbours as text changes length.
+//
+// Naming convention:
+//   col2 / col3 / col4          — N equal columns
+//   top_then_colN               — full-width header, then N columns (L-shape)
+//   colN_then_bottom            — N columns, then full-width footer (L-shape)
+//   sidebar_right / _left       — asymmetric split by ratio (0..1 = left width)
+//   header_sidebar_right / _left — full-width header + asymmetric body
+//   left_tall_right_stacked     — magazine: left spans height, right has rows
+
+/// Two equal columns with standard gutter.
+pub fn col2(ui: &mut Ui, content: impl FnOnce(&mut [Ui])) {
+    ui.columns(2, content);
+}
+
+/// Three equal columns with standard gutter.
+pub fn col3(ui: &mut Ui, content: impl FnOnce(&mut [Ui])) {
+    ui.columns(3, content);
+}
+
+/// Four equal columns with standard gutter.
+pub fn col4(ui: &mut Ui, content: impl FnOnce(&mut [Ui])) {
+    ui.columns(4, content);
+}
+
+/// Full-width header row, then 2 equal columns (top L-shape).
+pub fn top_then_col2(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    top: impl FnOnce(&mut Ui),
+    body: impl FnOnce(&mut [Ui]),
+) {
+    top(ui);
+    ui.add_space(theme.sp_xs);
+    ui.columns(2, body);
+}
+
+/// Full-width header row, then 3 equal columns (top L-shape).
+pub fn top_then_col3(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    top: impl FnOnce(&mut Ui),
+    body: impl FnOnce(&mut [Ui]),
+) {
+    top(ui);
+    ui.add_space(theme.sp_xs);
+    ui.columns(3, body);
+}
+
+/// Full-width header row, then 4 equal columns (top L-shape).
+pub fn top_then_col4(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    top: impl FnOnce(&mut Ui),
+    body: impl FnOnce(&mut [Ui]),
+) {
+    top(ui);
+    ui.add_space(theme.sp_xs);
+    ui.columns(4, body);
+}
+
+/// 2 equal columns, then full-width footer (bottom L-shape).
+pub fn col2_then_bottom(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    cols: impl FnOnce(&mut [Ui]),
+    bottom: impl FnOnce(&mut Ui),
+) {
+    ui.columns(2, cols);
+    ui.add_space(theme.sp_xs);
+    bottom(ui);
+}
+
+/// 3 equal columns, then full-width footer (bottom L-shape).
+pub fn col3_then_bottom(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    cols: impl FnOnce(&mut [Ui]),
+    bottom: impl FnOnce(&mut Ui),
+) {
+    ui.columns(3, cols);
+    ui.add_space(theme.sp_xs);
+    bottom(ui);
+}
+
+/// Asymmetric split: `left_ratio` (0..1) of available width goes to the left
+/// column, remainder to the right. Uses `ui.horizontal` + `ui.set_width` so
+/// the split is approximate but stable across frames.
+pub fn sidebar_right(
+    ui: &mut Ui,
+    left_ratio: f32,
+    left: impl FnOnce(&mut Ui),
+    right: impl FnOnce(&mut Ui),
+) {
+    let avail = ui.available_width();
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(avail * left_ratio.clamp(0.1, 0.9));
+            left(ui);
+        });
+        ui.vertical(|ui| {
+            right(ui);
+        });
+    });
+}
+
+/// Asymmetric split: narrow left (sidebar), wide right (main content).
+/// `left_ratio` is the fraction of available width for the left column.
+pub fn sidebar_left(
+    ui: &mut Ui,
+    left_ratio: f32,
+    left: impl FnOnce(&mut Ui),
+    right: impl FnOnce(&mut Ui),
+) {
+    sidebar_right(ui, left_ratio, left, right);
+}
+
+/// Full-width header, then asymmetric body (wide left + narrow right sidebar).
+pub fn header_sidebar_right(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    left_ratio: f32,
+    header: impl FnOnce(&mut Ui),
+    left: impl FnOnce(&mut Ui),
+    right: impl FnOnce(&mut Ui),
+) {
+    header(ui);
+    ui.add_space(theme.sp_xs);
+    sidebar_right(ui, left_ratio, left, right);
+}
+
+/// Full-width header, then asymmetric body (narrow left sidebar + wide right).
+pub fn header_sidebar_left(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    left_ratio: f32,
+    header: impl FnOnce(&mut Ui),
+    left: impl FnOnce(&mut Ui),
+    right: impl FnOnce(&mut Ui),
+) {
+    header(ui);
+    ui.add_space(theme.sp_xs);
+    sidebar_right(ui, left_ratio, left, right);
+}
+
+/// Magazine layout: left column spans full height, right is split into
+/// `right_rows` stacked vertical sections separated by `theme.sp_xs`.
+/// `left_ratio` controls how much width the left column takes (0..1).
+pub fn left_tall_right_stacked<'a>(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    left_ratio: f32,
+    left: impl FnOnce(&mut Ui),
+    right_rows: Vec<Box<dyn FnOnce(&mut Ui) + 'a>>,
+) {
+    let avail = ui.available_width();
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(avail * left_ratio.clamp(0.1, 0.9));
+            left(ui);
+        });
+        ui.vertical(|ui| {
+            let n = right_rows.len();
+            for (i, row) in right_rows.into_iter().enumerate() {
+                row(ui);
+                if i + 1 < n {
+                    ui.add_space(theme.sp_xs);
+                }
+            }
+        });
+    });
+}
+
+/// Mirror of `left_tall_right_stacked` — right column spans height, left
+/// is split into stacked rows.
+pub fn right_tall_left_stacked<'a>(
+    ui: &mut Ui,
+    theme: &SynthTheme,
+    right_ratio: f32,
+    left_rows: Vec<Box<dyn FnOnce(&mut Ui) + 'a>>,
+    right: impl FnOnce(&mut Ui),
+) {
+    let avail = ui.available_width();
+    let left_ratio = 1.0 - right_ratio.clamp(0.1, 0.9);
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(avail * left_ratio);
+            let n = left_rows.len();
+            for (i, row) in left_rows.into_iter().enumerate() {
+                row(ui);
+                if i + 1 < n {
+                    ui.add_space(theme.sp_xs);
+                }
+            }
+        });
+        ui.vertical(|ui| {
+            right(ui);
+        });
+    });
+}
+
 /// FxModule pattern — per `05-patterns.md` §FxModule. A single effect
 /// box in the FX chain. Renders:
 /// - A fixed-min-width vertical container (caller can override via
