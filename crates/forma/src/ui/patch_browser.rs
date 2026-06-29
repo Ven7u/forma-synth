@@ -192,10 +192,7 @@ impl SynthApp {
                     || p.category.to_lowercase().contains(&search_lc)
                     || p.tags.iter().any(|t| t.contains(&search_lc));
                 let tag_ok = self.patch_active_tags.is_empty()
-                    || self
-                        .patch_active_tags
-                        .iter()
-                        .all(|t| p.tags.contains(t));
+                    || self.patch_active_tags.iter().all(|t| p.tags.contains(t));
                 cat_ok && search_ok && tag_ok
             })
             .map(|(i, _)| i)
@@ -280,9 +277,7 @@ impl SynthApp {
                             if ui
                                 .selectable_label(
                                     active,
-                                    egui::RichText::new(cat)
-                                        .font(theme.font_body())
-                                        .color(col),
+                                    egui::RichText::new(cat).font(theme.font_body()).color(col),
                                 )
                                 .clicked()
                             {
@@ -293,7 +288,11 @@ impl SynthApp {
                         ui.add_space(theme.sp_sm);
 
                         // Tag groups — free function to avoid closure borrow conflict
-                        let colors = SidebarColors { accent, text_sec, text_dis };
+                        let colors = SidebarColors {
+                            accent,
+                            text_sec,
+                            text_dis,
+                        };
                         for (group_label, group_tags) in &[
                             ("INSPIRED BY", INSPIRED_BY_TAGS),
                             ("CHARACTER", CHARACTER_TAGS),
@@ -337,9 +336,7 @@ impl SynthApp {
                         let fav_indices: Vec<usize> = filtered
                             .iter()
                             .copied()
-                            .filter(|&i| {
-                                self.patch_favorites.contains(&self.patch_library[i].name)
-                            })
+                            .filter(|&i| self.patch_favorites.contains(&self.patch_library[i].name))
                             .collect();
 
                         if !fav_indices.is_empty() {
@@ -381,15 +378,11 @@ impl SynthApp {
                                     .color(text_sec),
                             );
                             for i in &recent_indices {
-                                let is_fav = self
-                                    .patch_favorites
-                                    .contains(&self.patch_library[*i].name);
-                                if let Some(action) = Self::patch_row(
-                                    ui,
-                                    &self.patch_library[*i],
-                                    is_fav,
-                                    &theme,
-                                ) {
+                                let is_fav =
+                                    self.patch_favorites.contains(&self.patch_library[*i].name);
+                                if let Some(action) =
+                                    Self::patch_row(ui, &self.patch_library[*i], is_fav, &theme)
+                                {
                                     match action {
                                         PatchAction::Load => load_idx = Some(*i),
                                         PatchAction::ToggleFav(n) => toggle_fav = Some(n),
@@ -549,7 +542,11 @@ fn sidebar_tag_group(
     );
     for &tag in &relevant {
         let active = active_tags.contains(tag);
-        let col = if active { colors.accent } else { colors.text_sec };
+        let col = if active {
+            colors.accent
+        } else {
+            colors.text_sec
+        };
         if ui
             .selectable_label(
                 active,
