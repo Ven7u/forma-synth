@@ -1,6 +1,6 @@
 [package]
 name = "forma-common"
-version = "0.1.4"
+version = "0.1.5"
 license = "GPL-3.0-only"
 edition = "2021"
 publish = false
