@@ -43,6 +43,6 @@ rfd         = "0.15"
 egui_dock   = "0.19"
 hound       = "3"
 image       = { version = "0.25", default-features = false, features = ["png"] }
-directories = "5"
+directories = "6"
 include_dir = { version = "0.7", features = ["glob"] }
 env_logger  = "0.11" # logger backend for egui/eframe/wgpu — set RUST_LOG to view
