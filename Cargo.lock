@@ -787,9 +787,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.15"
+version = "0.5.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
+checksum = "d85363c37faeca707aef026efa9f3b34d077bce547e48f770770625c6013679e"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "forma"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1363,14 +1363,14 @@ dependencies = [
 
 [[package]]
 name = "forma-common"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "fundsp",
 ]
 
 [[package]]
 name = "forma-control"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -1380,14 +1380,14 @@ dependencies = [
 
 [[package]]
 name = "forma-dsp"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "fundsp",
 ]
 
 [[package]]
 name = "forma-engine"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "forma-common",
