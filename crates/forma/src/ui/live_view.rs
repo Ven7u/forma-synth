@@ -56,11 +56,15 @@ impl SynthApp {
                 self.ui_live_track_strip(ui);
             });
 
-        // Full studio dock for the focused track.
+        // Central body: loop grid (new loop-station mode) or studio dock.
         egui::CentralPanel::default()
             .frame(SynthFrame::app_bg(&self.theme))
             .show_inside(ui, |ui| {
-                self.ui_synth_dock(ui);
+                if self.loop_grid_active {
+                    self.ui_loop_grid(ui);
+                } else {
+                    self.ui_synth_dock(ui);
+                }
             });
     }
 
@@ -357,8 +361,31 @@ impl SynthApp {
                 self.app_mode = AppMode::DrumMachine;
             }
 
-            // ── Right-side controls: MIX▸ + keyboard split ──────────────────
+            // ── Right-side controls: LOOPS + MIX▸ + keyboard split ─────────
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // LOOPS toggle — switches central panel between loop grid and dock.
+                let loops_col = if self.loop_grid_active {
+                    accent
+                } else {
+                    text_dis
+                };
+                if ui
+                    .add(
+                        egui::Label::new(
+                            egui::RichText::new("LOOPS")
+                                .font(self.theme.font_body())
+                                .color(loops_col),
+                        )
+                        .sense(Sense::click()),
+                    )
+                    .on_hover_text("Switch to loop grid view")
+                    .clicked()
+                {
+                    self.loop_grid_active = !self.loop_grid_active;
+                }
+
+                ui.add_space(12.0);
+
                 let mix_col = if self.show_mixer { accent } else { text_dis };
                 if ui
                     .add(

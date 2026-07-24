@@ -10,6 +10,7 @@ pub mod keyboard;
 pub mod layout;
 #[cfg(feature = "live_rig")]
 pub mod live_view;
+pub mod loop_grid;
 pub mod metronome;
 pub mod midi;
 #[cfg(feature = "live_rig")]

@@ -379,6 +379,11 @@ pub(crate) struct SynthApp {
     pub(crate) patch_favorites: std::collections::HashSet<String>,
     pub(crate) patch_recent: Vec<String>,
 
+    // Live loop grid
+    pub(crate) loop_cells: [crate::ui::loop_grid::LoopCell; crate::ui::loop_grid::GRID_SIZE],
+    #[allow(dead_code)] // used inside #[cfg(feature = "live_rig")] live_view.rs
+    pub(crate) loop_grid_active: bool,
+
     // Metronome
     pub(crate) show_metronome: bool,
     pub(crate) metro_enabled: bool,
@@ -764,6 +769,9 @@ impl SynthApp {
             patch_active_tags: std::collections::HashSet::new(),
             patch_favorites: saved.patch_favorites.into_iter().collect(),
             patch_recent: saved.patch_recent,
+
+            loop_cells: std::array::from_fn(|_| crate::ui::loop_grid::LoopCell::new()),
+            loop_grid_active: false,
             show_metronome: false,
             metro_enabled: false,
             metro_beats: 4,
@@ -1851,6 +1859,10 @@ impl eframe::App for SynthApp {
                     }
                     #[cfg(feature = "live_rig")]
                     AppMode::Live => {
+                        if self.loop_grid_active {
+                            let dt = ctx.input(|i| i.stable_dt);
+                            self.tick_loop_grid(dt);
+                        }
                         self.ui_live_view(ui);
                     }
                     #[cfg(not(feature = "live_rig"))]
