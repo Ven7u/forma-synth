@@ -8,6 +8,7 @@
 #![allow(deprecated)]
 
 mod audio;
+mod audio_loops;
 mod eq;
 mod history;
 mod layout_store;
@@ -379,10 +380,8 @@ pub(crate) struct SynthApp {
     pub(crate) patch_favorites: std::collections::HashSet<String>,
     pub(crate) patch_recent: Vec<String>,
 
-    // Live loop grid
-    pub(crate) loop_cells: [crate::ui::loop_grid::LoopCell; crate::ui::loop_grid::GRID_SIZE],
-    #[allow(dead_code)] // used inside #[cfg(feature = "live_rig")] live_view.rs
-    pub(crate) loop_grid_active: bool,
+    // Live loop grid — audio loops recorded on the DSP thread.
+    pub(crate) loop_audio: Arc<crate::audio_loops::LoopGridAtomics>,
 
     // Metronome
     pub(crate) show_metronome: bool,
@@ -599,6 +598,8 @@ impl SynthApp {
         let drum_engine = std::sync::Arc::clone(&audio.drum);
         // Extract EQ params Arc before audio is moved.
         let eq = std::sync::Arc::clone(&audio.eq);
+        // Extract loop-grid atomics Arc before audio is moved.
+        let loop_audio = std::sync::Arc::clone(&audio.loops);
 
         // Snapshot each engine's initial patch state (all "Init" on fresh start).
         let track_patches = [
@@ -770,8 +771,7 @@ impl SynthApp {
             patch_favorites: saved.patch_favorites.into_iter().collect(),
             patch_recent: saved.patch_recent,
 
-            loop_cells: std::array::from_fn(|_| crate::ui::loop_grid::LoopCell::new()),
-            loop_grid_active: false,
+            loop_audio,
             show_metronome: false,
             metro_enabled: false,
             metro_beats: 4,
@@ -1814,6 +1814,12 @@ impl eframe::App for SynthApp {
         // Advance metronome phase each frame.
         self.tick_metronome(ctx);
 
+        // Push transport params to the audio loop grid (cheap atomic stores).
+        self.loop_audio.set_bpm(self.global_bpm as f32);
+        self.loop_audio.set_beats_per_bar(self.metro_beats as u32);
+        self.loop_audio.set_live_track(self.focused_track);
+        self.loop_audio.set_running(self.app_mode == AppMode::Live);
+
         // Floating windows — must be shown before panels.
         self.ui_patch_browser(ctx);
         self.ui_kit_browser(ctx);
@@ -1859,10 +1865,7 @@ impl eframe::App for SynthApp {
                     }
                     #[cfg(feature = "live_rig")]
                     AppMode::Live => {
-                        if self.loop_grid_active {
-                            let dt = ctx.input(|i| i.stable_dt);
-                            self.tick_loop_grid(dt);
-                        }
+                        // ui_live_view drives the grid clock/dispatch internally.
                         self.ui_live_view(ui);
                     }
                     #[cfg(not(feature = "live_rig"))]

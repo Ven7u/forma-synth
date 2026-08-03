@@ -1,3 +1,7 @@
+//! Retained for a future LIVE rig-strip overlay — the current minimal loop-grid
+//! view does not surface it, so the whole module is intentionally unreferenced.
+#![allow(dead_code)]
+
 use crate::audio::TRACK_COUNT;
 use crate::ui::design::level_meter::{level_meter, LevelMeterOrientation, LevelMeterSize};
 use crate::ui::layout::AppMode;

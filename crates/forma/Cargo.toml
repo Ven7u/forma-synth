@@ -19,7 +19,7 @@ resources = ["assets/patches"]
 
 [features]
 # Enables the multi-track LIVE rig and drum machine UI surfaces.
-# Not yet production-ready — off by default so main branch builds clean.
+default = ["live_rig"]
 live_rig = []
 
 [dependencies]

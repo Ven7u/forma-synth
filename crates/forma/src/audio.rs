@@ -14,6 +14,7 @@ use fundsp::prelude32::*;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::audio_loops::{LoopGridAtomics, LoopProcessor};
 use crate::eq::{EqParams, ParametricEq};
 use crate::recorder::Recorder;
 use forma_control::{make_control_channel, ControlReceiver};
@@ -903,6 +904,8 @@ pub struct AudioEngine {
     pub drum: Arc<DrumEngineAtomics>,
     /// Mix-bus parametric EQ params — UI writes, audio thread reads.
     pub eq: Arc<Mutex<EqParams>>,
+    /// Audio loop grid control/readback — shared with the audio callback.
+    pub loops: Arc<LoopGridAtomics>,
     _stream: Stream,
 }
 
@@ -936,6 +939,7 @@ impl AudioEngine {
 
         let drum = DrumEngineAtomics::new();
         let eq: Arc<Mutex<EqParams>> = Arc::new(Mutex::new(EqParams::default()));
+        let loops = LoopGridAtomics::new();
 
         let stream = match config.sample_format() {
             cpal::SampleFormat::F32 => build_stream::<f32>(
@@ -951,6 +955,7 @@ impl AudioEngine {
                 Arc::clone(&eq),
                 sr,
                 recorder_sink,
+                Arc::clone(&loops),
             )?,
             cpal::SampleFormat::I16 => build_stream::<i16>(
                 &device,
@@ -965,6 +970,7 @@ impl AudioEngine {
                 Arc::clone(&eq),
                 sr,
                 recorder_sink,
+                Arc::clone(&loops),
             )?,
             cpal::SampleFormat::U16 => build_stream::<u16>(
                 &device,
@@ -979,6 +985,7 @@ impl AudioEngine {
                 Arc::clone(&eq),
                 sr,
                 recorder_sink,
+                Arc::clone(&loops),
             )?,
             _ => anyhow::bail!("Unsupported sample format"),
         };
@@ -999,6 +1006,7 @@ impl AudioEngine {
             ],
             drum,
             eq,
+            loops,
             _stream: stream,
         })
     }
@@ -1020,11 +1028,15 @@ fn build_stream<T>(
     eq_params: Arc<Mutex<EqParams>>,
     sr: f64,
     recorder_sink: RecorderSink,
+    loops: Arc<LoopGridAtomics>,
 ) -> anyhow::Result<Stream>
 where
     T: SizedSample + FromSample<f32>,
 {
     let channels = config.channels as usize;
+
+    // Audio-thread half of the loop grid — owns the pad buffers.
+    let mut loop_proc = LoopProcessor::new(loops, sr);
 
     let mut states = states;
     let mut rxs = rxs;
@@ -1087,6 +1099,9 @@ where
                 track.begin_buffer(frames, sr);
             }
             drum_proc.begin_buffer(frames, sr);
+            // Loop grid: refresh transport + consume tap/clear/length requests.
+            loop_proc.begin_buffer();
+            let live_track = loop_proc.live_track();
 
             // Solo logic: if any track is soloed, mute all others.
             let any_solo = mixers.iter().any(|m| m.solo());
@@ -1115,9 +1130,18 @@ where
             for (frame_i, frame) in data.chunks_mut(channels).enumerate() {
                 let mut mix_l: f32 = 0.0;
                 let mut mix_r: f32 = 0.0;
+                // Dry output of the live instrument (the loop-record source).
+                let mut live_l: f32 = 0.0;
+                let mut live_r: f32 = 0.0;
 
                 for (t_idx, track) in tracks.iter_mut().enumerate() {
                     let (tl, tr) = track.get_stereo_frame(dc_coeff);
+
+                    // Capture the live track's dry signal for loop recording.
+                    if t_idx == live_track {
+                        live_l = tl;
+                        live_r = tr;
+                    }
 
                     // Track peak before mute/solo so VU shows signal even when muted.
                     if tl.abs() > track_peak_l[t_idx] {
@@ -1168,6 +1192,12 @@ where
                     mix_l += dl * dvol * pan_l;
                     mix_r += dr * dvol * pan_r;
                 }
+
+                // Loop grid: record the live signal + sum playing pads into the
+                // mix bus (pre-EQ/limiter, so loops are mastered with everything).
+                let (loop_l, loop_r) = loop_proc.process_frame(live_l, live_r);
+                mix_l += loop_l;
+                mix_r += loop_r;
 
                 // Mix-bus parametric EQ.
                 let (mix_l, mix_r) = mix_eq.process(mix_l, mix_r);
