@@ -90,9 +90,60 @@ fn main() -> eframe::Result {
                     .callback_resources
                     .insert(resources);
             }
+            setup_fonts(&cc.egui_ctx);
             Ok(Box::new(SynthApp::new(audio, recorder_sink, saved_layout)))
         }),
     )
+}
+
+/// MIDI note numbers for the 12 loop-grid pads (ch10, 0-indexed channel 9).
+/// Physical pad 1 on the MK3 (note 39) maps to grid pad 12 (bottom-right);
+/// physical pad 12 (note 44) maps to grid pad 1 (top-left).
+///   Row 1: grid pads  0..3  → notes 44 45 46 47  (MK3 pads 12..9)
+///   Row 2: grid pads  4..7  → notes 40 41 42 43  (MK3 pads  8..5)
+///   Row 3: grid pads  8..11 → notes 36 37 38 39  (MK3 pads  4..1)
+const LIVE_PAD_NOTES: [u8; 12] = [44, 45, 46, 47, 40, 41, 42, 43, 36, 37, 38, 39];
+/// 0-indexed MIDI channel for the live pads (ch10 on the device = channel 9).
+const LIVE_PAD_CHANNEL: u8 = 9;
+
+/// Load system Unicode fallback fonts so every glyph (■ ♩ ⚙ ⏺ ✕ …) renders
+/// instead of showing as an empty square. egui's bundled Ubuntu-Light subset
+/// only covers basic Latin; everything else falls through to these fallbacks.
+fn setup_fonts(ctx: &egui::Context) {
+    // Candidate paths ordered by preference — first readable one wins.
+    // Arial Unicode MS ships with every macOS since 10.5 and covers the full
+    // Unicode BMP including music symbols, geometric shapes, and arrows.
+    let candidates = [
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        // Fallback: Apple Symbols covers geometric/technical blocks.
+        "/System/Library/Fonts/Apple Symbols.ttf",
+    ];
+
+    let mut fonts = egui::FontDefinitions::default();
+
+    for path in &candidates {
+        if let Ok(bytes) = std::fs::read(path) {
+            fonts.font_data.insert(
+                "unicode_fallback".to_owned(),
+                std::sync::Arc::new(egui::FontData::from_owned(bytes)),
+            );
+            // Push to the END of both families so it only activates for glyphs
+            // the primary fonts (Ubuntu-Light / Hack) don't cover.
+            for family in [
+                &egui::FontFamily::Proportional,
+                &egui::FontFamily::Monospace,
+            ] {
+                fonts
+                    .families
+                    .entry(family.clone())
+                    .or_default()
+                    .push("unicode_fallback".to_owned());
+            }
+            break; // first match is enough
+        }
+    }
+
+    ctx.set_fonts(fonts);
 }
 
 // ---------------------------------------------------------------------------
@@ -519,6 +570,9 @@ pub(crate) struct SynthApp {
     /// Recent MIDI events for the monitor panel — newest first, capped at 32.
     pub(crate) midi_monitor: Vec<String>,
     midi_reconnect_tick: u32,
+    /// Shared with the MIDI callback thread — when true, ch10 pad notes are
+    /// intercepted for the loop grid instead of being routed to the synth engine.
+    live_midi_gate: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
     // Mix-bus parametric EQ
     pub(crate) eq: Arc<Mutex<crate::eq::EqParams>>,
@@ -574,12 +628,33 @@ impl SynthApp {
         // Dispatch MIDI note events directly from the midir callback thread so
         // they reach the audio engine even when the window is on a different
         // macOS Space and the eframe render loop is paused.
+        // When Live mode is active (live_midi_gate=true), ch10 pad notes are
+        // withheld here and handled as loop-grid taps in the UI drain loop instead.
+        let live_midi_gate = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         {
             let e = engine.clone();
-            midi.set_on_event(move |ev| match ev {
-                MidiEvent::NoteOn { note, velocity, .. } => e.note_on(note, velocity),
-                MidiEvent::NoteOff { note, .. } => e.note_off(note),
-                _ => {}
+            let gate = std::sync::Arc::clone(&live_midi_gate);
+            midi.set_on_event(move |ev| {
+                let live = gate.load(std::sync::atomic::Ordering::Relaxed);
+                match ev {
+                    MidiEvent::NoteOn { note, channel, velocity } => {
+                        if live && channel == LIVE_PAD_CHANNEL
+                            && LIVE_PAD_NOTES.contains(&note)
+                        {
+                            return; // routed to loop grid in UI drain loop
+                        }
+                        e.note_on(note, velocity)
+                    }
+                    MidiEvent::NoteOff { note, channel } => {
+                        if live && channel == LIVE_PAD_CHANNEL
+                            && LIVE_PAD_NOTES.contains(&note)
+                        {
+                            return;
+                        }
+                        e.note_off(note)
+                    }
+                    _ => {}
+                }
             });
         }
         let track_engines = [
@@ -870,6 +945,7 @@ impl SynthApp {
             midi_last_cc: None,
             midi_monitor: Vec::new(),
             midi_reconnect_tick: 0,
+            live_midi_gate,
             eq,
             layout_save_name: String::new(),
         }
@@ -1499,18 +1575,30 @@ impl SynthApp {
             match ev {
                 MidiEvent::NoteOn { note, channel, .. } => {
                     self.midi_held_notes.insert(note);
-                    // Notes are already dispatched by the midir callback thread
-                    // (set_on_event), so we skip engine dispatch here to avoid
-                    // doubling. LIVE-mode channel routing is applied below only
-                    // when the UI loop is actually running (window focused).
-                    if !self.midi.has_on_event() {
+                    // In Live mode, ch10 NoteOns on pad notes tap the loop grid pad.
+                    // The callback already withheld these from the synth engine.
+                    if self.app_mode == AppMode::Live
+                        && channel == LIVE_PAD_CHANNEL
+                    {
+                        if let Some(pad) = LIVE_PAD_NOTES.iter().position(|&n| n == note) {
+                            self.loop_audio.tap(pad);
+                            // Don't fall through to synth routing.
+                        }
+                        // Non-pad ch10 notes are ignored in Live mode.
+                    } else if !self.midi.has_on_event() {
+                        // Normal path: callback already dispatched when has_on_event().
                         self.route_note_on(note, channel);
                     }
                 }
-                MidiEvent::NoteOff { note, .. } => {
+                MidiEvent::NoteOff { note, channel, .. } => {
                     self.midi_held_notes.remove(&note);
-                    // Same as above — callback already sent NoteOff to engine.
-                    if !self.midi.has_on_event() {
+                    // Pad NoteOffs do nothing — loop-grid taps are toggles on NoteOn.
+                    if self.app_mode == AppMode::Live
+                        && channel == LIVE_PAD_CHANNEL
+                        && LIVE_PAD_NOTES.contains(&note)
+                    {
+                        // intentionally ignored
+                    } else if !self.midi.has_on_event() {
                         self.push_note_off(note);
                     }
                 }
@@ -1815,10 +1903,15 @@ impl eframe::App for SynthApp {
         self.tick_metronome(ctx);
 
         // Push transport params to the audio loop grid (cheap atomic stores).
+        let in_live_mode = self.app_mode == AppMode::Live;
         self.loop_audio.set_bpm(self.global_bpm as f32);
         self.loop_audio.set_beats_per_bar(self.metro_beats as u32);
         self.loop_audio.set_live_track(self.focused_track);
-        self.loop_audio.set_running(self.app_mode == AppMode::Live);
+        self.loop_audio.set_running(in_live_mode);
+        // Sync the MIDI callback gate so ch10 pad notes go to the loop grid
+        // in Live mode instead of the synth engine.
+        self.live_midi_gate
+            .store(in_live_mode, Ordering::Relaxed);
 
         // Floating windows — must be shown before panels.
         self.ui_patch_browser(ctx);
@@ -2746,6 +2839,23 @@ impl SynthApp {
             {
                 let seq_playing = self.seq.playing.load(Ordering::Relaxed);
                 let drums_running = self.drum_engine.enabled.load(Ordering::Relaxed);
+                let live_transport = self.loop_audio.is_running();
+
+                // When the loop transport is running use the audio-thread bar_phase
+                // so the header dots are in sync with the loop grid strip.
+                let beats = self.metro_beats as u32;
+                let (beat_idx, beat_frac) = if live_transport {
+                    crate::audio_loops::beat_state_from_bar_phase(
+                        self.loop_audio.bar_phase(),
+                        beats,
+                    )
+                } else {
+                    (
+                        self.metro_phase as usize,
+                        self.metro_phase.fract() as f32,
+                    )
+                };
+
                 let resp = draw_beat_indicator(
                     ui,
                     &BeatState {
@@ -2753,9 +2863,10 @@ impl SynthApp {
                             || self.seq_pending_start
                             || self.arp_pending_start
                             || seq_playing
-                            || drums_running,
-                        beat_idx: self.metro_phase as usize,
-                        beat_frac: self.metro_phase.fract() as f32,
+                            || drums_running
+                            || live_transport,
+                        beat_idx,
+                        beat_frac,
                         beats: self.metro_beats,
                         denom: self.metro_denom,
                         show_metronome: self.show_metronome,
@@ -2769,6 +2880,27 @@ impl SynthApp {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
                 resp.on_hover_text("Click to open metronome / time signature settings.");
+            }
+
+            // ── Metronome click toggle ─────────────────────────────────────
+            {
+                let click_on = self.loop_audio.is_click_enabled();
+                let col = if click_on {
+                    self.theme.c(&self.theme.accent)
+                } else {
+                    self.theme.c(&self.theme.text_disabled)
+                };
+                if ui
+                    .button(egui::RichText::new("\u{266A}").size(13.0).color(col))
+                    .on_hover_text(if click_on {
+                        "Metronome click: ON — click to mute"
+                    } else {
+                        "Metronome click: OFF — click to enable"
+                    })
+                    .clicked()
+                {
+                    self.loop_audio.set_click_enabled(!click_on);
+                }
             }
 
             // ── STOP ─────────────────────────────────────────────────────

@@ -20,6 +20,54 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+// ── Pure beat-state helpers ────────────────────────────────────────────────────
+//
+// These functions derive UI display state from the audio-thread bar phase.
+// Keeping them pure (no atomics, no side effects) makes them trivially testable.
+
+/// Compute per-beat display state from the bar phase written by the audio thread.
+///
+/// - `bar_phase` – position within the current bar, 0.0..1.0
+///   (from [`LoopGridAtomics::bar_phase`], updated every audio buffer)
+/// - `beats_per_bar` – time-signature numerator, ≥ 1
+///
+/// Returns `(beat_idx, beat_frac)`:
+/// - `beat_idx`  – index of the currently active beat (0 = downbeat)
+/// - `beat_frac` – progress within that beat, 0.0..1.0
+///
+/// This is the single source of truth for beat animations in the loop grid.
+/// Using it instead of the UI-thread metro clock ensures the visualization is
+/// always sample-accurately aligned to the actual recording start, regardless
+/// of wall-clock drift or tempo changes.
+pub fn beat_state_from_bar_phase(bar_phase: f32, beats_per_bar: u32) -> (usize, f32) {
+    let beats = beats_per_bar.max(1) as f32;
+    // Keep phase strictly in [0, 1) so beat_idx never equals beats_per_bar.
+    let phase = bar_phase.clamp(0.0, 1.0 - f32::EPSILON);
+    let pos = phase * beats;
+    let beat_idx = pos as usize;
+    let beat_frac = pos - beat_idx as f32; // avoids float fract() precision edge cases
+    (beat_idx, beat_frac)
+}
+
+/// Compute the fill fraction for one segment of the beat timeline strip.
+///
+/// - `segment`   – which beat slot (0 = downbeat)
+/// - `beat_idx`  – currently active beat index
+/// - `beat_frac` – progress within the active beat, 0.0..1.0
+///
+/// Returns 0.0 (empty), 0..1 (filling), or 1.0 (complete).
+///
+/// **Invariant**: `sum over all segments == beat_idx + beat_frac == bar_phase * beats_per_bar`
+pub fn segment_fill(segment: usize, beat_idx: usize, beat_frac: f32) -> f32 {
+    if segment < beat_idx {
+        1.0
+    } else if segment == beat_idx {
+        beat_frac.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
 pub const LOOP_PADS: usize = 12;
 /// Number of peak-envelope bins stored per pad for the UI waveform preview.
 pub const LOOP_WAVE_BINS: usize = 48;
@@ -63,6 +111,12 @@ pub struct LoopGridAtomics {
     pub live_track: AtomicUsize,
     /// True while the LIVE loop grid is on screen; gates the transport clock.
     pub running: AtomicBool,
+    /// Position within the current bar, 0.0..1.0. Written each buffer; UI reads for beat feedback.
+    pub bar_phase: AtomicU32,
+    /// Whether to synthesize an audible metronome click on every beat.
+    pub click_enabled: AtomicBool,
+    /// Click volume (f32 bits), 0.0–1.0.
+    pub click_volume: AtomicU32,
 
     // ── Per-pad requests (UI writes, audio consumes) ───────────────────────
     /// Monotonic tap counter — UI increments on each user tap of the pad.
@@ -89,6 +143,9 @@ impl LoopGridAtomics {
             beats_per_bar: AtomicU32::new(4),
             live_track: AtomicUsize::new(0),
             running: AtomicBool::new(false),
+            bar_phase: AtomicU32::new(0),
+            click_enabled: AtomicBool::new(false),
+            click_volume: AtomicU32::new(0.5_f32.to_bits()),
             tap: std::array::from_fn(|_| AtomicU32::new(0)),
             clear: std::array::from_fn(|_| AtomicU32::new(0)),
             len_bars: std::array::from_fn(|_| AtomicU32::new(2)),
@@ -112,6 +169,30 @@ impl LoopGridAtomics {
     }
     pub fn set_running(&self, on: bool) {
         self.running.store(on, Ordering::Relaxed);
+    }
+    pub fn is_running(&self) -> bool {
+        self.running.load(Ordering::Relaxed)
+    }
+    /// Current bar position 0.0..1.0 (0 when stopped).
+    pub fn bar_phase(&self) -> f32 {
+        f32::from_bits(self.bar_phase.load(Ordering::Relaxed))
+    }
+    /// Beats per bar as stored by the UI thread.
+    pub fn beats_per_bar_value(&self) -> u32 {
+        self.beats_per_bar.load(Ordering::Relaxed).max(1)
+    }
+
+    pub fn set_click_enabled(&self, on: bool) {
+        self.click_enabled.store(on, Ordering::Relaxed);
+    }
+    pub fn is_click_enabled(&self) -> bool {
+        self.click_enabled.load(Ordering::Relaxed)
+    }
+    pub fn set_click_volume(&self, v: f32) {
+        self.click_volume.store(v.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+    }
+    pub fn click_volume_value(&self) -> f32 {
+        f32::from_bits(self.click_volume.load(Ordering::Relaxed))
     }
 
     /// Post a user tap for a pad (arm / cancel — interpreted on the audio thread).
@@ -207,6 +288,11 @@ pub struct LoopProcessor {
     sr: f64,
     // Cached per-buffer transport parameters.
     samples_per_bar: u64,
+    samples_per_beat: u64,
+    // Click oscillator state (audio-thread only).
+    click_env: f32,
+    click_osc: f32,
+    click_is_down: bool,
 }
 
 impl LoopProcessor {
@@ -222,6 +308,10 @@ impl LoopProcessor {
             cap,
             sr,
             samples_per_bar: (sr * 2.0) as u64, // recomputed each buffer
+            samples_per_beat: (sr * 0.5) as u64,
+            click_env: 0.0,
+            click_osc: 0.0,
+            click_is_down: false,
         }
     }
 
@@ -245,7 +335,16 @@ impl LoopProcessor {
         let bpm = bpm.clamp(20.0, 999.0);
         let beats = self.atomics.beats_per_bar.load(Ordering::Relaxed).max(1) as f64;
         let samples_per_beat = self.sr * 60.0 / bpm;
+        self.samples_per_beat = samples_per_beat.max(1.0) as u64;
         self.samples_per_bar = (samples_per_beat * beats).max(1.0) as u64;
+
+        // Publish bar position for the UI beat-clock.
+        let phase = if running && self.samples_per_bar > 0 {
+            (self.transport % self.samples_per_bar) as f32 / self.samples_per_bar as f32
+        } else {
+            0.0
+        };
+        self.atomics.bar_phase.store(phase.to_bits(), Ordering::Relaxed);
 
         // Consume per-pad control requests.
         for i in 0..LOOP_PADS {
@@ -351,8 +450,20 @@ impl LoopProcessor {
             self.on_bar();
         }
 
-        let mut out_l = 0.0;
-        let mut out_r = 0.0;
+        // Beat-boundary click trigger.
+        let spbeat = self.samples_per_beat.max(1);
+        if self.transport.is_multiple_of(spbeat)
+            && self.atomics.click_enabled.load(Ordering::Relaxed)
+        {
+            self.click_env = 1.0;
+            self.click_osc = 0.0;
+            let beat_idx = (self.transport / spbeat)
+                % (self.samples_per_bar / spbeat).max(1);
+            self.click_is_down = beat_idx == 0;
+        }
+
+        let mut out_l = 0.0f32;
+        let mut out_r = 0.0f32;
 
         for i in 0..LOOP_PADS {
             match self.pads[i].state {
@@ -374,6 +485,21 @@ impl LoopProcessor {
                 }
                 _ => {}
             }
+        }
+
+        // Click synthesis — short exponential-decay sine (12 ms).
+        if self.click_env > 1e-4 {
+            let vol = f32::from_bits(self.atomics.click_volume.load(Ordering::Relaxed));
+            let freq = if self.click_is_down { 1000.0f32 } else { 700.0f32 };
+            let click_s = (self.click_osc * std::f32::consts::TAU).sin()
+                * self.click_env
+                * vol
+                * 0.35;
+            self.click_osc = (self.click_osc + freq / self.sr as f32).fract();
+            // Time constant: -1/(0.012 * sr) ≈ -1/529 at 44100 Hz → ~12 ms decay.
+            self.click_env *= (-1.0f32 / (0.012 * self.sr as f32)).exp();
+            out_l += click_s;
+            out_r += click_s;
         }
 
         self.transport = self.transport.wrapping_add(1);
@@ -414,5 +540,271 @@ impl LoopProcessor {
             self.atomics.wave[i][b].store(v.to_bits(), Ordering::Relaxed);
         }
         self.publish_state(i);
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::{beat_state_from_bar_phase, segment_fill};
+
+    const EPSILON: f32 = 1e-5;
+
+    fn approx_eq(a: f32, b: f32) -> bool {
+        (a - b).abs() < EPSILON
+    }
+
+    // ── beat_state_from_bar_phase ─────────────────────────────────────────────
+
+    #[test]
+    fn test_4_4_beat_boundaries() {
+        // 4/4: beats start at 0.0, 0.25, 0.5, 0.75
+        let cases = [
+            (0.0f32,  0usize, 0.0f32),
+            (0.25,    1,      0.0),
+            (0.5,     2,      0.0),
+            (0.75,    3,      0.0),
+        ];
+        for (phase, exp_idx, exp_frac) in cases {
+            let (idx, frac) = beat_state_from_bar_phase(phase, 4);
+            assert_eq!(idx, exp_idx, "4/4 beat_idx at phase={phase}");
+            assert!(approx_eq(frac, exp_frac), "4/4 beat_frac at phase={phase}: got {frac}");
+        }
+    }
+
+    #[test]
+    fn test_4_4_midbeat_frac() {
+        // Halfway through beat 0 → frac=0.5
+        let (idx, frac) = beat_state_from_bar_phase(0.125, 4);
+        assert_eq!(idx, 0);
+        assert!(approx_eq(frac, 0.5), "got {frac}");
+
+        // Halfway through beat 1 → frac=0.5
+        let (idx, frac) = beat_state_from_bar_phase(0.375, 4);
+        assert_eq!(idx, 1);
+        assert!(approx_eq(frac, 0.5), "got {frac}");
+
+        // 3/4 through beat 3 → frac=0.75
+        let (idx, frac) = beat_state_from_bar_phase(0.9375, 4);
+        assert_eq!(idx, 3);
+        assert!(approx_eq(frac, 0.75), "got {frac}");
+    }
+
+    #[test]
+    fn test_3_4() {
+        // 3/4: beats at 0, 1/3, 2/3
+        let (idx, frac) = beat_state_from_bar_phase(0.0, 3);
+        assert_eq!(idx, 0);
+        assert!(approx_eq(frac, 0.0));
+
+        let (idx, frac) = beat_state_from_bar_phase(1.0 / 3.0, 3);
+        assert_eq!(idx, 1);
+        assert!(approx_eq(frac, 0.0), "got frac={frac}");
+
+        let (idx, frac) = beat_state_from_bar_phase(2.0 / 3.0, 3);
+        assert_eq!(idx, 2);
+        assert!(approx_eq(frac, 0.0), "got frac={frac}");
+
+        // Halfway through bar → beat 1, frac=0.5
+        let (idx, frac) = beat_state_from_bar_phase(0.5, 3);
+        assert_eq!(idx, 1);
+        assert!(approx_eq(frac, 0.5), "got frac={frac}");
+    }
+
+    #[test]
+    fn test_7_8() {
+        // 7/8: each beat is 1/7 of the bar
+        for b in 0..7usize {
+            let phase = b as f32 / 7.0;
+            let (idx, frac) = beat_state_from_bar_phase(phase, 7);
+            assert_eq!(idx, b, "7/8 beat_idx wrong at beat {b}");
+            assert!(approx_eq(frac, 0.0), "7/8 beat_frac should be 0 at beat boundary {b}, got {frac}");
+        }
+    }
+
+    #[test]
+    fn test_boundary_phase_zero() {
+        // phase=0 always means downbeat, frac=0
+        for beats in [2u32, 3, 4, 5, 6, 7, 8] {
+            let (idx, frac) = beat_state_from_bar_phase(0.0, beats);
+            assert_eq!(idx, 0, "beats={beats}");
+            assert!(approx_eq(frac, 0.0), "beats={beats}");
+        }
+    }
+
+    #[test]
+    fn test_boundary_phase_near_one() {
+        // phase just under 1.0 should be last beat, nearly done
+        let (idx, frac) = beat_state_from_bar_phase(0.9999, 4);
+        assert_eq!(idx, 3, "last beat of 4/4");
+        assert!(frac > 0.99, "frac should be near 1, got {frac}");
+
+        let (idx, _frac) = beat_state_from_bar_phase(0.9999, 7);
+        assert_eq!(idx, 6, "last beat of 7/8");
+    }
+
+    #[test]
+    fn test_phase_one_clamps_safely() {
+        // phase=1.0 is not produced by the audio thread but must not panic or
+        // return beat_idx == beats_per_bar.
+        for beats in [2u32, 3, 4, 7] {
+            let (idx, _frac) = beat_state_from_bar_phase(1.0, beats);
+            assert!((idx as u32) < beats, "beat_idx={idx} out of range for beats={beats}");
+        }
+    }
+
+    // ── segment_fill ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_segment_fill_past_current_future() {
+        // beat_idx=2, beat_frac=0.75, 4 beats
+        // seg 0 → 1.0 (past), seg 1 → 1.0 (past), seg 2 → 0.75 (current), seg 3 → 0.0 (future)
+        assert!(approx_eq(segment_fill(0, 2, 0.75), 1.0));
+        assert!(approx_eq(segment_fill(1, 2, 0.75), 1.0));
+        assert!(approx_eq(segment_fill(2, 2, 0.75), 0.75));
+        assert!(approx_eq(segment_fill(3, 2, 0.75), 0.0));
+    }
+
+    #[test]
+    fn test_segment_fill_downbeat() {
+        // At the downbeat (beat_idx=0, beat_frac=0.0), all segments except 0 are empty
+        assert!(approx_eq(segment_fill(0, 0, 0.0), 0.0));
+        assert!(approx_eq(segment_fill(1, 0, 0.0), 0.0));
+        assert!(approx_eq(segment_fill(3, 0, 0.0), 0.0));
+    }
+
+    #[test]
+    fn test_segment_fill_sum_invariant() {
+        // The invariant: sum(fills) == beat_idx + beat_frac == bar_phase * beats
+        // Test at several positions in 4/4 and 7/8.
+        let cases_4_4: &[(f32, u32)] = &[
+            (0.0, 4), (0.1, 4), (0.25, 4), (0.37, 4), (0.5, 4), (0.75, 4), (0.999, 4),
+        ];
+        for &(phase, beats) in cases_4_4 {
+            let (beat_idx, beat_frac) = beat_state_from_bar_phase(phase, beats);
+            let sum: f32 = (0..beats as usize)
+                .map(|b| segment_fill(b, beat_idx, beat_frac))
+                .sum();
+            let expected = beat_idx as f32 + beat_frac;
+            assert!(
+                approx_eq(sum, expected),
+                "sum invariant failed at phase={phase} beats={beats}: sum={sum} expected={expected}"
+            );
+        }
+
+        let cases_7_8: &[(f32, u32)] = &[
+            (0.0, 7), (1.0/7.0, 7), (3.0/7.0, 7), (6.5/7.0, 7),
+        ];
+        for &(phase, beats) in cases_7_8 {
+            let (beat_idx, beat_frac) = beat_state_from_bar_phase(phase, beats);
+            let sum: f32 = (0..beats as usize)
+                .map(|b| segment_fill(b, beat_idx, beat_frac))
+                .sum();
+            let expected = beat_idx as f32 + beat_frac;
+            assert!(
+                approx_eq(sum, expected),
+                "7/8 sum invariant failed at phase={phase}: sum={sum} expected={expected}"
+            );
+        }
+    }
+
+    // ── bar_phase produced by LoopProcessor ──────────────────────────────────
+
+    /// Simulate the bar_phase formula from `LoopProcessor::begin_buffer`.
+    fn simulated_bar_phase(transport: u64, samples_per_bar: u64) -> f32 {
+        if samples_per_bar == 0 {
+            return 0.0;
+        }
+        (transport % samples_per_bar) as f32 / samples_per_bar as f32
+    }
+
+    #[test]
+    fn test_bar_phase_always_in_range() {
+        // For any transport value and samples_per_bar, phase must be in [0, 1).
+        let spb_values = [100u64, 441, 4410, 44100, 88199];
+        for spb in spb_values {
+            for t in [0u64, 1, spb / 2, spb - 1, spb, spb + 1, spb * 3 + 7, u32::MAX as u64] {
+                let phase = simulated_bar_phase(t, spb);
+                assert!(
+                    (0.0..1.0).contains(&phase),
+                    "phase={phase} out of [0,1) for transport={t} spb={spb}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_bar_phase_resets_at_bar_boundary() {
+        // At transport = N * samples_per_bar, phase must be exactly 0.
+        let spb = 44100u64;
+        for n in [0u64, 1, 2, 100] {
+            let phase = simulated_bar_phase(n * spb, spb);
+            assert!(approx_eq(phase, 0.0), "phase={phase} at bar boundary n={n}");
+        }
+    }
+
+    #[test]
+    fn test_bar_phase_monotone_within_bar() {
+        // Within a bar, bar_phase strictly increases with transport.
+        let spb = 1000u64;
+        let mut prev = simulated_bar_phase(0, spb);
+        for t in 1..spb {
+            let cur = simulated_bar_phase(t, spb);
+            assert!(cur > prev, "phase not monotone at t={t}");
+            prev = cur;
+        }
+    }
+
+    #[test]
+    fn test_beat_state_consistent_across_tempos() {
+        // beat_state_from_bar_phase is tempo-independent: only bar_phase and
+        // beats_per_bar matter. Verify that two different tempos with the same
+        // fractional bar position yield the same beat state.
+        //
+        // 120 BPM, 4/4, sr=44100: samples_per_beat = 44100*60/120 = 22050
+        // 90 BPM,  4/4, sr=44100: samples_per_beat = 44100*60/90  = 29400
+        let sr = 44100u64;
+        let spb_120 = sr * 60 / 120 * 4; // samples_per_bar at 120 BPM 4/4
+        let spb_90  = sr * 60 / 90  * 4; // samples_per_bar at 90 BPM 4/4
+
+        // Both at "halfway through beat 2" — pick transport values accordingly.
+        // For 120 BPM: beat 2 starts at 2*22050, halfway = 2*22050 + 11025
+        let t_120 = 2 * (sr * 60 / 120) + (sr * 60 / 120) / 2;
+        // For 90 BPM: beat 2 starts at 2*29400, halfway = 2*29400 + 14700
+        let t_90  = 2 * (sr * 60 / 90)  + (sr * 60 / 90)  / 2;
+
+        let phase_120 = simulated_bar_phase(t_120, spb_120);
+        let phase_90  = simulated_bar_phase(t_90,  spb_90);
+
+        let (idx_120, frac_120) = beat_state_from_bar_phase(phase_120, 4);
+        let (idx_90,  frac_90)  = beat_state_from_bar_phase(phase_90,  4);
+
+        assert_eq!(idx_120, 2, "120 BPM beat_idx");
+        assert_eq!(idx_90,  2, "90 BPM beat_idx");
+        assert!(approx_eq(frac_120, 0.5), "120 BPM beat_frac={frac_120}");
+        assert!(approx_eq(frac_90,  0.5), " 90 BPM beat_frac={frac_90}");
+    }
+
+    #[test]
+    fn test_time_signature_change_mid_bar() {
+        // Simulate changing from 4/4 to 3/4 while bar_phase is mid-bar.
+        // The bar_phase itself doesn't change — only how many beats it divides into.
+        let bar_phase = 0.5f32;
+
+        // In 4/4: beat 2, frac 0.0
+        let (idx_4, frac_4) = beat_state_from_bar_phase(bar_phase, 4);
+        assert_eq!(idx_4, 2);
+        assert!(approx_eq(frac_4, 0.0));
+
+        // In 3/4: beat 1, frac 0.5
+        let (idx_3, frac_3) = beat_state_from_bar_phase(bar_phase, 3);
+        assert_eq!(idx_3, 1);
+        assert!(approx_eq(frac_3, 0.5), "got {frac_3}");
+
+        // In 6/8: beat 3, frac 0.0
+        let (idx_6, frac_6) = beat_state_from_bar_phase(bar_phase, 6);
+        assert_eq!(idx_6, 3);
+        assert!(approx_eq(frac_6, 0.0), "got {frac_6}");
     }
 }
