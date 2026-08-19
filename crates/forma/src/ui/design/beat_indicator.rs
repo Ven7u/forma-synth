@@ -1,9 +1,10 @@
 //! Beat indicator — Phase 7 design system component.
 //!
-//! Draws the time-signature label + two pulse dots into an allocated rect:
-//!   • Dot 1 (beat 1): pulses with `accent` color
-//!   • Dot 2 (beats 2+): pulses with `accent_beat` color
+//! Draws the time-signature label + one pulse dot per beat:
+//!   • Dot 0 (beat 1): pulses with `accent` color (downbeat)
+//!   • Dots 1+ (beats 2…N): pulse with `accent_beat` color
 //!
+//! Width is dynamic — scales with the beat count.
 //! All colors come from theme tokens; no hardcoded values.
 
 use egui::{Align2, Color32, FontId, Pos2, Rect, Response, Sense, Vec2};
@@ -11,6 +12,14 @@ use egui::{Align2, Color32, FontId, Pos2, Rect, Response, Sense, Vec2};
 use crate::ui::theme::SynthTheme;
 
 const DOT_R: f32 = 3.5;
+const DOT_GAP: f32 = 4.0;
+const SIG_W: f32 = 30.0;
+const SIG_GAP: f32 = 6.0;
+
+fn dots_width(beats: u8) -> f32 {
+    let n = beats.max(1) as f32;
+    n * DOT_R * 2.0 + (n - 1.0) * DOT_GAP
+}
 
 /// State passed to [`draw_beat_indicator`].
 pub struct BeatState {
@@ -28,13 +37,12 @@ pub struct BeatState {
     pub show_metronome: bool,
 }
 
-/// Allocates a fixed-width rect and draws the beat indicator into it.
+/// Allocates a rect sized for the current beat count and draws the indicator.
 ///
 /// Returns the `Response` so the caller can attach `.on_hover_text()` and a
 /// click handler for opening the metronome settings popover.
 pub fn draw_beat_indicator(ui: &mut egui::Ui, state: &BeatState, theme: &SynthTheme) -> Response {
-    // Fixed layout: 30 px sig text + 5 px gap + dot + 4 px gap + dot
-    let total_w = 30.0 + 5.0 + DOT_R * 2.0 + 4.0 + DOT_R * 2.0;
+    let total_w = SIG_W + SIG_GAP + dots_width(state.beats);
     let (rect, response) =
         ui.allocate_exact_size(Vec2::new(total_w, ui.available_height()), Sense::click());
 
@@ -61,44 +69,42 @@ pub fn paint_beat_indicator(
         theme.c(&theme.text_primary)
     };
     painter.text(
-        Pos2::new(rect.left() + 15.0, cy),
+        Pos2::new(rect.left() + SIG_W * 0.5, cy),
         Align2::CENTER_CENTER,
         format!("{}/{}", state.beats, state.denom),
         FontId::monospace(10.0),
         sig_col,
     );
 
-    // ── Dot envelope: power-2 decay from beat start ───────────────────────
-    let accent_t = if state.active && state.beat_idx == 0 {
-        (1.0_f32 - state.beat_frac).powf(2.2)
-    } else {
-        0.0
-    };
-    let beat_t = if state.active && state.beat_idx > 0 {
-        (1.0_f32 - state.beat_frac).powf(2.2)
-    } else {
-        0.0
-    };
-
-    // ── Dot 1: accent color (beat 1) ──────────────────────────────────────
+    // ── One dot per beat ──────────────────────────────────────────────────
     let accent_full = theme.c(&theme.accent);
-    let accent_dim = dim_color(accent_full, 0.12);
-    let dot1_x = rect.left() + 30.0 + 5.0 + DOT_R;
-    painter.circle_filled(
-        Pos2::new(dot1_x, cy),
-        DOT_R,
-        lerp_color(accent_dim, accent_full, accent_t),
-    );
-
-    // ── Dot 2: accent_beat color (beats 2+) ──────────────────────────────
     let beat_full = theme.c(&theme.accent_beat);
-    let beat_dim = dim_color(beat_full, 0.12);
-    let dot2_x = dot1_x + DOT_R * 2.0 + 4.0;
-    painter.circle_filled(
-        Pos2::new(dot2_x, cy),
-        DOT_R,
-        lerp_color(beat_dim, beat_full, beat_t),
-    );
+
+    let dots_x0 = rect.left() + SIG_W + SIG_GAP + DOT_R;
+
+    for i in 0..state.beats as usize {
+        let cx = dots_x0 + i as f32 * (DOT_R * 2.0 + DOT_GAP);
+        let center = Pos2::new(cx, cy);
+
+        let is_current = state.active && i == state.beat_idx;
+        let pulse = if is_current {
+            (1.0_f32 - state.beat_frac).powf(2.2)
+        } else {
+            0.0
+        };
+
+        let full_color = if i == 0 { accent_full } else { beat_full };
+        let dim_color = Color32::from_rgb(
+            (full_color.r() as f32 * 0.12) as u8,
+            (full_color.g() as f32 * 0.12) as u8,
+            (full_color.b() as f32 * 0.12) as u8,
+        );
+        let color = lerp_color(dim_color, full_color, pulse);
+
+        // Downbeat dot is slightly larger
+        let r = if i == 0 { DOT_R + 1.0 } else { DOT_R };
+        painter.circle_filled(center, r, color);
+    }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,13 +115,5 @@ fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
         (a.r() as f32 + (b.r() as f32 - a.r() as f32) * t) as u8,
         (a.g() as f32 + (b.g() as f32 - a.g() as f32) * t) as u8,
         (a.b() as f32 + (b.b() as f32 - a.b() as f32) * t) as u8,
-    )
-}
-
-fn dim_color(c: Color32, factor: f32) -> Color32 {
-    Color32::from_rgb(
-        (c.r() as f32 * factor) as u8,
-        (c.g() as f32 * factor) as u8,
-        (c.b() as f32 * factor) as u8,
     )
 }

@@ -8,6 +8,7 @@
 #![allow(dead_code)] // Phase 0/2 establish the API; callers land in Phase 5+.
 
 pub mod adsr_display;
+pub mod loop_pad;
 pub mod beat_indicator;
 pub mod chip;
 pub mod chord_pad;

@@ -220,6 +220,14 @@ impl SynthApp {
                     if ui.small_button("Clear").clicked() {
                         self.midi_monitor.clear();
                     }
+                    if ui
+                        .small_button("\u{2398} Copy")
+                        .on_hover_text("Copy all MIDI messages to clipboard")
+                        .clicked()
+                        && !self.midi_monitor.is_empty()
+                    {
+                        ui.ctx().copy_text(self.midi_monitor.join("\n"));
+                    }
                 });
             });
             ui.label(

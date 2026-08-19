@@ -20,11 +20,16 @@ impl SynthApp {
         // (a) the beat indicator stays animated while the sequencer or drums are playing, and
         // (b) a pending BAR-quantized launch fires at the correct next bar boundary rather
         //     than waiting a full extra bar because the phase had been frozen at 0.
+        // Also keep the clock running in Live mode so the loop grid beat dots animate.
+        let live_active =
+            self.app_mode == crate::ui::layout::AppMode::Live;
+
         let clock_active = self.metro_enabled
             || self.seq_pending_start
             || self.arp_pending_start
             || seq_playing
-            || drums_running;
+            || drums_running
+            || live_active;
 
         if clock_active {
             // beats per second: 4/4 at 120 BPM → 2 beats/s; 6/8 → 4 eighth-beats/s.
@@ -105,6 +110,38 @@ impl SynthApp {
                         self.seq
                             .current_step
                             .store(0, std::sync::atomic::Ordering::Relaxed);
+                    }
+
+                    ui.separator();
+
+                    // Click sound toggle
+                    let click_on = self.loop_audio.is_click_enabled();
+                    let click_label = if click_on {
+                        egui::RichText::new("CLK ON").color(accent)
+                    } else {
+                        egui::RichText::new("CLK OFF").color(text_sec)
+                    };
+                    if ui
+                        .button(click_label)
+                        .on_hover_text("Toggle audible metronome click.")
+                        .clicked()
+                    {
+                        self.loop_audio.set_click_enabled(!click_on);
+                    }
+
+                    // Click volume slider (only shown when click is on)
+                    if click_on {
+                        ui.label(egui::RichText::new("vol").small().color(text_sec));
+                        let mut vol = self.loop_audio.click_volume_value();
+                        if ui
+                            .add_sized(
+                                [60.0, 18.0],
+                                egui::Slider::new(&mut vol, 0.1_f32..=1.0).show_value(false),
+                            )
+                            .changed()
+                        {
+                            self.loop_audio.set_click_volume(vol);
+                        }
                     }
 
                     ui.separator();
