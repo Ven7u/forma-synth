@@ -8,12 +8,12 @@
 //! 5. Badge              — top-left state label in `font_body`
 //! 6. Countdown          — large centered beat-countdown for ArmedRec only
 //! 7. Length chips       — bottom-center 1/2/4 bar selectors
-//! 8. Hold progress bar  — top edge, sweeps red over 5s → clears pad
+//! 8. Hold progress bar  — top edge, sweeps red over 3s → clears pad
 //! 9. Border             — painted last so it's always crisp on top of every layer
 //!
 //! # Hold-to-delete
-//! Hold the primary button for 5 s to clear a pad. A red bar sweeps across the
-//! top edge as feedback. Releasing before 5 s cancels the hold. Right-click also
+//! Hold the primary button for 3 s to clear a pad. A red bar sweeps across the
+//! top edge as feedback. Releasing before 3 s cancels the hold. Right-click also
 //! clears immediately (power-user shortcut).
 
 use crate::audio_loops::LOOP_WAVE_BINS;
@@ -70,7 +70,7 @@ const PROGRESS_BAR_H: f32 = 6.0;
 const CHIP_H: f32 = 16.0;
 const CHIP_W: f32 = 24.0;
 const CHIP_GAP: f32 = 3.0;
-const HOLD_DELETE_SECS: f32 = 5.0;
+const HOLD_DELETE_SECS: f32 = 3.0;
 const HOLD_BAR_H: f32 = 4.0;
 
 // Sentinel stored in egui temp memory once the hold-delete fires, preventing

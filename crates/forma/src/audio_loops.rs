@@ -72,6 +72,22 @@ pub const LOOP_PADS: usize = 12;
 /// Number of peak-envelope bins stored per pad for the UI waveform preview.
 pub const LOOP_WAVE_BINS: usize = 48;
 
+// ── Worst-case sizing bounds ────────────────────────────────────────────────
+//
+// These mirror the ranges the UI actually exposes (BPM drag value in
+// main.rs, beats-per-bar drag value in metronome.rs, and the loop-length
+// chips in loop_grid.rs / loop_pad.rs) so pad buffers are pre-allocated
+// large enough that recording can never silently truncate.
+
+/// Slowest tempo reachable from the BPM control — matches the DragValue
+/// range in `main.rs` (`40..=600`).
+pub(crate) const MIN_BPM: f64 = 40.0;
+/// Widest time signature reachable from the beats-per-bar control — matches
+/// the DragValue range in `ui/metronome.rs` (`2..=8`).
+pub(crate) const MAX_BEATS_PER_BAR: u32 = 8;
+/// Longest loop length offered by the length chips.
+pub(crate) const MAX_LOOP_BARS: u32 = 4;
+
 /// Playback / record state of a single pad. Mirrors the UI enum; kept as `u8`
 /// for the shared atomic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -297,8 +313,12 @@ pub struct LoopProcessor {
 
 impl LoopProcessor {
     pub fn new(atomics: Arc<LoopGridAtomics>, sr: f64) -> Self {
-        // Pre-allocate ~8 s per pad — covers 4 bars of 4/4 down to ~60 BPM.
-        let cap = (sr * 8.0).ceil() as usize;
+        // Pre-allocate for the worst case reachable via the UI: slowest
+        // tempo × widest time signature × longest loop length. Sized once
+        // up front (never reallocated on the audio thread) so recording can
+        // never silently truncate — e.g. ≈48 s at 40 BPM, 8 beats/bar, 4 bars.
+        let seconds_per_bar = (60.0 / MIN_BPM) * MAX_BEATS_PER_BAR as f64;
+        let cap = (sr * seconds_per_bar * MAX_LOOP_BARS as f64).ceil() as usize;
         let pads = (0..LOOP_PADS).map(|_| Pad::new(cap)).collect();
         Self {
             atomics,
@@ -332,7 +352,11 @@ impl LoopProcessor {
         self.was_running = running;
 
         let bpm = f32::from_bits(self.atomics.bpm.load(Ordering::Relaxed)) as f64;
-        let bpm = bpm.clamp(20.0, 999.0);
+        // Lower bound matches MIN_BPM so pad buffers (sized for that worst
+        // case) can never be asked to hold more than they can — this can be
+        // hit at reads other than the UI's own 40..=600 slider, e.g. a
+        // hand-edited or corrupted save file.
+        let bpm = bpm.clamp(MIN_BPM, 999.0);
         let beats = self.atomics.beats_per_bar.load(Ordering::Relaxed).max(1) as f64;
         let samples_per_beat = self.sr * 60.0 / bpm;
         self.samples_per_beat = samples_per_beat.max(1.0) as u64;
@@ -379,13 +403,27 @@ impl LoopProcessor {
 
     /// Interpret a user tap given the pad's current state.
     fn on_tap(&mut self, i: usize) {
+        // Commit a recording early → play from next bar. Handled separately
+        // from the match below because it needs to call `commit_recording`
+        // (which owns `&mut self`) rather than just producing a next state.
+        if self.pads[i].state == PadState::Recording {
+            let rec_pos = self.pads[i].rec_pos;
+            if rec_pos == 0 {
+                // Nothing captured yet — treat like cancelling an arm.
+                self.pads[i].state = PadState::Empty;
+            } else {
+                self.commit_recording(i, rec_pos);
+                self.pads[i].state = PadState::ArmedPlay;
+            }
+            self.publish_state(i);
+            return;
+        }
+
         let has = self.pads[i].has_content();
         let next = match self.pads[i].state {
             PadState::Empty => PadState::ArmedRec,
             PadState::Stopped => PadState::ArmedPlay,
             PadState::Playing => PadState::ArmedStop,
-            // Commit a recording early → play from next bar.
-            PadState::Recording => PadState::ArmedPlay,
             // Cancel a pending arm.
             PadState::ArmedRec => PadState::Empty,
             PadState::ArmedPlay => {
@@ -396,6 +434,7 @@ impl LoopProcessor {
                 }
             }
             PadState::ArmedStop => PadState::Playing,
+            PadState::Recording => unreachable!("handled above"),
         };
         self.pads[i].state = next;
         self.publish_state(i);
@@ -527,10 +566,26 @@ impl LoopProcessor {
     }
 
     fn commit_recording(&mut self, i: usize, target: usize) {
+        // Declick: short linear fade in/out at the buffer edges so the
+        // hard-cut loop wrap in `process_frame` doesn't click when the
+        // recording doesn't happen to start/end near silence. ~5 ms, capped
+        // at half the buffer so it can't overlap itself on tiny loops (e.g.
+        // an early-committed recording).
+        let fade_len = ((self.sr * 0.005) as usize).min(target / 2);
+
         let p = &mut self.pads[i];
         p.len = target;
         p.pos = 0;
         p.state = PadState::Playing;
+        for s in 0..fade_len {
+            let gain = s as f32 / fade_len as f32;
+            let head = &mut p.buf[s];
+            head[0] *= gain;
+            head[1] *= gain;
+            let tail = &mut p.buf[target - 1 - s];
+            tail[0] *= gain;
+            tail[1] *= gain;
+        }
         // Publish length + envelope for the UI.
         self.atomics.length_samp[i].store(target as u32, Ordering::Relaxed);
         // Normalise envelope to 0..1 for display.
@@ -547,7 +602,12 @@ impl LoopProcessor {
 
 #[cfg(test)]
 mod tests {
-    use super::{beat_state_from_bar_phase, segment_fill};
+    use super::{
+        beat_state_from_bar_phase, segment_fill, LoopGridAtomics, LoopProcessor, PadState,
+        LOOP_WAVE_BINS, MAX_BEATS_PER_BAR, MAX_LOOP_BARS, MIN_BPM,
+    };
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
 
     const EPSILON: f32 = 1e-5;
 
@@ -806,5 +866,192 @@ mod tests {
         let (idx_6, frac_6) = beat_state_from_bar_phase(bar_phase, 6);
         assert_eq!(idx_6, 3);
         assert!(approx_eq(frac_6, 0.0), "got {frac_6}");
+    }
+
+    // ── LoopProcessor integration regression tests ─────────────────────────────
+    //
+    // These drive LoopProcessor the same way the audio callback does: one
+    // begin_buffer() per simulated hardware buffer, then process_frame() per
+    // sample. No hardware/cpal dependency — it's pure computation over
+    // LoopGridAtomics, so it runs fine as a plain unit test.
+
+    #[test]
+    fn test_early_commit_actually_commits_instead_of_going_silent() {
+        let atomics = LoopGridAtomics::new();
+        atomics.set_bpm(120.0);
+        atomics.set_beats_per_bar(4);
+        atomics.set_live_track(0);
+        atomics.set_running(true);
+
+        let sr = 1000.0;
+        let mut proc = LoopProcessor::new(Arc::clone(&atomics), sr);
+
+        // Arm + start recording pad 0.
+        atomics.tap(0);
+        proc.begin_buffer();
+
+        // Record 50 frames of a constant signal.
+        for _ in 0..50 {
+            proc.process_frame(1.0, 1.0);
+        }
+        assert_eq!(
+            atomics.pad_state(0),
+            PadState::Recording,
+            "should still be recording before the early-stop tap"
+        );
+
+        // Tap again mid-recording to stop early — this must commit what was
+        // captured so far, not just switch state and strand len at 0.
+        atomics.tap(0);
+        proc.begin_buffer();
+
+        // Run forward through the next bar boundary so ArmedPlay promotes to
+        // Playing (bar is 2000 samples at 120 BPM/4-4/sr=1000).
+        let mut promoted = false;
+        for _ in 0..4000 {
+            proc.process_frame(1.0, 1.0);
+            if atomics.pad_state(0) == PadState::Playing {
+                promoted = true;
+                break;
+            }
+        }
+
+        assert!(
+            promoted,
+            "pad never promoted to Playing after early-commit + bar boundary"
+        );
+        assert!(
+            atomics.pad_has_content(0),
+            "early-committed pad should have content, not be silently empty"
+        );
+        assert_eq!(
+            atomics.length_samp[0].load(Ordering::Relaxed),
+            50,
+            "committed length should match samples captured before the early-stop tap"
+        );
+
+        let mut wave = [0.0f32; LOOP_WAVE_BINS];
+        atomics.pad_wave(0, &mut wave);
+        assert!(
+            wave.iter().any(|&v| v > 0.0),
+            "waveform should be published for an early-committed recording"
+        );
+    }
+
+    #[test]
+    fn test_early_commit_with_nothing_captured_cancels_to_empty() {
+        // Tapping in the same instant recording starts (rec_pos == 0) should
+        // behave like cancelling an arm, not commit an empty loop.
+        //
+        // This state (Recording with rec_pos == 0) can't actually be reached
+        // through begin_buffer()/process_frame() alone in real operation —
+        // entering Recording always records at least one sample within that
+        // same process_frame() call, and every begin_buffer() in the real
+        // audio callback is followed by many process_frame() calls before
+        // the next one. So this exercises the on_tap branch directly, as a
+        // defensive-code regression test.
+        let atomics = LoopGridAtomics::new();
+        let mut proc = LoopProcessor::new(Arc::clone(&atomics), 1000.0);
+
+        proc.pads[0].state = PadState::Recording;
+        proc.pads[0].rec_pos = 0;
+
+        proc.on_tap(0);
+
+        assert_eq!(atomics.pad_state(0), PadState::Empty);
+        assert!(!atomics.pad_has_content(0));
+    }
+
+    #[test]
+    fn test_buffer_capacity_covers_full_ui_range_without_truncation() {
+        // Worst case reachable via the UI: slowest tempo, widest time
+        // signature, longest loop length. Before the capacity fix this
+        // combination silently truncated to the old fixed 8s cap.
+        let atomics = LoopGridAtomics::new();
+        atomics.set_bpm(MIN_BPM as f32);
+        atomics.set_beats_per_bar(MAX_BEATS_PER_BAR);
+        atomics.set_live_track(0);
+        atomics.set_running(true);
+        atomics.set_len_bars(0, MAX_LOOP_BARS);
+
+        let sr = 200.0;
+        let mut proc = LoopProcessor::new(Arc::clone(&atomics), sr);
+
+        let seconds_per_bar = (60.0 / MIN_BPM) * MAX_BEATS_PER_BAR as f64;
+        let expected_len = (sr * seconds_per_bar * MAX_LOOP_BARS as f64).ceil() as u32;
+
+        atomics.tap(0);
+        proc.begin_buffer();
+
+        let mut committed = false;
+        for _ in 0..(expected_len as usize * 2) {
+            proc.process_frame(1.0, 1.0);
+            if atomics.pad_state(0) == PadState::Playing {
+                committed = true;
+                break;
+            }
+        }
+
+        assert!(committed, "recording never completed naturally");
+        assert_eq!(
+            atomics.length_samp[0].load(Ordering::Relaxed),
+            expected_len,
+            "recorded length should match the full requested length, not be clamped short by a too-small cap"
+        );
+    }
+
+    #[test]
+    fn test_commit_applies_declick_fade_at_buffer_edges() {
+        let atomics = LoopGridAtomics::new();
+        atomics.set_bpm(120.0);
+        atomics.set_beats_per_bar(4);
+        atomics.set_live_track(0);
+        atomics.set_running(true);
+        atomics.set_len_bars(0, 1);
+
+        let sr = 1000.0;
+        let mut proc = LoopProcessor::new(Arc::clone(&atomics), sr);
+
+        atomics.tap(0);
+        proc.begin_buffer();
+
+        // 1 bar at 120 BPM/4-4/sr=1000 = 2000 samples.
+        let mut committed = false;
+        for _ in 0..4000 {
+            proc.process_frame(1.0, 1.0);
+            if atomics.pad_state(0) == PadState::Playing {
+                committed = true;
+                break;
+            }
+        }
+        assert!(committed, "recording never completed naturally");
+
+        let pad = &proc.pads[0];
+        let target = pad.len;
+        assert_eq!(target, 2000);
+        let fade_len = ((sr * 0.005) as usize).min(target / 2);
+        assert_eq!(fade_len, 5, "sanity-check the expected fade length at sr=1000");
+
+        assert_eq!(pad.buf[0], [0.0, 0.0], "first sample should be fully faded to silence");
+        assert_eq!(
+            pad.buf[target - 1],
+            [0.0, 0.0],
+            "last sample should be fully faded to silence"
+        );
+        // Mid-ramp sample: gain = 2/5 = 0.4.
+        assert!(
+            (pad.buf[2][0] - 0.4).abs() < EPSILON,
+            "got {}",
+            pad.buf[2][0]
+        );
+        // Just past the fade zone on each edge should be untouched.
+        assert_eq!(pad.buf[fade_len], [1.0, 1.0], "sample just past the fade-in zone should be untouched");
+        assert_eq!(
+            pad.buf[target - fade_len - 1],
+            [1.0, 1.0],
+            "sample just before the fade-out zone should be untouched"
+        );
+        // Middle of the loop should be completely unaffected.
+        assert_eq!(pad.buf[target / 2], [1.0, 1.0]);
     }
 }
